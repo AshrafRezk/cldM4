@@ -16,11 +16,12 @@ Clicking **Build** in the original planning chat would have started coding on **
 
 On the Mac Mini:
 
-1. Install Cursor. Clone `https://github.com/AshrafRezk/cldM4.git`.
-2. Open **this folder** as the workspace.
-3. New Agent chat. Paste the prompt for **Phase A only** from [docs/cursor-phases.md](docs/cursor-phases.md).
-4. When Phase A definition of done is green, commit, then Phase B, and so on.
+1. Install Cursor **Pro Plus**. Clone `https://github.com/AshrafRezk/cldM4.git`.
+2. Open **this folder** as the workspace. Apply [docs/cursor-settings.md](docs/cursor-settings.md) (Privacy Mode, Auto **off**, Claude Opus 5 for A/B/D/E, no auto-run terminal).
+3. New **Agent** chat. Model = Opus 5. Attach `@PLAN.md`. Paste the prompt for **Phase A only** from [docs/cursor-phases.md](docs/cursor-phases.md).
+4. When Phase A definition of done is green, commit, **new chat**, then Phase B, and so on.
 5. Never ask one chat to “build the whole product.” Context and RAM on the Mini will thrash.
+6. Project rule `.cursor/rules/cloudiator.mdc` must stay Always-on.
 
 Do **not** implement from a laptop and expect Metal/Vision/Ollama to be production-tested. You may write TypeScript dashboard code anywhere; **worker + models + LaunchAgents must be verified on the Mini.**
 

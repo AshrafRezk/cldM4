@@ -11,10 +11,11 @@ A Mac Mini M4 **24GB** is the AI worker. A small cloud control plane (Netlify da
 ## If you are on the Mac Mini M4 and ready to build
 
 1. Clone this repo (or `git pull`).
-2. Open the folder in Cursor.
-3. Read **[PLAN.md](PLAN.md) end to end** before generating code.
-4. Execute **one phase at a time** using the copy-paste prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**.
-5. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
+2. Open **this folder** in Cursor (Pro Plus / $60).
+3. Configure Cursor using **[docs/cursor-settings.md](docs/cursor-settings.md)** (Opus vs Sonnet vs Grok, Privacy Mode, Auto off, no YOLO).
+4. Read **[PLAN.md](PLAN.md)** end to end before generating code.
+5. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`.
+6. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
 
 ## If you are not on the Mini
 
@@ -25,6 +26,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | File | Use |
 | --- | --- |
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
+| [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |
 | [docs/cursor-phases.md](docs/cursor-phases.md) | Exact Cursor prompts per phase + definition of done |
 | [docs/env.md](docs/env.md) | Every environment variable |
 | [docs/schema.md](docs/schema.md) | Neon / Postgres DDL |

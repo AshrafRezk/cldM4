@@ -1,16 +1,26 @@
 # Cursor phase prompts (Mac Mini)
 
-Use a **new Agent chat per phase**. First message of every chat:
+Full picker / Privacy / spend-cap setup: **[cursor-settings.md](cursor-settings.md)**.
+
+Use a **new Agent chat per phase**. Set **Agent** mode. **Auto off.** Attach `@PLAN.md` `@docs/cursor-phases.md`. First message of every chat:
 
 ```
-You are implementing Cloudiator from this repo. Read PLAN.md and the docs/ files. Do not skip RAM rules. Do not use Docker for Ollama. Do not put inference in Netlify. Work only on the current phase. Commit when the phase definition of done is met if I ask you to commit.
+You are implementing Cloudiator from this repo. Read PLAN.md, docs/cursor-settings.md, and the docs/ files. Do not skip RAM rules. Do not use Docker for Ollama. Do not put inference in Netlify. Work only on the current phase. Commit when the phase definition of done is met if I ask you to commit.
 ```
 
 Then paste the phase block.
 
+| Phase | Model dropdown |
+| --- | --- |
+| A, B, D, E | Claude Opus 5 (latest Opus) |
+| C, D2, F | Claude Sonnet 5 (latest Sonnet) |
+| D3 and bugfixes | Grok 4.6 or Composer 2.5 |
+
 ---
 
 ## Phase A — Local OpenAI shim + RAM lock
+
+**Model: Claude Opus 5.**
 
 ```
 Phase A only.
@@ -35,6 +45,8 @@ Definition of done: curl chat on loopback returns a completion; ollama ps shows 
 
 ## Phase B — Neon keys + Cloudflare Tunnel
 
+**Model: Claude Opus 5.**
+
 ```
 Phase B only. Do not start the dashboard UI except a stub if needed.
 
@@ -53,6 +65,8 @@ Definition of done: from a device that is not the Mini, HTTPS chat with a real k
 
 ## Phase C — Netlify dashboard
 
+**Model: Claude Sonnet 5.**
+
 ```
 Phase C only.
 
@@ -69,6 +83,8 @@ Definition of done: I can mint a Salesforce-engineer key, download OAS, see a us
 ---
 
 ## Phase D — Tool registry + OCR + maps
+
+**Model: Claude Opus 5.**
 
 ```
 Phase D only.
@@ -88,6 +104,8 @@ Definition of done: OCR a screenshot without loading extra weights; geocode work
 
 ## Phase D2 — Charts, stats, DuckDB
 
+**Model: Claude Sonnet 5.**
+
 ```
 Phase D2 only.
 
@@ -105,6 +123,8 @@ Definition of done: CSV in → SQL group by → PNG chart URL. LLM is not used f
 
 ## Phase D3 — Image ops, docs, diagrams, utilities
 
+**Model: Grok 4.6 (or Claude Sonnet 5).**
+
 ```
 Phase D3 only. Do not add FLUX.
 
@@ -116,6 +136,8 @@ Definition of done: HEIC converts; QR encode/decode; PDF text extract; mermaid �
 ---
 
 ## Phase E — FLUX + jobs
+
+**Model: Claude Opus 5.**
 
 ```
 Phase E only.
@@ -130,6 +152,8 @@ Definition of done: image job succeeds; memory_pressure normal afterwards; 9B an
 ---
 
 ## Phase F — Salesforce pack + optional Whisper
+
+**Model: Claude Sonnet 5.**
 
 ```
 Phase F only.
