@@ -1,5 +1,7 @@
 # Mac Mini host setup
 
+**Before this file:** finish [hardware-and-network.md](hardware-and-network.md) (physical box, Ethernet, no port forwards, accounts). This file is Homebrew, Ollama.app, LaunchAgents, and the tunnel daemon.
+
 Run on the **M4 Mini**, not a laptop. Work top to bottom; the gates near the top exist because skipping them fails much later and much less obviously.
 
 ## 0. Architecture gate — run this first

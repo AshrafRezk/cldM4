@@ -11,12 +11,13 @@ A Mac Mini M4 **24GB** is the AI worker. A small cloud control plane (Netlify da
 ## If you are on the Mac Mini M4 and ready to build
 
 1. Clone this repo (or `git pull`).
-2. Open **this folder** in Cursor (Pro Plus / $60).
-3. Configure Cursor using **[docs/cursor-settings.md](docs/cursor-settings.md)** (Opus vs Sonnet vs Grok, Privacy Mode, Auto off, no YOLO).
-4. Read **[PLAN.md](PLAN.md)** end to end before generating code.
-5. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. Phase B cannot pass with blanks in it.
-6. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`. Each phase lists the files that must exist, the commands that prove it, and how to roll back.
-7. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
+2. Do **physical + internet first:** **[docs/hardware-and-network.md](docs/hardware-and-network.md)** (Ethernet, no port forwards, FileVault/UPS, accounts, phone-on-cellular test). Then **[docs/host-setup.md](docs/host-setup.md)** (Homebrew, Ollama.app, LaunchAgents).
+3. Open **this folder** in Cursor (Pro Plus / $60).
+4. Configure Cursor using **[docs/cursor-settings.md](docs/cursor-settings.md)** (Opus vs Sonnet vs Grok, Privacy Mode, Auto off, no YOLO).
+5. Read **[PLAN.md](PLAN.md)** end to end before generating code.
+6. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. Phase B cannot pass with blanks in it.
+7. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`. Each phase lists the files that must exist, the commands that prove it, and how to roll back.
+8. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
 
 ## If you are not on the Mini
 
@@ -27,6 +28,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | File | Use |
 | --- | --- |
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
+| [docs/hardware-and-network.md](docs/hardware-and-network.md) | **Day 0.** Physical Mini, Ethernet, CGNAT, no port forwards, accounts, prove-internet commands |
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
 | [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |

@@ -29,9 +29,9 @@ Every phase below has four parts and none of them are optional:
 
 ## Phase 0 — operator inputs (human, no agent)
 
-Not a Cursor phase. Fill in [operator-checklist.md](operator-checklist.md) sections 1–6 before Phase B, and section 0 before Phase A.
+Not a Cursor phase. First complete [hardware-and-network.md](hardware-and-network.md) (desk, Ethernet, CGNAT, no WAN forwards). Then fill in [operator-checklist.md](operator-checklist.md) sections 1–6 before Phase B, and section 0 before Phase A.
 
-**Prove it:** no blanks in §§1–5, exactly one boot policy ticked in §6, and you can explain what Bot Fight Mode does to a Salesforce callout.
+**Prove it:** [hardware-and-network.md](hardware-and-network.md) §9 sign-off is ticked; no blanks in operator-checklist §§1–5; exactly one boot policy ticked in §6; you can explain what Bot Fight Mode does to a Salesforce callout.
 
 ---
 

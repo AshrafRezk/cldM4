@@ -1,5 +1,7 @@
 # Operator checklist — fill this in BEFORE Phase B
 
+Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.
+
 This is the human's job, not the agent's. Every blank below becomes a value in `~/Cloudiator/.env`, a Cloudflare setting, or a Salesforce config field. **Phase B cannot pass its definition of done with blanks in sections 1–5.**
 
 Fill it in, keep this file in the repo with placeholders, and keep the **real** values in a password manager. Do not commit real values — `git diff` this file before every commit.

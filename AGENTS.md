@@ -1,6 +1,6 @@
 # Agent notes
 
-Read `PLAN.md` and `docs/cursor-settings.md` before generating code. `docs/plan-review-findings.md` explains why the harder constraints exist.
+Read `PLAN.md`, `docs/hardware-and-network.md`, and `docs/cursor-settings.md` before generating code. `docs/plan-review-findings.md` explains why the harder constraints exist.
 
 - Mac Mini M4 24GB appliance. One Metal model at a time.
 - Execute only the current phase from `docs/cursor-phases.md`. Each phase lists files, proof commands, and rollback.

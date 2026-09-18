@@ -20,6 +20,7 @@ Clicking **Build** in the original planning chat would have started coding on **
 
 On the Mac Mini:
 
+0. **Hardware and internet first:** [docs/hardware-and-network.md](docs/hardware-and-network.md) (right chip/RAM, Ethernet, no WAN port forwards, Cloudflare zone, phone-on-cellular test). Then [docs/host-setup.md](docs/host-setup.md).
 1. Install Cursor **Pro Plus**. Clone `https://github.com/AshrafRezk/cldM4.git`.
 2. Open **this folder** as the workspace. Apply [docs/cursor-settings.md](docs/cursor-settings.md) (Privacy Mode, Auto **off**, Claude Opus 5 for A/B/D/E, no auto-run terminal).
 3. New **Agent** chat. Model = Opus 5. Attach `@PLAN.md`. Paste the prompt for **Phase A only** from [docs/cursor-phases.md](docs/cursor-phases.md).
