@@ -28,4 +28,6 @@ Python/JS packages keep their own licenses (BSD/MIT/Apache typically). `ocrmac` 
 
 ## Salesforce customer data
 
-Sending org data to a home Mini is a **data processing** decision. Default `log_prompts=false`. Document Mini location, disk encryption (FileVault **must** be on), and who can SSH to the Mini.
+Sending org data to a home Mini is a **data processing** decision. Default `log_prompts=false`. Document Mini location, disk encryption, and who can SSH to the Mini.
+
+FileVault should be on. Be aware that this has an operational cost rather than pretending it does not: with FileVault enabled, a cold boot stops at the pre-boot unlock screen, so no LaunchAgent runs and the appliance stays down until a human types the password. Choose and record a boot policy in `docs/operator-checklist.md` §6. If you decide to run without FileVault, write down the compensating physical control — "we forgot" is not one.

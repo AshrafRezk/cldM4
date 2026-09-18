@@ -14,8 +14,9 @@ A Mac Mini M4 **24GB** is the AI worker. A small cloud control plane (Netlify da
 2. Open **this folder** in Cursor (Pro Plus / $60).
 3. Configure Cursor using **[docs/cursor-settings.md](docs/cursor-settings.md)** (Opus vs Sonnet vs Grok, Privacy Mode, Auto off, no YOLO).
 4. Read **[PLAN.md](PLAN.md)** end to end before generating code.
-5. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`.
-6. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
+5. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. Phase B cannot pass with blanks in it.
+6. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`. Each phase lists the files that must exist, the commands that prove it, and how to roll back.
+7. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
 
 ## If you are not on the Mini
 
@@ -26,8 +27,11 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | File | Use |
 | --- | --- |
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
+| [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
+| [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |
-| [docs/cursor-phases.md](docs/cursor-phases.md) | Exact Cursor prompts per phase + definition of done |
+| [docs/plan-review-prompt.md](docs/plan-review-prompt.md) | Opus 5 prompt to re-audit the plan (already run once; keep for later) |
+| [docs/cursor-phases.md](docs/cursor-phases.md) | Exact Cursor prompts per phase + files, proof commands, and rollback |
 | [docs/env.md](docs/env.md) | Every environment variable |
 | [docs/schema.md](docs/schema.md) | Neon / Postgres DDL |
 | [docs/host-setup.md](docs/host-setup.md) | macOS, Homebrew, Ollama, LaunchAgents, tunnel |
@@ -41,5 +45,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 - OpenAI-compatible API **plus** Cloudiator extras (usage, jobs, per-key OpenAPI, tools).
 - **No video generation** in v1.
 - Inference **never** runs on Netlify (timeouts).
-- One Metal-heavy model at a time on 24GB.
+- One Metal-heavy model at a time on 24GB, enforced by the worker's scheduler and `uvicorn --workers 1`.
 - Libraries first, models last.
+- The FastAPI worker is the only thing that validates API keys. Cloudflare does TLS, DDoS, and a WAF skip rule — Salesforce Apex cannot answer a bot challenge.
+- Admin and dashboard sit behind Cloudflare Access. No shared password anywhere.

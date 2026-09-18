@@ -9,6 +9,8 @@ Official pools: [Models & Pricing](https://cursor.com/docs/models-and-pricing).
 
 Opus is expensive (~$5 input / $25 output per million tokens). Use it where the spec can be violated. Do not use it to write the 12th Pillow helper.
 
+**Plan review vs build:** to re-audit the bible, use **Claude Opus 5 + Max Mode** and paste [plan-review-prompt.md](plan-review-prompt.md). That pass already landed in this repo (`docs/plan-review-findings.md`). For **building**, use the phase table below — do not mix a second full-plan rewrite into Phase A.
+
 ---
 
 ## 1. One-time setup on the Mac Mini
@@ -34,7 +36,7 @@ Do not also pay for a separate Claude.ai subscription unless you want chat outsi
 1. Click **New Chat**.
 2. Set the mode dropdown to **Agent**.
 3. Set the **model** from the table below (do not leave Auto).
-4. Attach context: type `@PLAN.md` and `@docs/cursor-phases.md`. For later phases also `@docs/host-setup.md` / `@docs/schema.md` / `@docs/salesforce.md` as relevant.
+4. Attach context: type `@PLAN.md` and `@docs/cursor-phases.md`. For later phases also `@docs/host-setup.md` / `@docs/schema.md` / `@docs/salesforce.md` / `@docs/env.md` as relevant. Attach `@docs/plan-review-findings.md` if the agent starts arguing with a rule — it explains *why* each constraint exists.
 5. Paste the **shared opener** plus **that phase only** from `docs/cursor-phases.md`.
 6. Let it run until **definition of done**. Then you review: `curl` health, `ollama ps` (one model), no Docker.
 7. Ask it to **commit** that phase. Then **new chat** for the next phase. Never “keep going through D3” in the same thread.
@@ -80,8 +82,9 @@ Cursor’s own note: daily Agent users often land **$60–$100/mo**. Pro Plus is
 ## 5. Chat hygiene (this is what makes it “great”)
 
 - One phase, one PR-sized commit, one green DoD.
-- If the agent proposes Docker, 70B, Netlify inference, or loading FLUX beside 9B: stop, point at `PLAN.md`, retry. Do not “let it cook.”
-- After every GPU-ish change: `ollama ps` must show **at most one** model.
+- If the agent proposes Docker, 70B, Netlify inference, loading FLUX beside the chat model, `--workers 4`, a shared admin password, or letting Ollama run the tool loop: stop, point at `PLAN.md`, retry. Do not “let it cook.”
+- After every GPU-ish change: `ollama ps` must show **at most one generative model** (plus `nomic-embed-text`, which is expected).
+- After every worker change: `pgrep -fc "uvicorn app.main:app"` must be **1**.
 - After Phase B: test HTTPS from a **phone**, not only localhost.
 - Keep the Mini awake (see `docs/host-setup.md`). Cursor Agent cannot fix a sleeping origin.
 

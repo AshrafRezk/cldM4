@@ -1,16 +1,20 @@
----
-description: Cloudiator non-negotiables for every Agent session on the Mac Mini
-alwaysApply: true
----
-
 # Cloudiator
 
 You are building a Mac Mini M4 24GB inference appliance. `PLAN.md` wins over blogs.
 
 - One phase per chat. Stop at that phase's definition of done.
 - Do not use Docker for Ollama/MLX. Official Ollama.app, bind worker to `127.0.0.1:8080` only.
+- `uvicorn --workers 1` always. `metal_lock` is in-process; a second worker means a second scheduler.
+- `OLLAMA_MAX_LOADED_MODELS=2`: slot 1 = one generative model, slot 2 = `nomic-embed-text` only.
+- Always send an explicit `keep_alive`: `-1` for the hot model and embedder, `0` for everything else.
+- Exclusive slot work goes in `try/finally`: kill orphans, reload the hot model, release the lock.
 - Never tunnel or expose `11434`. Never put inference in Netlify Functions.
-- One Metal-heavy model at a time. Do not `ollama pull` 70B, 120B, or default-hot 27B.
+- One Metal-heavy model at a time. Do not `ollama pull` 70B, 120B, or default-hot 27B. `gpt-oss:20b` is Phase E only.
+- Python 3.11 arm64 only. Abort on x86_64/Rosetta.
+- FastAPI owns the tool loop: max 8 iterations, 75s budget, scope re-checked every call.
+- Vision `image_url` is SSRF-exposed: https/data only, resolve DNS, block private ranges, downscale to 1024px.
+- Admin and dashboard are behind Cloudflare Access. No shared password, no login form.
 - Libraries first (OCR, DuckDB, charts, Pillow). Models last. No unrestricted `eval`.
-- Salesforce keys: `stream=false`, `max_tokens=512`, Apex timeout 120000, jobs for FLUX/20B.
+- DuckDB is locked down by configuration (`enable_external_access=false`), not by a keyword regex.
+- Salesforce keys: `stream=false`, `max_tokens=512`, Apex timeout 120000, jobs for FLUX/20B, artifact URLs never base64.
 - Do not commit `.env` or API keys. Artifacts stay under `~/Cloudiator/`, not git.
