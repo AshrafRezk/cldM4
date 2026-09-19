@@ -4,7 +4,7 @@ This is the living status board. Operator blanks still live in [operator-checkli
 
 **Last updated:** 2026-09-19  
 **Current phase:** A (code in git; Mini proofs not yet run)  
-**This environment:** Linux x86_64 Cloud Agent — **not** the Mac Mini M4. Metal, Apple Vision, Ollama.app, and LaunchAgents cannot be production-tested here.
+**This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, LAN `192.168.100.51`, Screen Sharing on (Admins only). **Wi-Fi only** — Ethernet skipped. Display connected; auto-login still **Off**.
 
 Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashboards)**
 
@@ -14,19 +14,36 @@ Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashbo
 
 These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks. The agent cannot complete them from this cloud VM.
 
-### Day 0 — hardware and Mac Mini (before / during Phase A)
+### Day 0 — hardware and Mac Mini
 
-Do [hardware-and-network.md](hardware-and-network.md) top to bottom, then [host-setup.md](host-setup.md).
+#### Proven from screenshots (2026-09-19)
 
-- [ ] Confirm **Mac mini M4, 24 GB**, `uname -m` → `arm64`, **≥ 120 GB free**
-- [ ] Ethernet, DHCP reservation, Wi-Fi off, **no WAN port forwards** for 22 / 8080 / 11434
-- [ ] Energy: computer must not sleep; set time automatically
-- [ ] Tick **exactly one** FileVault/boot policy in operator-checklist **§6** (A recommended: FileVault + UPS + manual unlock)
-- [ ] Automatic login for the appliance user (LaunchAgents will not start without a GUI session)
+- [x] Right machine: **Mac mini 2024, Apple M4, 24 GB**
+- [x] Disk: **443 GB free** of 494 GB (need ≥ 120 GB)
+- [x] Display connected (screen-only desk is OK)
+- [x] Energy: prevent sleep when display off, wake for network, start up after power failure
+- [x] Local hostname `cloudiator.local`
+- [x] Appliance user `Cloudiator` exists (Admin) plus `Ashraf` (Admin)
+- [x] Screen Sharing **LAN only** at `192.168.100.51`, Administrators only
+- [x] **Ethernet skipped on purpose.** Wi-Fi-only accepted — [hardware-and-network.md](hardware-and-network.md) §3a. Do not turn Wi-Fi off.
+
+#### Still you, on the Mini (hardware/OS leftovers)
+
+A screen-only + Wi-Fi desk is enough to continue. These four are the remaining hardware/OS items that actually block unattended Phase A:
+
+- [ ] **Automatic login as `Cloudiator`** (Users & Groups → Automatically log in as). It is **Off** today. LaunchAgents and Ollama.app will not come back after a reboot until this is On.
+- [ ] Tick **exactly one** FileVault/boot policy in operator-checklist **§6** (A / B / C). A keyboard must stay in the room: Screen Sharing cannot type at the FileVault pre-boot screen.
+- [ ] Date & Time → **Set time automatically**
+- [ ] Router: DHCP reservation so `192.168.100.51` does not change; confirm **no WAN port forwards** for 22 / 5900 / 8080 / 11434
+- [ ] Optional: UPS yes/no; confirm Mini sits open (not in a cabinet)
+- [ ] Terminal: `uname -m` → `arm64` (Terminal must not be “Open using Rosetta”)
+
+#### Then software on the Mini (Phase A proofs)
+
 - [ ] Install **Cursor Pro Plus** on the Mini, Privacy Mode on, Auto off ([cursor-settings.md](cursor-settings.md))
 - [ ] Install **official Ollama.app** (not `brew install ollama`)
 - [ ] Copy repo `.env.example` → `~/Cloudiator/.env`, `chmod 600`, **outside git**
-- [ ] Run `scripts/mac-setup.sh` **on the Mini** (arm64 gate, brew deps, exclusions, newsyslog, `qwen3.5:9b` + `nomic-embed-text` pulls only)
+- [ ] Run `scripts/mac-setup.sh` **on the Mini** (arm64 gate, brew deps, exclusions, newsyslog, `qwen3.5:9b` + `nomic-embed-text` pulls only). Overnight is fine on Wi-Fi (~7 GB).
 - [ ] Run each binary once in Terminal so Sequoia **Local Network** permission is granted, then `scripts/install-launchagents.sh`
 - [ ] Set the Ollama.app env from `infra/launchagents/ollama.env` (`OLLAMA_MAX_LOADED_MODELS=2`)
 - [ ] Run the Phase A **Prove it** commands in [cursor-phases.md](cursor-phases.md) and paste results into operator-checklist **§8–9**
@@ -56,7 +73,7 @@ Do [hardware-and-network.md](hardware-and-network.md) top to bottom, then [host-
 
 | Phase | What | Status |
 | --- | --- | --- |
-| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | **You** — checklist §§1–6 still blank |
+| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware SKU **green**. **You:** auto-login, FileVault tick, accounts §§1–5 |
 | **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |

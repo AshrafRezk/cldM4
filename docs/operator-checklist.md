@@ -2,7 +2,7 @@
 
 **Execution tracker:** [progress.md](progress.md) (done vs not done vs manual). This file stays the fill-in-the-blanks form. Do not commit real secrets.
 
-**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Sections **0–7 and 9–11 below are still yours.** Section 8: the `qwen3.5:9b` tag exists on ollama.com (tools + image input, ~6.6 GB) but is **not installed on your Mini until you pull it**.
+**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Hardware SKU is confirmed (M4 24 GB, 443 GB free, Wi-Fi-only). Sections **1–5** (cloud accounts) and **§6 auto-login / FileVault** are still yours. Section 8: the `qwen3.5:9b` tag exists on ollama.com but is **not installed on your Mini until you pull it**.
 
 Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.
 
@@ -16,8 +16,8 @@ Legend: `[ ]` not done · `[x]` done · `n/a` deliberately skipped (write why).
 
 ## 0. Before you touch the Mini (15 min)
 
-- [ ] Mini is on wired Ethernet if possible (tunnel stability + first weight downloads are tens of GB).
-- [ ] Free disk measured: `df -h /` → **______ GB free**. Need **≥ 120 GB** free for the full v1 model set. Below 80 GB, plan to skip FLUX 8-bit and `gpt-oss:20b`.
+- [x] **n/a Ethernet.** Operator: wired Ethernet not feasible. Mini stays on Wi-Fi (`192.168.100.51`). See [hardware-and-network.md](hardware-and-network.md) §3a. Do **not** turn Wi-Fi off.
+- [x] Free disk measured: About This Mac → Storage → **443 GB free** of 494 GB (2026-09-19). Comfortable for full v1.
 - [ ] Mini is not in a closed cabinet.
 - [ ] UPS decision: ☐ have one ☐ accepting the risk (see §6, FileVault).
 - [ ] Network time is on: System Settings → General → Date & Time → *Set time and date automatically*. Artifact URL signatures expire against this clock.
@@ -149,12 +149,12 @@ Pick exactly one and tick it:
 
 Then, regardless of choice:
 
-- [ ] Automatic login enabled for the appliance account (System Settings → Users & Groups → Automatic login). Without a GUI session, LaunchAgents and Ollama.app do not run.
-- [ ] Energy: prevent sleep when display is off, wake for network access, start up after a power failure. Display may sleep; the **computer must not**.
-- [ ] Appliance account is a **standard-privileged daily account** with a separate admin account for setup, or a documented reason it is not.
-- [ ] Screen lock timeout set, and you know the unlock password is required after every power cut (options A and B).
+- [ ] Automatic login enabled for the appliance account **`Cloudiator`** (System Settings → Users & Groups → Automatic login). Screenshot 2026-09-19 showed this **Off**. Without a GUI session, LaunchAgents and Ollama.app do not run after reboot.
+- [x] Energy: prevent sleep when display is off, wake for network access, start up after a power failure (screenshot 2026-09-19). Display may sleep; the **computer must not**.
+- [x] **n/a standard-user split.** Both `Cloudiator` and `Ashraf` are Admin. Appliance user is `Cloudiator`. Documented deviation from “standard daily account + separate admin”.
+- [ ] Screen lock timeout set, and you know the unlock password is required after every power cut (options A and B). Screen Sharing cannot unlock FileVault at the pre-boot screen — a keyboard on the desk matters even if a monitor is the only cable besides power.
 
-Who is allowed to log in / SSH to this Mini: ____________________
+Who is allowed to log in / SSH to this Mini: Users `Cloudiator` and `Ashraf` (Admins). Screen Sharing: Administrators only, LAN `192.168.100.51`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Hardware and internet runbook
 
-**Read this on the Mac Mini before writing code.** Software in `PLAN.md` assumes this box is powered, awake, on Ethernet, and reachable from the public internet **only** through Cloudflare Tunnel. If this page is wrong, every later phase looks like an application bug.
+**Read this on the Mac Mini before writing code.** Software in `PLAN.md` assumes this box is powered, awake, on the LAN, and reachable from the public internet **only** through Cloudflare Tunnel. Ethernet is preferred; **this Mini is Wi-Fi-only** (operator exception, §3a). If this page is wrong, every later phase looks like an application bug.
 
 Operator blanks (domain, accounts): [operator-checklist.md](operator-checklist.md).  
 Software install after this page is green: [host-setup.md](host-setup.md).
@@ -21,10 +21,11 @@ On the Mini: Apple menu → About This Mac.
 Write it down:
 
 ```
-Chip: ________   Memory: ________ GB   Disk: ________ GB   Serial: ________
+Chip: Apple M4   Memory: 24 GB   Disk: 494 GB (443 GB free, 2026-09-19)   Serial: F47YLJF2M
+Name: Ashraf's Mac mini (2024)   Local hostname: cloudiator.local   LAN: 192.168.100.51 (Wi-Fi)
 ```
 
-If this is an M4 **Pro** 24 GB, the plan still applies (same memory ceiling). If it is 16 GB or Intel, stop.
+Recorded from About This Mac + Storage + Sharing screenshots, 2026-09-19. This **is** the right SKU. If this is an M4 **Pro** 24 GB, the plan still applies (same memory ceiling). If it is 16 GB or Intel, stop.
 
 ---
 
@@ -43,8 +44,8 @@ The 2024 Mac mini M4 has **HDMI, USB-C, Gigabit Ethernet** (10 GbE is a configur
 Plug in, in this order:
 
 1. **Power brick into a wall outlet or a UPS.** Not a cheap USB-C hub “power passthrough.”
-2. **Ethernet** from Mini Ethernet port → router LAN port. Prefer this over Wi-Fi for the tunnel and for 20–50 GB model downloads.
-3. **Display** (HDMI or USB-C) + keyboard + mouse for first boot, FileVault unlock, and Local Network permission prompts. After auto-login works you can leave the display dark; keep a keyboard in the room for power-cut unlock.
+2. **Ethernet** from Mini Ethernet port → router LAN port. Prefer this over Wi-Fi for the tunnel and for 20–50 GB model downloads. **Operator exception (2026-09-19): Ethernet is not feasible. Wi-Fi-only is accepted — see §3a. Do not turn Wi-Fi off.**
+3. **Display** (HDMI or USB-C) + keyboard + mouse for first boot, FileVault unlock, and Local Network permission prompts. A screen-only desk plus LAN Screen Sharing is enough for day-to-day; keep a **keyboard in the room** for FileVault unlock after a power cut (Screen Sharing cannot type at the pre-boot lock screen). After auto-login works you can leave the display dark.
 4. Optional: USB-C Ethernet adapter only if you must use a dongle; onboard Ethernet is better.
 
 **UPS (strongly recommended):** FileVault + a power cut means the Mini sits at the disk-unlock screen and **does not run Ollama or the tunnel** until a human types a password. A small UPS covering 10–30 minutes of outages is the difference between “Salesforce works” and “mystery 503s.” Record the UPS choice in operator-checklist §6.
@@ -108,6 +109,21 @@ Mini worker            --outbound HTTPS-->  Neon, Nominatim, Overpass, OSRM, Hug
 2. Turn **Wi-Fi off** on the Mini once Ethernet works. Two interfaces cause flaky tunnel reconnects.
 3. In the **router** admin UI, add a **DHCP reservation** for the Mini’s Ethernet MAC → a fixed LAN IP (example `192.168.1.50`). You will SSH to that IP from a laptop. MAC is on the Mini Network pane or `ifconfig en0`.
 
+### 3a. Wi-Fi-only exception (this Mini)
+
+Ethernet is **not** required to start Phase A. This appliance is on **Wi-Fi only** by operator decision (2026-09-19). Cloudflare Tunnel still works: it dials **out**. What you give up is stability and download speed, not the architecture.
+
+Rules while Ethernet is out:
+
+- **Do not turn Wi-Fi off.** The “Ethernet then disable Wi-Fi” step above does not apply.
+- Use the **main** SSID, 5 GHz if you have it. Not guest Wi-Fi, not AP isolation (Screen Sharing to `192.168.100.51` would die).
+- In the router, DHCP-reserve the Mini’s **Wi-Fi** MAC so `192.168.100.51` stays put.
+- First `ollama pull` (~7 GB for 9B + embed) will be slower. Overnight is fine. Disk is not the bottleneck (443 GB free).
+- If the named tunnel later flaps every few minutes, set `protocol: http2` in `~/.cloudflared/config.yml` (some Wi-Fi routers break QUIC UDP 7844).
+- Still **no WAN port forwards**. Screen Sharing stays LAN-only (already true: Administrators only, VNC-with-password off).
+
+This exception can be reversed later by plugging Ethernet and then turning Wi-Fi off. Until then, treat random 502s as a network symptom before an application bug.
+
 ### Router / firewall — allow outbound, deny inbound
 
 The Mini only needs **outbound** access:
@@ -146,7 +162,7 @@ Do not put the Mini on **guest / AP isolation** Wi-Fi. The laptop would not reac
 
 ### ISP quality
 
-- First week downloads: **~20–80 GB** (9B + embed + later FLUX ~7–34 GB first run + optional 20B). Use Ethernet. Overnight pulls are fine.
+- First week downloads: **~20–80 GB** (9B + embed + later FLUX ~7–34 GB first run + optional 20B). On this Mini that is Wi-Fi; overnight pulls are fine. Disk headroom is not the issue (443 GB free).
 - Watch **data caps**.
 - Unstable Wi-Fi + QUIC = random 502s. If tunnel flaps, set `protocol: http2` in `~/.cloudflared/config.yml` (see host-setup.md).
 
@@ -177,14 +193,14 @@ Fill the actual IDs into [operator-checklist.md](operator-checklist.md) §§1–
 
 Print this. Tick as you go.
 
-1. [ ] Physical: power, Ethernet, display, keyboard. UPS if you have one.
-2. [ ] macOS setup, updates, hostname `cloudiator-mini`, appliance + admin users.
-3. [ ] Energy settings (no computer sleep). Automatic time.
-4. [ ] FileVault policy ticked in operator-checklist §6. Automatic login on.
-5. [ ] `df -h /` → ≥ 120 GB free. Write the number in the checklist.
-6. [ ] `uname -m` → `arm64`. Terminal **not** “Open using Rosetta”.
-7. [ ] Ethernet up, Wi-Fi off, DHCP reservation in router.
-8. [ ] Sharing: Screen Sharing and/or SSH **LAN only**. Confirm from a laptop: `ssh cloudiator@192.168.x.x` or Screen Sharing.
+1. [x] Physical: power + display. Ethernet **n/a** (Wi-Fi-only, §3a). Keyboard still needed in the room for FileVault unlock. UPS: undecided.
+2. [x] macOS setup: hostname `cloudiator.local`, users `Cloudiator` + `Ashraf` (both Admin). Software Update: freeze casual updates during Phase A–B.
+3. [x] Energy: prevent sleep when display off, wake for network, start up after power failure. [ ] Automatic time still unconfirmed.
+4. [ ] FileVault policy ticked in operator-checklist §6. [ ] Automatic login on (**currently Off** — LaunchAgents will not survive a reboot until this is On for `Cloudiator`).
+5. [x] Disk: **443 GB free** of 494 GB (About This Mac → Storage, 2026-09-19). Comfortable for full v1.
+6. [ ] `uname -m` → `arm64` in Terminal (M4 implies it; still run the command, Terminal must not be “Open using Rosetta”).
+7. [x] Wi-Fi-only exception. [ ] DHCP reservation for the Wi-Fi MAC → keep `192.168.100.51`.
+8. [x] Screen Sharing **LAN only** at `vnc://192.168.100.51/` / “Ashraf's Mac mini”, Administrators only, VNC-password viewers off.
 9. [ ] Internet: `curl -I https://github.com` and `curl -I https://ollama.com` return success.
 10. [ ] Note public IPv4 (`curl -4 -s https://ifconfig.me`) vs router WAN (CGNAT or not).
 11. [ ] Create/login Cloudflare, Neon, GitHub. Domain zone **Active**.
@@ -205,12 +221,12 @@ Print this. Tick as you go.
 
 ## 6. Prove the network (copy-paste)
 
-Run on the Mini after Ethernet is up:
+Run on the Mini (Wi-Fi-only is fine):
 
 ```bash
 uname -m
 df -h /
-networksetup -getinfo Ethernet || networksetup -getinfo "USB 10/100/1000 LAN"
+networksetup -getinfo Wi-Fi
 curl -4 -sS https://ifconfig.me; echo
 curl -sS -o /dev/null -w "%{http_code}\n" https://github.com
 curl -sS -o /dev/null -w "%{http_code}\n" https://ollama.com
@@ -265,11 +281,11 @@ Confirm **closed** from WAN (should time out). Use a phone cellular `nc` or a po
 
 Hardware/network is green when:
 
-- [ ] 24 GB M4 Mini, arm64, ≥ 120 GB free
-- [ ] Ethernet + DHCP reservation + Wi-Fi off
-- [ ] No WAN port forwards for 22/8080/11434
+- [x] 24 GB M4 Mini, ≥ 120 GB free (443 GB). [ ] `uname -m` still to run in Terminal
+- [x] Wi-Fi-only exception accepted (§3a). [ ] DHCP reservation for `192.168.100.51`
+- [ ] No WAN port forwards for 22/8080/11434 (Screen Sharing is LAN-only already)
 - [ ] Phone-on-cellular test of `api.` is possible after Phase B (you already own the domain)
-- [ ] FileVault/UPS policy written
+- [ ] FileVault/UPS policy written; automatic login for `Cloudiator`
 - [ ] Cursor Pro Plus on this machine, repo cloned, next file is host-setup.md
 
 Operator: ____________________  Date: ____________
