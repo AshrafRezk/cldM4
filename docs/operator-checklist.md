@@ -12,7 +12,9 @@ Legend: `[ ]` not done · `[x]` done · `n/a` deliberately skipped (write why).
 
 ## 0. Before you touch the Mini (15 min)
 
-- [ ] Mini is on wired Ethernet if possible (tunnel stability + first weight downloads are tens of GB).
+- [ ] Uplink chosen (tick exactly one):
+  - ☐ **Ethernet** (preferred) — Wi-Fi off after Ethernet is up; DHCP reservation on Ethernet MAC.
+  - ☐ **Wi-Fi only** — main SSID (not guest), prefer 5 GHz, DHCP reservation on Wi-Fi MAC, single interface. Phase B must use `protocol: http2` in `~/.cloudflared/config.yml` (see [hardware-and-network.md](hardware-and-network.md) §3).
 - [ ] Free disk measured: `df -h /` → **______ GB free**. Need **≥ 120 GB** free for the full v1 model set. Below 80 GB, plan to skip FLUX 8-bit and `gpt-oss:20b`.
 - [ ] Mini is not in a closed cabinet.
 - [ ] UPS decision: ☐ have one ☐ accepting the risk (see §6, FileVault).
@@ -182,7 +184,8 @@ Do **not** install `gemma4` / `gemma4:latest` (those are the ~9.6 GB Q4_K_M E4B)
 
 - [ ] `DEFAULT_MODEL` in `.env` matches the "actually installed" default-chat (or 12B upgrade) row. Only one generative chat model is hot.
 - [ ] Arabic smoke: a short فصحى prompt returned Arabic, not an English apology.
-- [ ] Quant is QAT Q4_0 (`ollama show` / file type), not Q8 or bf16. ☐
+- [ ] Quant is QAT Q4_0 (`ollama show` / file type), not Q8 or bf16.
+- [ ] `DEFAULT_MODEL_HAS_VISION` in `.env` matches the Vision column. `scripts/phase-a-gates.sh` prints what `ollama show` reported. Gemma 4 QAT should be `true`.
 - [ ] If the default chat model has **no** vision capability (fallback only), the router is OCR-only for images and the `/v1/chat/completions` vision path returns `model_not_found`. Confirmed and acceptable: ☐
 
 ---

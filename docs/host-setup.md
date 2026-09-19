@@ -248,7 +248,7 @@ cloudflared tunnel create cloudiator-mini
 tunnel: TUNNEL_UUID
 credentials-file: /Users/REPLACE/.cloudflared/TUNNEL_UUID.json
 no-autoupdate: true          # a self-update restarts the tunnel mid-job
-protocol: quic               # switch to http2 if your ISP or router breaks QUIC/UDP
+protocol: quic               # use http2 on Wi-Fi-only installs, or if ISP/router breaks QUIC/UDP
 ingress:
   - hostname: api.YOURDOMAIN
     service: http://127.0.0.1:8080
