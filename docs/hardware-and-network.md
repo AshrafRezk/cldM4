@@ -242,7 +242,7 @@ Print this. Tick as you go.
 4. [x] Automatic login as `Cloudiator`. [x] FileVault **Off** = policy **C** (cannot enable FileVault while auto-login is on).
 5. [x] Disk: **443 GB free** of 494 GB (About This Mac → Storage, 2026-09-19). Comfortable for full v1.
 6. [x] `uname -m` → `arm64` (`ashrafrezk@cloudiator`, 2026-09-19). Terminal is not Rosetta.
-7. [x] Wi-Fi-only: SSID **Ash & Mimi**, `192.168.100.51`, MAC `d0:11:e5:94:6b:23`, proxies off. [ ] DHCP **reservation** on router `192.168.100.1` for that MAC.
+7. [x] Wi-Fi-only: SSID **Ash & Mimi**, `192.168.100.51`, MAC `d0:11:e5:94:6b:23`, proxies off. [x] DHCP Static IP on WE HG8145V5 (`192.168.100.1`) for that MAC → `.51`. [ ] **Forward Rules** still to open (must not forward 22/5900/8080/11434).
 8. [x] Screen Sharing **LAN only** at `vnc://192.168.100.51/` / “Ashraf's Mac mini”, Administrators only, VNC-password viewers off.
 9. [ ] Internet: `curl -I https://github.com` and `curl -I https://ollama.com` return success.
 10. [ ] Note public IPv4 (`curl -4 -s https://ifconfig.me`) vs router WAN (CGNAT or not).
@@ -325,7 +325,8 @@ Confirm **closed** from WAN (should time out). Use a phone cellular `nc` or a po
 Hardware/network is green when:
 
 - [x] 24 GB M4 Mini, arm64, ≥ 120 GB free (443 GB)
-- [x] Wi-Fi-only exception accepted (§3a). SSID Ash & Mimi, MAC `d0:11:e5:94:6b:23`, IP `192.168.100.51`. [ ] DHCP reservation on the router
+- [x] Wi-Fi-only exception accepted (§3a). SSID Ash & Mimi, MAC `d0:11:e5:94:6b:23`, IP `192.168.100.51`. [x] DHCP Static IP on HG8145V5
+- [ ] No WAN port forwards for 22/8080/11434 — open **Forward Rules** on the same router and confirm the list is empty (or has none of those ports)
 - [ ] No WAN port forwards for 22/8080/11434 (Screen Sharing is LAN-only already)
 - [ ] Phone-on-cellular test of `api.` is possible after Phase B (you already own the domain)
 - [x] No UPS (accepted). [x] Automatic login for `Cloudiator`. [x] FileVault policy **C** (Off)
