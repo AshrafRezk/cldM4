@@ -3,7 +3,7 @@
 This is the living status board. Operator blanks still live in [operator-checklist.md](operator-checklist.md). Phase commands live in [cursor-phases.md](cursor-phases.md).
 
 **Last updated:** 2026-09-19  
-**Current phase:** A (worker job **unloaded** from launchd — bootstrap the existing plist, do not kickstart a missing service)  
+**Current phase:** A **live proofs green** on the Mini. Next is operator-checklist §§1–5 (Cloudflare / Neon / Nominatim) before Phase B.  
 **This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
 **Account note:** The appliance login **Cloudiator** is the original user renamed in Users & Groups. Unix short name / `$HOME` is still **`ashrafrezk`** (`ashrafrezk@cloudiator` in Terminal). A second Admin named **Ashraf** exists for updates. Install Ollama, `~/Cloudiator/.env`, and LaunchAgents on **this** session — do not switch users.
@@ -50,18 +50,9 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 - [x] Xcode Command Line Tools, Homebrew, repo `~/cldM4` on `cursor/phase-a-openai-shim-ee9d`, `~/Cloudiator/.env` chmod 600.
 - [x] `mac-setup.sh` finished: pulled **`qwen3.5:9b`** (6.6 GB, tools + vision + thinking) and **`nomic-embed-text`** (~274 MB).
 - [x] Ollama `/api/tags` on `127.0.0.1:11434` lists both models (2026-09-19). Session `launchctl setenv` applied; do **not** `killall Ollama` again (`open -a` then hits LS error -600). Reopen from `/Applications/Ollama.app` only if the menu-bar app is actually gone.
-- [ ] Worker **loaded in launchd** and listening. Health was `ok:true` once, then `bootout` + bootstrap error 5 left **no** `gui/501/ai.cloudiator.worker` (`Could not find service`). Kickstart cannot recreate it. Plist is still at `~/Library/LaunchAgents/ai.cloudiator.worker.plist` — `launchctl bootstrap` then `kickstart` (no `-k`, no `bootout`). Install script no longer bootouts by default.
+- [x] Worker on **`127.0.0.1:8080`** (2026-09-19 smoke). Health `ok: true`, `X-Request-Id` present, **one** uvicorn bound to `127.0.0.1:8080` (not `*:8080`), chat returned assistant text, embeddings length **768**, `ollama ps` = `qwen3.5:9b` + `nomic-embed-text` both Forever / 100% GPU, `vm.swapusage` used **0.00M**. LaunchAgent loaded via `launchctl bootstrap` (not `load`). Do **not** Connect ChatGPT in Ollama Apps. Do **not** `killall Ollama`.
 
-**Next (do not Force Quit, do not killall Ollama, do not re-run mac-setup):**
-
-```bash
-cd ~/cldM4
-git pull
-./scripts/install-launchagents.sh
-curl -sS http://127.0.0.1:8080/v1/health
-./scripts/smoke-phase-a.sh
-sysctl vm.swapusage
-```
+Phase A Mini live proofs are **done**. Optional: `cd ~/cldM4 && git pull` so a later install does not `bootout` the job. Then fill [operator-checklist.md](operator-checklist.md) §§1–5 before any Phase B chat.
 
 ### Before Phase B (operator-checklist §§1–5 must have no blanks)
 
@@ -88,7 +79,7 @@ sysctl vm.swapusage
 | Phase | What | Status |
 | --- | --- | --- |
 | 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware Day 0 **done**. Cloud accounts §§1–5 still needed **before Phase B** |
-| **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code in git. Ollama tags live.** Worker not serving yet — reinstall LaunchAgent after pull |
+| **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent, Mini live proofs | **Done** (2026-09-19 smoke: health, chat, embed 768, one 9B + nomic, swap 0) |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |
 | D | Tool registry, OCR, maps, artifact signing, tool loop | **Not started** |
@@ -120,22 +111,23 @@ sysctl vm.swapusage
 - [x] LaunchAgent template + path substitution (`scripts/install-launchagents.sh`)
 - [x] `scripts/mac-setup.sh`, `scripts/smoke-phase-a.sh`
 - [x] Tests: `test_openai_translation.py`, `test_metal_lock.py`, `test_ssrf_guard.py`, `test_context_guard.py` (+ HTTP smoke)
-- [x] Off-Mini unit tests: **53 passed** (2026-09-19, Linux x86_64, `CLOUDIATOR_ENV=test`)
+- [x] Off-Mini unit tests: **66 passed** (2026-09-19, Linux x86_64, `CLOUDIATOR_ENV=test`)
+- [x] Mini live smoke: **66 passed** + loopback health/chat/embeddings (2026-09-19, Darwin arm64)
 
 Production boot still **aborts on Linux / x86_64**. Unit tests set `CLOUDIATOR_ENV=test` so they can run off-Mini.
 
-## Phase A — not done until you run it on the Mini
+## Phase A — Mini live proofs (2026-09-19)
 
 - [x] `uname -m` and smoke architecture both **arm64** (venv Python asserted arm64 during `mac-setup.sh`)
 - [x] `ollama pull qwen3.5:9b && ollama show qwen3.5:9b` (tools + vision recorded in §8)
 - [x] `ollama pull nomic-embed-text` only — **do not** pull `gpt-oss:20b` / 27B / 70B / 120B
-- [ ] `(pgrep -f "uvicorn app.main:app" || true) | wc -l` → **1** (do not use `pgrep -fc` on macOS)
-- [ ] `lsof` shows **127.0.0.1:8080**, not `*:8080`
-- [ ] Live `curl` chat + embeddings against loopback
-- [ ] `ollama ps` → at most **one** generative model (+ `nomic-embed-text`)
-- [ ] `sysctl vm.swapusage` → used **0.00M**
-- [ ] `~/Library/LaunchAgents/ai.cloudiator.worker.plist` loaded via `launchctl bootstrap` (not `load`) and **healthy**
-- [ ] `python -c "import Vision"` in the venv
+- [x] uvicorn process count **1** (`python3.11` PID 13135 on `127.0.0.1:8080`)
+- [x] `lsof` shows **127.0.0.1:8080**, not `*:8080`
+- [x] Live `curl` chat + embeddings (768) against loopback
+- [x] `ollama ps` → **one** generative (`qwen3.5:9b`) + `nomic-embed-text`
+- [x] `sysctl vm.swapusage` → used **0.00M**
+- [x] `~/Library/LaunchAgents/ai.cloudiator.worker.plist` loaded via `launchctl bootstrap` (not `load`) and healthy
+- [x] `python -c "import Vision"` in the venv (mac-setup)
 
 Rollback (Mini): `launchctl bootout gui/$UID/ai.cloudiator.worker`, `git checkout -- apps/worker scripts`, `rm -rf apps/worker/.venv`. Models stay on disk.
 
