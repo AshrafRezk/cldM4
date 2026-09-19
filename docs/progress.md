@@ -36,8 +36,10 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 
 #### Still you — hardware leftovers (short)
 
-- [x] Router `192.168.100.1` (WE / Huawei **HG8145V5**): **DHCP Static IP** binds MAC `d0:11:e5:94:6b:23` → `192.168.100.51` (screenshot 2026-09-19). Click **Apply** if that row is new and not saved yet.
-- [ ] Same UI, left nav **Forward Rules**: confirm nothing forwards WAN 22 / 5900 / 8080 / 11434. Empty list = done. Do not add rules. Step-by-step: [hardware-and-network.md](hardware-and-network.md) §3b.
+- [x] Router `192.168.100.1` (WE / Huawei **HG8145V5**): **DHCP Static IP** binds MAC `d0:11:e5:94:6b:23` → `192.168.100.51` (saved row, 2026-09-19).
+- [x] **Forward Rules empty:** IPv4 Port Mapping, Port Trigger, IP Mapping, and DMZ all have no rows. WAN 22 / 5900 / 8080 / 11434 are not forwarded. Do not add any.
+
+Hardware Day 0 is done. Next is software on the Mini.
 
 Hardware Day 0 is otherwise done. Next is software on the Mini.
 
@@ -76,7 +78,7 @@ Hardware Day 0 is otherwise done. Next is software on the Mini.
 
 | Phase | What | Status |
 | --- | --- | --- |
-| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware Day 0 **done** (FileVault C). **You:** DHCP reservation optional-but-wise; cloud accounts §§1–5 before Phase B |
+| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware Day 0 **done**. Cloud accounts §§1–5 still needed **before Phase B** |
 | **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |
