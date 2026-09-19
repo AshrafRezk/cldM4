@@ -182,6 +182,7 @@ An appliance with no alerting is an appliance that is down and nobody knows. If 
 
 - [ ] `DEFAULT_MODEL` in `.env` matches the "actually installed" row.
 - [ ] If the default chat model has **no** vision capability, the router is OCR-only for images and the `/v1/chat/completions` vision path returns `model_not_found`. Confirmed and acceptable: ☐
+- [ ] `DEFAULT_MODEL_HAS_VISION` in `.env` matches the Vision column above. `scripts/phase-a-gates.sh` prints what `ollama show` reported.
 
 ---
 

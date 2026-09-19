@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and later the product.** Right now it contains the implementation bible only. No application code yet.
+**This repository is the production plan and the product.** Phase A (the worker) is in `apps/worker`; the rest of the plan is still plan.
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -18,6 +18,19 @@ A Mac Mini M4 **24GB** is the AI worker. A small cloud control plane (Netlify da
 6. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. Phase B cannot pass with blanks in it.
 7. Execute **one phase at a time** with the prompts in **[docs/cursor-phases.md](docs/cursor-phases.md)**. New Agent chat per phase. Attach `@PLAN.md`. Each phase lists the files that must exist, the commands that prove it, and how to roll back.
 8. Do not skip Phase A. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
+
+### Phase A on the Mini, in order
+
+```bash
+scripts/phase-a-gates.sh --no-pull      # step 0 + the Phase 0 host checks; changes nothing
+cp .env.example ~/Cloudiator/.env && chmod 600 ~/Cloudiator/.env
+scripts/mac-setup.sh                    # brew, exclusions, log rotation, venv, Phase A pulls only
+scripts/phase-a-gates.sh                # must be green before the worker is trusted
+scripts/install-launchagents.sh         # renders the plist, bootstraps, waits for /v1/health
+scripts/smoke-phase-a.sh                # the definition of done
+```
+
+Roll back with `scripts/install-launchagents.sh --uninstall`, `git checkout -- apps/worker scripts`, and `rm -rf apps/worker/.venv`. Models stay on disk.
 
 ## If you are not on the Mini
 
@@ -41,6 +54,9 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Known failures and fixes |
 | [docs/licenses.md](docs/licenses.md) | Model and library licenses |
 | [.env.example](.env.example) | Mini worker env template (copy, do not commit secrets) |
+| [apps/worker/](apps/worker/) | Phase A: FastAPI worker, RAM scheduler, guards, tests |
+| [scripts/](scripts/) | Gates, host setup, LaunchAgent install, Phase A smoke |
+| [infra/launchd/](infra/launchd/) | LaunchAgent and wrapper templates |
 
 ## Locked v1 decisions
 

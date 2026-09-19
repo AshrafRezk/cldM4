@@ -15,11 +15,14 @@ Template: [.env.example](../.env.example).
 | `PUBLIC_BASE_URL` | `https://api.example.com` | yes (artifact URLs) |
 | `DATABASE_URL` | pooled Neon URL (`...-pooler...`) | yes from Phase B |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | yes |
+| `OLLAMA_MAX_LOADED_MODELS` | `2` | yes — the worker asserts this and refuses to boot on any other value |
 | `DEFAULT_MODEL` | the tag verified in Phase A step 0 | yes |
+| `DEFAULT_MODEL_HAS_VISION` | `false` | yes — `true` only if `ollama show` reported vision |
 | `EMBED_MODEL` | `nomic-embed-text` | yes |
 | `HEAVY_MODEL` | `gpt-oss:20b` | no — **keep commented out until the Phase E pull completes** |
 | `VISION_MODEL` | | no — shares slot 1, see `PLAN.md` §7 |
 | `NUM_CTX` | `4096` | yes |
+| `NUM_CTX_MAX` | `8192` | yes — the worker clamps `num_ctx` to this |
 | `MAX_TOKENS_DEFAULT` | `512` | yes |
 | `MPLBACKEND` | `Agg` | yes |
 
@@ -38,6 +41,11 @@ These implement the timeout ladder and the tool-loop cap in `PLAN.md` §§9–10
 | `VISION_MAX_EDGE_PX` | `1024` | downscale before the model |
 | `VISION_MAX_IMAGES` | `4` | per request |
 | `KEY_CACHE_TTL_SECONDS` | `60` | keeps argon2id off the hot path; **revocation lag equals this value** |
+| `EMBEDDINGS_TIMEOUT_SECONDS` | `15` | embeddings leg of the ladder |
+| `METAL_WAIT_SECONDS` | `2` | longer than this and a sync chat gets `429` + `Retry-After` instead of queueing |
+| `EXCLUSIVE_TIMEOUT_SECONDS` | `600` | wall clock for one exclusive-slot job before it is killed |
+| `HARD_FREE_DISK_GB` | `5` | below this, refuse everything that writes |
+| `HEALTH_RPM` | `120` | `/v1/health` is unauthenticated, so it gets its own bucket |
 
 ## Mini worker — database pool
 
