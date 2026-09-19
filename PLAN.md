@@ -180,7 +180,7 @@ The "one Metal-heavy model" invariant is enforced by the worker's `metal_lock` p
 ```bash
 OLLAMA_HOST=127.0.0.1:11434
 OLLAMA_MAX_LOADED_MODELS=2     # slot 1 = one generative model, slot 2 = nomic-embed-text only
-OLLAMA_NUM_PARALLEL=1
+OLLAMA_NUM_PARALLEL=1          # not vLLM; extra slots are extra KV
 OLLAMA_MAX_QUEUE=32
 OLLAMA_FLASH_ATTENTION=1
 OLLAMA_KEEP_ALIVE=30m          # safety net only — see keep-alive precedence below
