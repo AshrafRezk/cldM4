@@ -118,7 +118,7 @@ launchctl print gui/$(id -u)/ai.cloudiator.worker | head -40
 
 **zsh `.env` glob:** `zsh: no matches found` (`?` in `DATABASE_URL`) or `command not found: you@example.com`. Pull the bash dotenv loader.
 
-**Logging error during warmup:** `Message: 'HTTP Request: %s %s "%s %d %s"'` / `Arguments: (..., '200', 'OK')`. The redaction filter stringified httpx's status code and broke `%d`. Health stayed down because warmup was `await`ed before listen. Fixed: format-then-redact, background warmup with `stream: false` / `think: false`.
+**Logging / warmup:** `Message: 'HTTP Request: %s %s "%s %d %s"'` — redaction filter vs httpx `%d`. **`FileNotFoundError` in `memory.py` `_run` / `sysctl`:** launchd `EnvironmentVariables` **replaces** PATH. Our plist used to omit `/usr/sbin`, so `sysctl` (at `/usr/sbin/sysctl`) was missing and lifespan crashed before listen. The worker now execs `/usr/sbin/sysctl` and treats a miss as pressure `normal` instead of exiting.
 
 Pull and reinstall — **do not** `killall Ollama` (`open -a` then hits LaunchServices error -600):
 

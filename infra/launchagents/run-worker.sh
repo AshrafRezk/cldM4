@@ -43,6 +43,8 @@ export MPLBACKEND=Agg
 export WEB_CONCURRENCY=1
 export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"
 export CLOUDIATOR_ENV="${CLOUDIATOR_ENV:-production}"
+# launchd PATH replaces the default and historically omitted /usr/sbin (sysctl).
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/sbin:/usr/bin:/bin:/sbin:${PATH:-}"
 
 REPO_WORKER="${CLOUDIATOR_WORKER_DIR:-__REPO__/apps/worker}"
 cd "$REPO_WORKER"

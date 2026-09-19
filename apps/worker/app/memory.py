@@ -14,6 +14,9 @@ from app.config import Settings
 log = logging.getLogger("cloudiator.memory")
 
 PRESSURE_NAMES = {1: "normal", 2: "warn", 4: "critical"}
+# launchd EnvironmentVariables PATH replaces the default and often omits
+# /usr/sbin, where macOS ships sysctl. Always exec the absolute binary.
+_SYSCTL_CANDIDATES = ("/usr/sbin/sysctl", "/sbin/sysctl")
 
 
 @dataclass
@@ -32,7 +35,10 @@ class MemoryMonitor:
         self._task: asyncio.Task[None] | None = None
 
     async def start(self, settings: Settings) -> None:
-        await self.refresh(settings)
+        try:
+            await self.refresh(settings)
+        except Exception as exc:
+            log.warning("initial memory snapshot failed: %s", exc)
         self._task = asyncio.create_task(self._loop(settings), name="memory-poller")
 
     async def stop(self) -> None:
@@ -95,20 +101,32 @@ class MemoryMonitor:
         return raw.strip() or "unknown"
 
 
+def _sysctl_bin() -> str:
+    for candidate in _SYSCTL_CANDIDATES:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    found = shutil.which("sysctl")
+    return found or "/usr/sbin/sysctl"
+
+
 async def _sysctl_n(name: str) -> str:
-    return await _run("sysctl", "-n", name)
+    return await _run(_sysctl_bin(), "-n", name)
 
 
 async def _sysctl(name: str) -> str:
-    return await _run("sysctl", name)
+    return await _run(_sysctl_bin(), name)
 
 
 async def _run(*args: str) -> str:
-    proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        log.warning("missing executable: %s", args[0] if args else "?")
+        return ""
     out, _err = await proc.communicate()
     return out.decode("utf-8", errors="replace")
 

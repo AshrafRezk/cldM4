@@ -171,6 +171,7 @@ Phase A creates `~/Library/LaunchAgents/ai.cloudiator.worker.plist`. **Substitut
   <key>WorkingDirectory</key><string>/Users/REPLACE/cldM4/apps/worker</string>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/sbin:/usr/bin:/bin:/sbin</string>
     <key>MPLBACKEND</key><string>Agg</string>
   </dict>
   <key>RunAtLoad</key><true/>
