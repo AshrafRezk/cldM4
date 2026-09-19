@@ -45,8 +45,11 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 
 #### Then software on the Mini (this is the remaining manual work)
 
-- [ ] Install **Cursor Pro Plus** on the Mini, Privacy Mode on, Auto off ([cursor-settings.md](cursor-settings.md))
-- [ ] Install **official Ollama.app** (not `brew install ollama`)
+- [x] **Cursor** is in `/Applications` (screenshot 2026-09-19). Still set Privacy Mode on and Auto off per [cursor-settings.md](cursor-settings.md) when you use it on this Mini.
+- [x] **Ollama.app** is in `/Applications` (llama icon). Open it once so it sits in the menu bar and owns `127.0.0.1:11434`. Do not `brew install ollama`.
+
+#### Then software on the Mini (remaining)
+
 - [ ] Copy repo `.env.example` → `~/Cloudiator/.env`, `chmod 600`, **outside git**
 - [ ] Run `scripts/mac-setup.sh` **on the Mini** (arm64 gate, brew deps, exclusions, newsyslog, `qwen3.5:9b` + `nomic-embed-text` pulls only). Overnight is fine on Wi-Fi (~7 GB).
 - [ ] Run each binary once in Terminal so Sequoia **Local Network** permission is granted, then `scripts/install-launchagents.sh`
