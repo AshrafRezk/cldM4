@@ -30,7 +30,7 @@ Embeddings are evicting the chat model. `OLLAMA_MAX_LOADED_MODELS` is `1`; it mu
 
 If the chat model unloads after a quiet half hour, the worker is omitting `keep_alive` and inheriting `OLLAMA_KEEP_ALIVE=30m`. The worker must send `keep_alive: -1` explicitly on every hot-model call.
 
-## The 9B never comes back after an image or 20B job
+## The hot Gemma never comes back after an image or 20B job
 
 The exclusive teardown is not in a `finally`, so a crash left the lock held and no model loaded. Symptoms: everything returns `429 metal_busy` and `ollama ps` is empty.
 
@@ -166,3 +166,24 @@ Context truncation. Ollama silently drops the oldest tokens past `num_ctx`. The 
 ## Duplicate FLUX jobs from one Salesforce action
 
 Apex retried a timed-out callout. Send an `Idempotency-Key` header on `POST /v1/jobs`.
+
+## Arabic comes back in English, or the model is huge and the box swaps
+
+Wrong Ollama tag. `gemma4` / `gemma4:latest` / `gemma4:e4b` is the **9.6 GB Q4_K_M**, not the QAT Q4_0 default. `DEFAULT_MODEL` must be `gemma4:e4b-it-qat` (~6.1 GB) or, if you measured swap = 0, `gemma4:12b-it-qat` (~7.2 GB). Never `26b` / `31b` / `*-q8_0` / `*-bf16`.
+
+```bash
+ollama show "$DEFAULT_MODEL" | head
+# file type should be Q4_0 for the QAT tags
+```
+
+If the tag is right and replies are still English-only, the worker may be injecting a system prompt that says "respond in English", or `GEMMA_THINKING=true` is eating `max_tokens` before the Arabic answer. Both are bugs.
+
+Gemma 4 **does not generate images**. "Generate a picture" is FLUX (Phase E). "What does this Arabic invoice say?" is OCR first, then Gemma vision.
+
+## Concurrent chats are slow, so someone wants vLLM or NUM_PARALLEL=4
+
+vLLM *does* batch better (paged KV). On this 24GB Mini, extra in-flight sequences are extra unified RAM, and vLLM-metal wants Python 3.12 while the worker is 3.11 for Vision. v1 serializes: FastAPI `metal_lock`, `OLLAMA_NUM_PARALLEL=1`, `429` + jobs if the lock wait exceeds 2s. See `PLAN.md` §4.
+
+Do not install vllm-metal into the worker venv. Do not pull `gemma4:*-mlx` for "better cache" — Gemma 4 hybrid KV prefix reuse is the GGUF/llama.cpp path, not Ollama MLX.
+
+If the *second* identical-prefix chat is as slow as the first, the worker is mutating the system prompt or tools JSON (timestamps, shuffled keys, request ids). That is a product bug, not a missing engine.

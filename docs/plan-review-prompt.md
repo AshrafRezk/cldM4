@@ -56,7 +56,8 @@ B. Mini / Metal / RAM
 - FileVault on; Time Machine and Spotlight exclude ~/.ollama and HuggingFace cache
 - macOS Sequoia Local Network permission for cloudflared
 - Ollama .app vs brew ollama conflict
-- Exclusive slot teardown if mflux crashes mid-job (always reload 9B in finally)
+- Exclusive slot teardown if mflux crashes mid-job (always reload DEFAULT_MODEL / Gemma in finally)
+- vLLM-metal vs Ollama: do not raise NUM_PARALLEL; prefix-cache hygiene; Python 3.12 vs worker 3.11
 - Disk-full and artifact TTL
 - memory_pressure polling implementation note
 - First-run mflux weight download size vs 25s HTTP
@@ -81,7 +82,9 @@ D. Salesforce
 
 E. API contract completeness (so OpenAI SDKs don't explode)
 - Unsupported: n>1, logprobs, image variation, assistants
-- model alias map (gpt-4o → qwen3.5:9b) optional and scoped
+- model alias map (gpt-4o → DEFAULT_MODEL / gemma4:e4b-it-qat) optional and scoped
+- Arabic + UTF-8: default is Gemma 4 E4B QAT, not a second coresident chat model
+- Gemma thinking off by default; do not raise num_ctx toward 128K on 24GB
 - tools vs Ollama native tools: FastAPI owns tool loop; cap iterations (e.g. 8)
 - Vision: downscale images before Ollama; max dimension
 - Idempotency-Key for jobs
