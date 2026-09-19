@@ -3,7 +3,7 @@
 This is the living status board. Operator blanks still live in [operator-checklist.md](operator-checklist.md). Phase commands live in [cursor-phases.md](cursor-phases.md).
 
 **Last updated:** 2026-09-19  
-**Current phase:** A (health JSON **once** `ok:true`; launchctl bootstrap error 5 then process SIGTERM before smoke)  
+**Current phase:** A (worker job **unloaded** from launchd — bootstrap the existing plist, do not kickstart a missing service)  
 **This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
 **Account note:** The appliance login **Cloudiator** is the original user renamed in Users & Groups. Unix short name / `$HOME` is still **`ashrafrezk`** (`ashrafrezk@cloudiator` in Terminal). A second Admin named **Ashraf** exists for updates. Install Ollama, `~/Cloudiator/.env`, and LaunchAgents on **this** session — do not switch users.
@@ -50,9 +50,9 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 - [x] Xcode Command Line Tools, Homebrew, repo `~/cldM4` on `cursor/phase-a-openai-shim-ee9d`, `~/Cloudiator/.env` chmod 600.
 - [x] `mac-setup.sh` finished: pulled **`qwen3.5:9b`** (6.6 GB, tools + vision + thinking) and **`nomic-embed-text`** (~274 MB).
 - [x] Ollama `/api/tags` on `127.0.0.1:11434` lists both models (2026-09-19). Session `launchctl setenv` applied; do **not** `killall Ollama` again (`open -a` then hits LS error -600). Reopen from `/Applications/Ollama.app` only if the menu-bar app is actually gone.
-- [ ] Worker **stays** on `127.0.0.1:8080`. 2026-09-19 curl got `{"ok":true,"free_mb":92,"loaded":["qwen3.5:9b"],...}` then smoke missed it. `install-launchagents.sh` died on `Bootstrap failed: 5: Input/output error` (already loaded / bootout race) before finishing the worker agent; uvicorn then logged graceful shutdown. `free_mb: 92` is very tight with Cursor + 9B loaded (swap still 0). Fix in git: treat bootstrap 5 as already-loaded, do not `kickstart -k` a healthy worker, smoke waits for KeepAlive.
+- [ ] Worker **loaded in launchd** and listening. Health was `ok:true` once, then `bootout` + bootstrap error 5 left **no** `gui/501/ai.cloudiator.worker` (`Could not find service`). Kickstart cannot recreate it. Plist is still at `~/Library/LaunchAgents/ai.cloudiator.worker.plist` — `launchctl bootstrap` then `kickstart` (no `-k`, no `bootout`). Install script no longer bootouts by default.
 
-**Next (prove Phase A — do not re-run mac-setup, do not killall Ollama, do not Force Quit):**
+**Next (do not Force Quit, do not killall Ollama, do not re-run mac-setup):**
 
 ```bash
 cd ~/cldM4

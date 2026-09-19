@@ -42,14 +42,17 @@ fi
 UID_NUM="$(id -u)"
 DOMAIN="gui/$UID_NUM"
 
-# launchctl bootstrap error 5 (EIO) = already loaded / bootout not finished.
-# Do not abort the worker install if the one-shot ollama-env agent races.
+# Never bootout by default. bootout + bootstrap error 5 left the worker
+# unloaded ("Could not find service ai.cloudiator.worker") while uvicorn
+# was SIGTERM'd. Plist/wrapper updates on disk apply on the next start;
+# Python is loaded from ~/cldM4. Error 5 = already loaded.
 ensure_agent() {
   local label="$1" plist="$2" required="${3:-0}"
   local target="$DOMAIN/$label"
   if launchctl print "$target" >/dev/null 2>&1; then
-    launchctl bootout "$target" 2>/dev/null || true
-    sleep 2
+    echo "$label already loaded"
+    launchctl enable "$target" 2>/dev/null || true
+    return 0
   fi
   if ! launchctl bootstrap "$DOMAIN" "$plist" 2>/tmp/cloudiator-bootstrap.err; then
     if grep -qiE 'Input/output error|already loaded|Duplicate' /tmp/cloudiator-bootstrap.err 2>/dev/null; then
@@ -60,6 +63,7 @@ ensure_agent() {
       if [[ "$required" == "1" ]]; then
         abort "bootstrap $label failed"
       fi
+      return 0
     fi
   fi
   launchctl enable "$target" 2>/dev/null || true
@@ -73,12 +77,11 @@ ensure_agent "ai.cloudiator.worker" \
   "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist" 1
 
 if curl -sf --max-time 1 http://127.0.0.1:8080/v1/health >/dev/null; then
-  echo "worker already healthy on 127.0.0.1:8080; skipping kickstart -k"
+  echo "worker already healthy on 127.0.0.1:8080; skipping kickstart"
 else
-  # -k kills a running job. Only use it when nothing is listening.
-  launchctl kickstart -k "$DOMAIN/ai.cloudiator.worker" 2>/dev/null \
-    || launchctl kickstart "$DOMAIN/ai.cloudiator.worker" 2>/dev/null \
-    || true
+  # Never kickstart -k: that SIGTERMs a healthy worker. Missing job needs
+  # bootstrap (ensure_agent). Loaded-but-idle job needs kickstart only.
+  launchctl kickstart "$DOMAIN/ai.cloudiator.worker" 2>/dev/null || true
 fi
 
 echo "Waiting for 127.0.0.1:8080..."

@@ -56,7 +56,9 @@ if ! wait_for_health "$HEALTH_ATTEMPTS"; then
     echo "---- $DATA/logs/worker.err (last 50) ----"
     tail -n 50 "$DATA/logs/worker.err" 2>/dev/null || echo "(no worker.err yet)"
     echo
-    echo "Start without a full reinstall (do not killall Ollama):"
+    echo "The LaunchAgent is not loaded. Bootstrap it (do not killall Ollama):"
+    echo "  launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/ai.cloudiator.worker.plist"
+    echo "  launchctl enable gui/\$(id -u)/ai.cloudiator.worker"
     echo "  launchctl kickstart gui/\$(id -u)/ai.cloudiator.worker"
     echo "  curl -sS http://127.0.0.1:8080/v1/health"
     exit 1
