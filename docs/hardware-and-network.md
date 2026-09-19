@@ -102,11 +102,24 @@ Mini worker            --outbound HTTPS-->  Neon, Nominatim, Overpass, OSRM, Hug
 
 ## 3. Home / office network
 
-### Ethernet first
+### Ethernet first (preferred)
 
 1. Connect Ethernet. In System Settings → Network, Ethernet should be **Connected** with an IPv4 like `192.168.x.x` or `10.x.x.x`.
 2. Turn **Wi-Fi off** on the Mini once Ethernet works. Two interfaces cause flaky tunnel reconnects.
 3. In the **router** admin UI, add a **DHCP reservation** for the Mini’s Ethernet MAC → a fixed LAN IP (example `192.168.1.50`). You will SSH to that IP from a laptop. MAC is on the Mini Network pane or `ifconfig en0`.
+
+### Wi-Fi only (accepted when Ethernet is unavailable)
+
+Ethernet is still better for 20–80 GB model pulls and for tunnel stability. If the Mini must stay on Wi-Fi:
+
+1. Use the **main** SSID, not guest / AP-isolation Wi-Fi. Prefer **5 GHz** with a strong signal; avoid congested 2.4 GHz.
+2. Leave **Ethernet disconnected** so there is exactly one active uplink (dual interfaces flap the tunnel).
+3. DHCP-reserve the Mini’s **Wi-Fi MAC** to a fixed LAN IP (same idea as Ethernet).
+4. When you reach Phase B, set `protocol: http2` in `~/.cloudflared/config.yml` instead of `quic`. Unstable Wi-Fi + QUIC is a common source of random 502s.
+5. Expect slower `ollama pull` / FLUX downloads. Overnight pulls are fine; watch ISP data caps.
+6. Still **no WAN port forwards**. Tunnel is outbound-only either way.
+
+Tick “Wi-Fi only” in [operator-checklist.md](operator-checklist.md) §0 so later phases know to use `http2`.
 
 ### Router / firewall — allow outbound, deny inbound
 
@@ -183,7 +196,7 @@ Print this. Tick as you go.
 4. [ ] FileVault policy ticked in operator-checklist §6. Automatic login on.
 5. [ ] `df -h /` → ≥ 120 GB free. Write the number in the checklist.
 6. [ ] `uname -m` → `arm64`. Terminal **not** “Open using Rosetta”.
-7. [ ] Ethernet up, Wi-Fi off, DHCP reservation in router.
+7. [ ] Uplink: Ethernet up + Wi-Fi off **or** Wi-Fi-only mode (main SSID, DHCP reservation on Wi-Fi MAC, single interface).
 8. [ ] Sharing: Screen Sharing and/or SSH **LAN only**. Confirm from a laptop: `ssh cloudiator@192.168.x.x` or Screen Sharing.
 9. [ ] Internet: `curl -I https://github.com` and `curl -I https://ollama.com` return success.
 10. [ ] Note public IPv4 (`curl -4 -s https://ifconfig.me`) vs router WAN (CGNAT or not).
@@ -266,7 +279,7 @@ Confirm **closed** from WAN (should time out). Use a phone cellular `nc` or a po
 Hardware/network is green when:
 
 - [ ] 24 GB M4 Mini, arm64, ≥ 120 GB free
-- [ ] Ethernet + DHCP reservation + Wi-Fi off
+- [ ] Stable uplink: Ethernet (+ Wi-Fi off) **or** documented Wi-Fi-only mode + DHCP reservation
 - [ ] No WAN port forwards for 22/8080/11434
 - [ ] Phone-on-cellular test of `api.` is possible after Phase B (you already own the domain)
 - [ ] FileVault/UPS policy written

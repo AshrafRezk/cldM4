@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. scripts/install-launchagents.sh substitutes __HOME__ and __REPO__
+  and writes the result to ~/Library/LaunchAgents/ai.cloudiator.worker.plist.
+  docs/host-setup.md §6 calls these placeholders REPLACE.
+
+  A plist with placeholder paths loads "successfully" and then fails to exec,
+  which looks exactly like a working install. The installer refuses to write a
+  file that still contains one.
+
+  The wrapper never enables uvicorn's reloader: it forks, and metal_lock does
+  not span processes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.cloudiator.worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__HOME__/Cloudiator/run-worker.sh</string>
+  </array>
+  <key>WorkingDirectory</key><string>__REPO__/apps/worker</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MPLBACKEND</key><string>Agg</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>__HOME__/Cloudiator/logs/worker.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Cloudiator/logs/worker.err</string>
+  <key>ProcessType</key><string>Interactive</string>
+</dict>
+</plist>
