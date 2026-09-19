@@ -50,8 +50,8 @@ require_arm64_macos() {
 # pulled by a setup script (PLAN.md §7).
 assert_model_allowed() {
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-    *gpt-oss:20b*|*gpt-oss:120b*|*:27b*|*:70b*|*:72b*|*:120b*|*llama3.1:70b*)
-      die "Refusing to pull '$1'. 20B is Phase E and opt-in; 27B/70B/120B exceed the 18 GB ceiling and guarantee swap (PLAN.md §7)."
+    *:20b*|*:27b*|*:70b*|*:72b*|*:120b*)
+      die "Refusing to pull '$1'. 20B is exclusive-slot, Phase E, and opt-in; 27B/70B/120B exceed the 18 GB ceiling and guarantee swap (PLAN.md §7)."
       ;;
   esac
 }

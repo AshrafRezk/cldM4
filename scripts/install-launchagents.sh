@@ -6,6 +6,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 . "$SCRIPT_DIR/lib/common.sh"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -30,7 +31,7 @@ section "Preflight"
   || die "no $ROOT/apps/worker/.venv/bin/uvicorn. Run scripts/mac-setup.sh first."
 
 if [ -f "$HOME/Cloudiator/.env" ]; then
-  pass "~/Cloudiator/.env exists"
+  pass "$HOME/Cloudiator/.env exists"
   grep -q '^OLLAMA_MAX_LOADED_MODELS=2$' "$HOME/Cloudiator/.env" \
     && pass "OLLAMA_MAX_LOADED_MODELS=2 is in .env" \
     || warn "add OLLAMA_MAX_LOADED_MODELS=2 to ~/Cloudiator/.env or the worker refuses to boot"
