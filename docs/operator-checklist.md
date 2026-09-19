@@ -2,7 +2,7 @@
 
 **Execution tracker:** [progress.md](progress.md) (done vs not done vs manual). This file stays the fill-in-the-blanks form. Do not commit real secrets.
 
-**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Hardware: M4 24 GB, 443 GB free, Wi-Fi-only, auto-login `Cloudiator`, network time on, arm64, **no UPS**. Remaining Day-0: FileVault tick (§6), DHCP reservation. Cloud accounts §§1–5 still yours before Phase B. `qwen3.5:9b` is not pulled on the Mini yet.
+**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Hardware Day 0 is effectively done (M4 24 GB, FileVault **C**/Off, auto-login, no UPS, Wi-Fi `192.168.100.51`). Remaining: DHCP reservation on the router, then Mini software (Ollama + `mac-setup.sh`). Cloud accounts §§1–5 before Phase B.
 
 Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.
 
@@ -143,9 +143,9 @@ FileVault and unattended reboot are in direct conflict. With FileVault on, a col
 
 Pick exactly one and tick it. **A is not available** on this Mini: there is no UPS.
 
-- [ ] **A — FileVault ON + UPS + manual unlock** — **not chosen** (no UPS).
-- [ ] **B — FileVault ON, planned reboots only via `sudo fdesetup authrestart`.** Unplanned power loss still needs a human at the keyboard. Auto-login usually **cannot** stay on with FileVault.
-- [ ] **C — FileVault OFF.** Likely match: auto-login as `Cloudiator` is already enabled, which macOS typically only allows when FileVault is off. Compensating control: home desk, keyboard in the room, Screen Sharing LAN-only to Administrators, no UPS. Confirm FileVault is Off, then tick this box.
+- n/a **A — FileVault ON + UPS + manual unlock** — not chosen (no UPS).
+- n/a **B — FileVault ON + `authrestart`** — not chosen.
+- [x] **C — FileVault OFF** (screenshot 2026-09-19: FileVault toggle off; “can’t be turned on because automatic login is enabled”). Compensating control: home desk, keyboard in the room, Screen Sharing LAN-only to Administrators, no UPS, Wi-Fi SSID `Ash & Mimi`. Disk is not encrypted at rest.
 
 Then, regardless of choice:
 

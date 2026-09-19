@@ -4,7 +4,7 @@ This is the living status board. Operator blanks still live in [operator-checkli
 
 **Last updated:** 2026-09-19  
 **Current phase:** A (code in git; Mini proofs not yet run)  
-**This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, LAN `192.168.100.51`, `uname -m` = **arm64**, auto-login **Cloudiator**, network time on, **no UPS** (accepted). **Wi-Fi only.** Keyboard in the room.
+**This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
 Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashboards)**
 
@@ -31,12 +31,15 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 - [x] `uname -m` → **arm64** (Terminal as `ashrafrezk@cloudiator`)
 - [x] Keyboard in the room
 - [x] **No UPS** — operator will not buy one. Power cuts mean downtime until a human is at the Mini.
+- [x] **FileVault Off (policy C).** macOS: “FileVault can’t be turned on because automatic login is enabled.” Compensating control: home desk, keyboard, Screen Sharing LAN-only, no UPS.
+- [x] Wi-Fi **Ash & Mimi**, DHCP `192.168.100.51`, router `192.168.100.1`, MAC `d0:11:e5:94:6b:23`, proxies off.
 
 #### Still you — hardware leftovers (short)
 
-- [ ] **FileVault: tick exactly one of A / B / C** in operator-checklist §6. Auto-login is on, which on macOS usually means FileVault is **Off** → that is policy **C**. Confirm in System Settings → Privacy & Security → FileVault, then tick C and write the compensating control (home desk + keyboard + Screen Sharing LAN-only). **A is off the table** without a UPS.
-- [ ] Router: DHCP reservation so `192.168.100.51` stays; no WAN forwards on 22 / 5900 / 8080 / 11434
-- [ ] Confirm the Mini sits in the open (not a closed cabinet)
+- [ ] Router `192.168.100.1`: DHCP **reservation** for MAC `d0:11:e5:94:6b:23` → `192.168.100.51` so the lease does not drift. (The Mini is on DHCP today; that is not yet a reservation.)
+- [ ] Confirm the router is **not** forwarding WAN ports 22 / 5900 / 8080 / 11434.
+
+Hardware Day 0 is otherwise done. Next is software on the Mini.
 
 #### Then software on the Mini (this is the real remaining manual work)
 
@@ -73,7 +76,7 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 
 | Phase | What | Status |
 | --- | --- | --- |
-| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware almost green. **You:** FileVault tick (likely C), DHCP reservation, then cloud accounts §§1–5 |
+| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware Day 0 **done** (FileVault C). **You:** DHCP reservation optional-but-wise; cloud accounts §§1–5 before Phase B |
 | **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |
