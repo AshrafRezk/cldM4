@@ -124,6 +124,49 @@ Rules while Ethernet is out:
 
 This exception can be reversed later by plugging Ethernet and then turning Wi-Fi off. Until then, treat random 502s as a network symptom before an application bug.
 
+### 3b. How to reserve `192.168.100.51` and check port forwarding (this Mini)
+
+These clicks happen on the **router**, not on the Mac. Open a browser **on a phone or laptop that is already on `Ash & Mimi`**.
+
+This Mini right now:
+
+| | |
+| --- | --- |
+| Router admin | `http://192.168.100.1` (the “Router” IP from the Mini’s Wi-Fi TCP/IP pane) |
+| Mini LAN IP | `192.168.100.51` |
+| Mini Wi-Fi MAC | `d0:11:e5:94:6b:23` |
+| SSID | Ash & Mimi |
+
+Login is whatever you (or the ISP) set when the Wi-Fi was installed. Common defaults if you never changed them: printed on a sticker on the router (`admin` / a password). If the page does not load, you are not on that Wi-Fi, or the ISP uses a different admin URL (try `http://192.168.1.1` only if 192.168.100.1 fails).
+
+#### A. DHCP reservation (keep the Mini at .51)
+
+The Mini is already at `.51` **today** via a normal DHCP lease. A reservation tells the router: “this MAC always gets .51,” so Screen Sharing does not break in a week when the lease expires.
+
+1. In the router UI, look for one of these names: **DHCP reservation**, **Address reservation**, **Static lease**, **Bind IP to MAC**, **LAN → DHCP**.
+2. Add (or “reserve existing client”):
+   - MAC: `d0:11:e5:94:6b:23` (colons or dashes; routers accept either)
+   - IP: `192.168.100.51`
+   - Name: `cloudiator-mini` (optional)
+3. Save. You do **not** need to restart the Mini if it already has that IP.
+
+If you cannot find the screen: skip it for Phase A. `.51` will likely last days. Come back before you rely on Screen Sharing from another room after a power cut.
+
+Do **not** set a manual IP on the Mac itself (avoid “Configure IPv4: Manually”). Leave the Mini on DHCP and pin it in the router.
+
+#### B. Port forwarding (look, then do nothing)
+
+You are checking that the internet **cannot** open 22 / 5900 / 8080 / 11434 on your house. Salesforce will reach the Mini later through Cloudflare Tunnel (outbound), not through these ports.
+
+1. In the router UI, look for **Port forwarding**, **Virtual servers**, **NAT forwarding**, or **WAN applications**.
+2. If the list is **empty**, you are done. Do not add anything.
+3. If a row exists for 22, 5900, 8080, or 11434, **delete it**.
+4. Also turn **UPnP** off for this box if you see a toggle and you are not using it for a game console (optional but cleaner). **DMZ** must not point at `192.168.100.51`.
+
+You never need to “open a port for Cloudiator.” Opening 11434 would put Ollama on the public internet.
+
+**Not a Phase A blocker.** Install Ollama and run `scripts/mac-setup.sh` even if the router UI is confusing. Finish this the first time you can log into `192.168.100.1`.
+
 ### Router / firewall — allow outbound, deny inbound
 
 The Mini only needs **outbound** access:

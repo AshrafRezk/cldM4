@@ -36,8 +36,8 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 
 #### Still you — hardware leftovers (short)
 
-- [ ] Router `192.168.100.1`: DHCP **reservation** for MAC `d0:11:e5:94:6b:23` → `192.168.100.51` so the lease does not drift. (The Mini is on DHCP today; that is not yet a reservation.)
-- [ ] Confirm the router is **not** forwarding WAN ports 22 / 5900 / 8080 / 11434.
+- [ ] Router `192.168.100.1`: DHCP **reservation** for MAC `d0:11:e5:94:6b:23` → `192.168.100.51`. Step-by-step: [hardware-and-network.md](hardware-and-network.md) §3b. Not a Phase A blocker.
+- [ ] Confirm no WAN forwards on 22 / 5900 / 8080 / 11434 (same §3b: open the list, delete those rows if any, otherwise leave empty).
 
 Hardware Day 0 is otherwise done. Next is software on the Mini.
 
