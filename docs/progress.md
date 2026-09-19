@@ -6,6 +6,8 @@ This is the living status board. Operator blanks still live in [operator-checkli
 **Current phase:** A (code in git; Mini proofs not yet run)  
 **This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
+**Account note:** The appliance login **Cloudiator** is the original user renamed in Users & Groups. Unix short name / `$HOME` is still **`ashrafrezk`** (`ashrafrezk@cloudiator` in Terminal). A second Admin named **Ashraf** exists for updates. Install Ollama, `~/Cloudiator/.env`, and LaunchAgents on **this** session — do not switch users.
+
 Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashboards)**
 
 ---
@@ -23,7 +25,7 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 - [x] Display connected (screen-only desk is OK)
 - [x] Energy: prevent sleep when display off, wake for network, start up after power failure
 - [x] Local hostname `cloudiator.local`
-- [x] Appliance user `Cloudiator` exists (Admin) plus `Ashraf` (Admin)
+- [x] Appliance user **Cloudiator** is the renamed original account (Unix name **`ashrafrezk`**, home `/Users/ashrafrezk`). Second Admin: **Ashraf**. Auto-login is this same account, so LaunchAgents in `gui/$UID` match.
 - [x] Screen Sharing **LAN only** at `192.168.100.51`, Administrators only
 - [x] **Ethernet skipped on purpose.** Wi-Fi-only accepted — [hardware-and-network.md](hardware-and-network.md) §3a. Do not turn Wi-Fi off.
 - [x] **Automatically log in as `Cloudiator`**
