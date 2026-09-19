@@ -52,7 +52,8 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 #### Then software on the Mini (remaining)
 
 - [ ] Install Xcode CLT (GUI prompt or `xcode-select --install`), wait until `git --version` prints a version
-- [ ] Clone `cldM4`, checkout `cursor/phase-a-openai-shim-ee9d`, `~/Cloudiator/.env`, run `scripts/mac-setup.sh`
+- [x] Repo cloned at `~/cldM4` on branch `cursor/phase-a-openai-shim-ee9d`; `~/Cloudiator/.env` copied (`chmod 600`).
+- [ ] **Homebrew** — `mac-setup.sh` aborted: `Homebrew missing`. Install from https://brew.sh then re-run the script.
 
 #### Then software on the Mini (remaining)
 

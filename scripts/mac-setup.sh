@@ -30,7 +30,11 @@ if brew list --cask ollama >/dev/null 2>&1; then
   brew uninstall --cask ollama
 fi
 
-command -v brew >/dev/null 2>&1 || abort "Homebrew missing. Install from https://brew.sh then re-run."
+command -v brew >/dev/null 2>&1 || abort "Homebrew missing. In Terminal:
+  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"
+  echo 'eval \"\$(/opt/homebrew/bin/brew shellenv)\"' >> ~/.zprofile
+  eval \"\$(/opt/homebrew/bin/brew shellenv)\"
+then re-run this script from ~/cldM4."
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 brew install python@3.11 uv node@22 ffmpeg graphviz zbar poppler cloudflared git
