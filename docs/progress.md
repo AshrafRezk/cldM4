@@ -3,7 +3,7 @@
 This is the living status board. Operator blanks still live in [operator-checklist.md](operator-checklist.md). Phase commands live in [cursor-phases.md](cursor-phases.md).
 
 **Last updated:** 2026-09-19  
-**Current phase:** A **live proofs green** on the Mini. Next is operator-checklist §§1–5 (Cloudflare / Neon / Nominatim) before Phase B.  
+**Current phase:** A **live proofs green**. Next: [docs/next-steps-phase-b.md](next-steps-phase-b.md) (domain on Cloudflare, not Netlify).  
 **This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
 **Account note:** The appliance login **Cloudiator** is the original user renamed in Users & Groups. Unix short name / `$HOME` is still **`ashrafrezk`** (`ashrafrezk@cloudiator` in Terminal). A second Admin named **Ashraf** exists for updates. Install Ollama, `~/Cloudiator/.env`, and LaunchAgents on **this** session — do not switch users.
@@ -52,7 +52,7 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 - [x] Ollama `/api/tags` on `127.0.0.1:11434` lists both models (2026-09-19). Session `launchctl setenv` applied; do **not** `killall Ollama` again (`open -a` then hits LS error -600). Reopen from `/Applications/Ollama.app` only if the menu-bar app is actually gone.
 - [x] Worker on **`127.0.0.1:8080`** (2026-09-19 smoke). Health `ok: true`, `X-Request-Id` present, **one** uvicorn bound to `127.0.0.1:8080` (not `*:8080`), chat returned assistant text, embeddings length **768**, `ollama ps` = `qwen3.5:9b` + `nomic-embed-text` both Forever / 100% GPU, `vm.swapusage` used **0.00M**. LaunchAgent loaded via `launchctl bootstrap` (not `load`). Do **not** Connect ChatGPT in Ollama Apps. Do **not** `killall Ollama`.
 
-Phase A Mini live proofs are **done**. Optional: `cd ~/cldM4 && git pull` so a later install does not `bootout` the job. Then fill [operator-checklist.md](operator-checklist.md) §§1–5 before any Phase B chat.
+Phase A Mini live proofs are **done**. Next human work (other laptop is fine): **[docs/next-steps-phase-b.md](next-steps-phase-b.md)**. Do **not** buy the domain on Netlify. Then fill [operator-checklist.md](operator-checklist.md) §§1–3 and §5 before any Phase B coding chat.
 
 ### Before Phase B (operator-checklist §§1–5 must have no blanks)
 

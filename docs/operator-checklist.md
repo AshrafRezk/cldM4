@@ -2,6 +2,8 @@
 
 **Execution tracker:** [progress.md](progress.md) (done vs not done vs manual). This file stays the fill-in-the-blanks form. Do not commit real secrets.
 
+**Click-by-click for this week (other laptop):** **[docs/next-steps-phase-b.md](next-steps-phase-b.md)** — buy/point the domain on **Cloudflare, not Netlify**, wait until the zone is **Active**, create Neon (pooled URL in a password manager), pick a contact email. Then open a new Phase B chat.
+
 **Code vs you (2026-09-19):** Phase A is **done** on the Mini (loopback health, chat, embeddings, swap 0). Hardware Day 0 is **done**. Fill §§1–5 (Cloudflare / Neon / Nominatim) before Phase B.
 
 Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.

@@ -15,7 +15,7 @@ A Mac Mini M4 **24GB** is the AI worker. A small cloud control plane (Netlify da
 3. Open **this folder** in Cursor (Pro Plus / $60).
 4. Configure Cursor using **[docs/cursor-settings.md](docs/cursor-settings.md)** (Opus vs Sonnet vs Grok, Privacy Mode, Auto off, no YOLO).
 5. Read **[PLAN.md](PLAN.md)** end to end before generating code.
-6. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. Phase B cannot pass with blanks in it.
+6. Fill in **[docs/operator-checklist.md](docs/operator-checklist.md)** §0 now and §§1–6 before Phase B. **This week’s clicks:** **[docs/next-steps-phase-b.md](docs/next-steps-phase-b.md)** (domain on Cloudflare, **not** Netlify). Phase B cannot pass with blanks in the checklist.
 7. Pull this repo. **Phase A application code is already in `apps/worker`.** On the Mini run `scripts/mac-setup.sh`, then the Phase A **Prove it** commands in **[docs/cursor-phases.md](docs/cursor-phases.md)**. Track done / not done / manual in **[docs/progress.md](docs/progress.md)**. New Agent chat for Phase B only after those proofs are green.
 8. Do not skip Mini proofs. Do not install Docker for GPU inference. Do not put inference in Netlify Functions.
 
@@ -28,6 +28,7 @@ You may run `cd apps/worker && uv sync --extra dev && uv run pytest -q` (set `CL
 | File | Use |
 | --- | --- |
 | [docs/progress.md](docs/progress.md) | **What is done / not done / manual.** Start here if you are asking “where are we?” |
+| [docs/next-steps-phase-b.md](docs/next-steps-phase-b.md) | **Do this week on a laptop.** Domain + Cloudflare Active + Neon. Not Netlify. |
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
 | [docs/hardware-and-network.md](docs/hardware-and-network.md) | **Day 0.** Physical Mini, Ethernet, CGNAT, no port forwards, accounts, prove-internet commands |
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
