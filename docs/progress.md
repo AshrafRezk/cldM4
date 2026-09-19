@@ -4,7 +4,7 @@ This is the living status board. Operator blanks still live in [operator-checkli
 
 **Last updated:** 2026-09-19  
 **Current phase:** A (code in git; Mini proofs not yet run)  
-**This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, LAN `192.168.100.51`, Screen Sharing on (Admins only). **Wi-Fi only** — Ethernet skipped. Display connected; auto-login still **Off**.
+**This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, LAN `192.168.100.51`, `uname -m` = **arm64**, auto-login **Cloudiator**, network time on, **no UPS** (accepted). **Wi-Fi only.** Keyboard in the room.
 
 Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashboards)**
 
@@ -26,19 +26,19 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 - [x] Appliance user `Cloudiator` exists (Admin) plus `Ashraf` (Admin)
 - [x] Screen Sharing **LAN only** at `192.168.100.51`, Administrators only
 - [x] **Ethernet skipped on purpose.** Wi-Fi-only accepted — [hardware-and-network.md](hardware-and-network.md) §3a. Do not turn Wi-Fi off.
+- [x] **Automatically log in as `Cloudiator`**
+- [x] Date & Time → **Set time and date automatically** (Apple `time.apple.com`, Pacific)
+- [x] `uname -m` → **arm64** (Terminal as `ashrafrezk@cloudiator`)
+- [x] Keyboard in the room
+- [x] **No UPS** — operator will not buy one. Power cuts mean downtime until a human is at the Mini.
 
-#### Still you, on the Mini (hardware/OS leftovers)
+#### Still you — hardware leftovers (short)
 
-A screen-only + Wi-Fi desk is enough to continue. These four are the remaining hardware/OS items that actually block unattended Phase A:
+- [ ] **FileVault: tick exactly one of A / B / C** in operator-checklist §6. Auto-login is on, which on macOS usually means FileVault is **Off** → that is policy **C**. Confirm in System Settings → Privacy & Security → FileVault, then tick C and write the compensating control (home desk + keyboard + Screen Sharing LAN-only). **A is off the table** without a UPS.
+- [ ] Router: DHCP reservation so `192.168.100.51` stays; no WAN forwards on 22 / 5900 / 8080 / 11434
+- [ ] Confirm the Mini sits in the open (not a closed cabinet)
 
-- [ ] **Automatic login as `Cloudiator`** (Users & Groups → Automatically log in as). It is **Off** today. LaunchAgents and Ollama.app will not come back after a reboot until this is On.
-- [ ] Tick **exactly one** FileVault/boot policy in operator-checklist **§6** (A / B / C). A keyboard must stay in the room: Screen Sharing cannot type at the FileVault pre-boot screen.
-- [ ] Date & Time → **Set time automatically**
-- [ ] Router: DHCP reservation so `192.168.100.51` does not change; confirm **no WAN port forwards** for 22 / 5900 / 8080 / 11434
-- [ ] Optional: UPS yes/no; confirm Mini sits open (not in a cabinet)
-- [ ] Terminal: `uname -m` → `arm64` (Terminal must not be “Open using Rosetta”)
-
-#### Then software on the Mini (Phase A proofs)
+#### Then software on the Mini (this is the real remaining manual work)
 
 - [ ] Install **Cursor Pro Plus** on the Mini, Privacy Mode on, Auto off ([cursor-settings.md](cursor-settings.md))
 - [ ] Install **official Ollama.app** (not `brew install ollama`)
@@ -73,7 +73,7 @@ A screen-only + Wi-Fi desk is enough to continue. These four are the remaining h
 
 | Phase | What | Status |
 | --- | --- | --- |
-| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware SKU **green**. **You:** auto-login, FileVault tick, accounts §§1–5 |
+| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware almost green. **You:** FileVault tick (likely C), DHCP reservation, then cloud accounts §§1–5 |
 | **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |

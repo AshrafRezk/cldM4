@@ -193,12 +193,12 @@ Fill the actual IDs into [operator-checklist.md](operator-checklist.md) §§1–
 
 Print this. Tick as you go.
 
-1. [x] Physical: power + display. Ethernet **n/a** (Wi-Fi-only, §3a). Keyboard still needed in the room for FileVault unlock. UPS: undecided.
+1. [x] Physical: power + display + **keyboard in the room**. Ethernet **n/a** (Wi-Fi-only, §3a). **No UPS** (operator will not buy one).
 2. [x] macOS setup: hostname `cloudiator.local`, users `Cloudiator` + `Ashraf` (both Admin). Software Update: freeze casual updates during Phase A–B.
-3. [x] Energy: prevent sleep when display off, wake for network, start up after power failure. [ ] Automatic time still unconfirmed.
-4. [ ] FileVault policy ticked in operator-checklist §6. [ ] Automatic login on (**currently Off** — LaunchAgents will not survive a reboot until this is On for `Cloudiator`).
+3. [x] Energy: prevent sleep when display off, wake for network, start up after power failure. Automatic time on (Apple `time.apple.com`).
+4. [x] Automatic login as `Cloudiator`. [ ] FileVault policy still needs an explicit A/B/C tick in operator-checklist §6 (likely **C** — auto-login is on).
 5. [x] Disk: **443 GB free** of 494 GB (About This Mac → Storage, 2026-09-19). Comfortable for full v1.
-6. [ ] `uname -m` → `arm64` in Terminal (M4 implies it; still run the command, Terminal must not be “Open using Rosetta”).
+6. [x] `uname -m` → `arm64` (`ashrafrezk@cloudiator`, 2026-09-19). Terminal is not Rosetta.
 7. [x] Wi-Fi-only exception. [ ] DHCP reservation for the Wi-Fi MAC → keep `192.168.100.51`.
 8. [x] Screen Sharing **LAN only** at `vnc://192.168.100.51/` / “Ashraf's Mac mini”, Administrators only, VNC-password viewers off.
 9. [ ] Internet: `curl -I https://github.com` and `curl -I https://ollama.com` return success.
@@ -281,11 +281,11 @@ Confirm **closed** from WAN (should time out). Use a phone cellular `nc` or a po
 
 Hardware/network is green when:
 
-- [x] 24 GB M4 Mini, ≥ 120 GB free (443 GB). [ ] `uname -m` still to run in Terminal
+- [x] 24 GB M4 Mini, arm64, ≥ 120 GB free (443 GB)
 - [x] Wi-Fi-only exception accepted (§3a). [ ] DHCP reservation for `192.168.100.51`
 - [ ] No WAN port forwards for 22/8080/11434 (Screen Sharing is LAN-only already)
 - [ ] Phone-on-cellular test of `api.` is possible after Phase B (you already own the domain)
-- [ ] FileVault/UPS policy written; automatic login for `Cloudiator`
+- [x] No UPS (accepted). [x] Automatic login for `Cloudiator`. [ ] FileVault A/B/C still needs a tick (likely C)
 - [ ] Cursor Pro Plus on this machine, repo cloned, next file is host-setup.md
 
 Operator: ____________________  Date: ____________
