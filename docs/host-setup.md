@@ -125,8 +125,10 @@ Only after that, bootstrap the LaunchAgents.
 After installing the .app, confirm `which ollama`, then:
 
 ```bash
-ollama pull qwen3.5:9b          # verify the tag first — see PLAN.md section 7, Phase A step 0
-ollama show qwen3.5:9b          # confirm tools support; note whether it supports vision
+ollama pull gemma4:e4b-it-qat   # QAT Q4_0 — verify the tag first; PLAN.md section 7, Phase A step 0
+ollama show gemma4:e4b-it-qat   # must show tools AND vision; file type Q4_0
+# Do NOT `ollama pull gemma4` — that is the 9.6GB Q4_K_M latest tag.
+# Do NOT pull gemma4:26b / gemma4:31b / *-q8_0 / *-bf16.
 ollama pull nomic-embed-text
 # gpt-oss:20b belongs to Phase E, not now. It is ~14GB.
 ```

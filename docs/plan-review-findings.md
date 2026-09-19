@@ -10,6 +10,8 @@ Reviewer pass over `PLAN.md`, `README.md`, `AGENTS.md`, `docs/*`, `.cursor/rules
 
 Every finding below has already been **patched into the instructions**. The "Patched in" column is where the implementer will actually read it. This file is the audit log, not a second source of truth — `PLAN.md` still wins.
 
+**Later plan change (Arabic / Gemma 4):** the always-hot chat model is now `gemma4:e4b-it-qat` (official QAT Q4_0), not `qwen3.5:9b`. Historical P0s below that say "the 9B" mean **the hot `DEFAULT_MODEL`**. P0-09's tag-gate still applies — the intended tag is just Gemma. Do not pull `gemma4:26b` / `31b` / Q8 / bf16 as a "better Arabic" fix; that is the swap failure P0-01 warned about.
+
 ---
 
 ## P0 — must fix before Phase A

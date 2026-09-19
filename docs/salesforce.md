@@ -41,7 +41,7 @@ req.setMethod('POST');
 req.setHeader('Content-Type', 'application/json');
 req.setTimeout(120000);                       // default is 10s; without this you time out mid-thought
 req.setBody(JSON.serialize(new Map<String, Object>{
-  'model' => 'qwen3.5:9b',
+  'model' => 'gemma4:e4b-it-qat',
   'stream' => false,
   'max_tokens' => 512,
   'messages' => new List<Object>{
@@ -169,7 +169,7 @@ Reference: https://salesforce.stackexchange.com/questions/27668
 
 ## Preset
 
-Use dashboard preset **Salesforce engineer**: default model only, `max_tokens=512`, `force_no_stream=true`, `max_response_bytes=1MB`, tools ocr/maps/charts/stats/data/docs/text/time/image_ops, no FLUX, no Google, `log_prompts=false`.
+Use dashboard preset **Salesforce engineer**: default Gemma E4B QAT only, `max_tokens=512`, `force_no_stream=true`, `max_response_bytes=1MB`, tools ocr/maps/charts/stats/data/docs/text/time/image_ops, no FLUX, no Google, `log_prompts=false`, `GEMMA_THINKING=false`. Arabic and English.
 
 ## Data leaving the org
 

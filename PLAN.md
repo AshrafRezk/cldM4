@@ -42,7 +42,7 @@ Cloudiator looks like a private OpenAI:
 - The Mini **orchestrates**: deterministic libraries when possible; local models when language/vision/generation is required.
 - 24GB is enough if you treat Metal as **one slot**, not a GPU farm.
 
-This is not ChatGPT quality. It is an always-on, scoped, Salesforce-callable inference + tools appliance.
+This is not ChatGPT quality. It is an always-on, scoped, Salesforce-callable inference + tools appliance. Default chat is Arabic-capable (Gemma 4) as well as English.
 
 ---
 
@@ -57,8 +57,9 @@ This is not ChatGPT quality. It is an always-on, scoped, Salesforce-callable inf
 | Auth in v1 | **FastAPI worker is the only authenticator.** Cloudflare does TLS, DDoS, WAF skip, and rate limiting — never key validation | Avoid a second proxy timeout hop. A gateway Worker is **not** in v1; do not create `apps/gateway/` |
 | Admin auth | Cloudflare Access on `app.<domain>` and `/v1/admin*`. No shared password anywhere | The dashboard mints API keys; a shared password on a public URL is the weakest link in the system |
 | LLM runtime | Official Ollama.app + GGUF | Simplest; MLX optional later for 10–20% speed |
-| Image generation | mflux FLUX.1-schnell quantized | Apple Silicon native; exclusive RAM slot |
-| OCR | Apple Vision (`ocrmac`) | Instant, zero extra weights |
+| Default chat (Arabic + English + vision) | `gemma4:e4b-it-qat` (Gemma 4 E4B, official QAT **Q4_0**) | One always-hot slot that covers MSA/Arabic, tools, and image *understanding*; see §7 |
+| Image generation | mflux FLUX.1-schnell quantized | Apple Silicon native; exclusive RAM slot. **Gemma 4 does not generate images** |
+| OCR | Apple Vision (`ocrmac`) first; Gemma VLM only if layout/handwriting needs it | Instant, zero extra weights for the common path |
 | Maps | Nominatim + Overpass + OSRM | No Google key required |
 | Charts/stats/data | matplotlib/plotly, scipy, DuckDB | LLMs lie about numbers |
 | Docker for inference | Forbidden | Docker Desktop does not pass Metal well |
@@ -142,27 +143,28 @@ macOS Sequoia idle ≈ 5–8 GB. Treat **16 GB** as the model envelope. **18 GB*
 | --- | --- | --- |
 | macOS + apps | 5–8 GB | always |
 | FastAPI + numpy/pandas/scipy/matplotlib/opencv-headless | 0.7–1.2 GB | always |
-| `qwen3.5:9b` hot | 6.6–8 GB | always-hot (**slot 1**) |
+| `gemma4:e4b-it-qat` hot | ~6.1 GB disk; ~5–8 GB resident | always-hot (**slot 1**). Official QAT **Q4_0**. Arabic + vision + tools |
+| `gemma4:12b-it-qat` (optional) | ~7.2 GB disk; ~7–9 GB resident | **instead of** E4B, never beside it. Arabic-quality upgrade after swap = 0 |
 | `nomic-embed-text` | 0.3 GB | always-hot (**slot 2, reserved**) |
-| KV cache 4k ctx | 0.5–1.5 GB | per loaded LLM |
-| `gpt-oss:20b` | ~14 GB | exclusive; unload 9B first |
+| KV cache 4k ctx | 0.5–1.5 GB | per loaded LLM. Do **not** raise `num_ctx` toward Gemma's 128K/256K window |
+| `gpt-oss:20b` | ~14 GB | exclusive; unload the hot Gemma first |
 | FLUX schnell **4-bit** | 9–12 GB peak | exclusive; default |
 | FLUX schnell 8-bit | 13–16 GB peak | exclusive; **opt-in, measure first** |
 | Whisper large-v3-turbo | ~1.6 GB | exclusive |
 | Headless Chromium (mmdc / kaleido) | 0.4–1.2 GB per render | CPU, but see `cpu_heavy_lock` in §8 |
 | DuckDB query | tens–hundreds MB | CPU, skip `metal_lock` |
 
-**Never coresident:** 9B+20B, 9B+FLUX, 20B+FLUX, 27B+anything, FLUX+Chromium.
+**Never coresident:** Gemma+20B, Gemma+FLUX, Gemma E4B+12B, 20B+FLUX, 26B/31B+anything, FLUX+Chromium. `gemma4:26b*` and `gemma4:31b*` are **never** pulled in v1 (16–20 GB Q4 already blows the 18 GB ceiling once macOS is resident).
 
 The numbers above are estimates from this SKU class, not measurements of *your* machine. Record real values in `docs/operator-checklist.md` §9 during Phases A and E. **If `sysctl vm.swapusage` shows non-zero swap at any peak, reduce the configuration — do not proceed.**
 
 ### The two-slot rule
 
-`OLLAMA_MAX_LOADED_MODELS=1` and "9B and the embedder are both always hot" cannot both be true. With a limit of 1, every embeddings call evicts the 9B and the next chat pays a 5–15s cold load; chat latency becomes randomly terrible and nobody can reproduce it.
+`OLLAMA_MAX_LOADED_MODELS=1` and "the hot chat model and the embedder are both always hot" cannot both be true. With a limit of 1, every embeddings call evicts Gemma and the next chat pays a 5–15s cold load; chat latency becomes randomly terrible and nobody can reproduce it.
 
 So: **`OLLAMA_MAX_LOADED_MODELS=2`**, with a product rule that Ollama itself cannot express —
 
-- **Slot 1** holds exactly one *generative* model (the 9B, or an exclusive model while it runs).
+- **Slot 1** holds exactly one *generative* model (Gemma 4 E4B QAT, or an exclusive model while it runs).
 - **Slot 2** is reserved for `nomic-embed-text` and nothing else (0.3 GB, no Metal contention worth worrying about).
 
 The "one Metal-heavy model" invariant is enforced by the worker's `metal_lock` plus an explicit unload-and-verify before every exclusive load (§8), **not** by the Ollama limit. Belt and braces:
@@ -171,7 +173,7 @@ The "one Metal-heavy model" invariant is enforced by the worker's `metal_lock` p
 - Before any exclusive load, poll `/api/ps` until nothing but `nomic-embed-text` remains.
 - If `/api/ps` ever reports two generative models, that is a P0 bug: log loudly, set `/v1/health` to `degraded`, and stop accepting exclusive work.
 
-**Failure if skipped:** raising the limit to 4 "to fix embeddings" puts 9B + 20B resident at ~21 GB, the box swaps, and throughput drops below 1 tok/s.
+**Failure if skipped:** raising the limit to 4 "to fix embeddings" puts Gemma + 20B resident at ~21 GB, the box swaps, and throughput drops below 1 tok/s. Same failure if you `ollama pull gemma4:e4b` (the 9.6 GB Q4_K_M tag) *and* leave it coresident with anything exclusive.
 
 **Ollama env (LaunchAgent):**
 
@@ -191,18 +193,20 @@ OLLAMA_ORIGINS=http://127.0.0.1:8080
 
 | Path | `keep_alive` sent by the worker |
 | --- | --- |
-| Hot chat model (9B) | `-1` (resident forever) |
+| Hot chat model (`DEFAULT_MODEL`, Gemma E4B QAT) | `-1` (resident forever) |
 | `nomic-embed-text` | `-1` |
 | Any exclusive model (20B, whisper) | `0` — unload the moment the call returns |
 | Anything else | `0` |
 
 `OLLAMA_KEEP_ALIVE=30m` stays as the env default purely as a **safety net**: if the worker crashes while an exclusive model is resident, the Mini reclaims 14 GB half an hour later instead of never. In normal operation the env value is never the effective value.
 
-**Failure if skipped:** omit `keep_alive` on the hot model and it unloads after 30 quiet minutes; the next Salesforce call spends 5–15s of its 120s budget on a cold load, and the first call every morning is the slow one.
+**Failure if skipped:** omit `keep_alive` on the hot Gemma and it unloads after 30 quiet minutes; the next Salesforce call spends 5–15s of its 120s budget on a cold load, and the first call every morning is the slow one.
 
 `OLLAMA_ORIGINS` is a **browser CORS** setting. It is not authentication and it does not protect port 11434. The only protection on 11434 is the loopback bind — any local process or logged-in user can drive it directly (§12).
 
-Context caps: default `num_ctx=4096`, max `8192` on 9B. Salesforce keys: `max_tokens=512` (about 25–40s at 15–22 tok/s, inside 120s). Ollama **silently drops the oldest tokens** when a prompt exceeds `num_ctx`; the worker must detect this before the call and return `400 context_length_exceeded` instead (§10).
+Context caps: default `num_ctx=4096`, max `8192` on the hot Gemma. Salesforce keys: `max_tokens=512` (about 25–40s at 15–22 tok/s, inside 120s). Gemma 4's *trained* window is 128K (E4B) / 256K (12B) — **do not use it**. KV cache at those lengths will swap a 24 GB Mini. Ollama **silently drops the oldest tokens** when a prompt exceeds `num_ctx`; the worker must detect this before the call and return `400 context_length_exceeded` instead (§10).
+
+**Thinking mode is off by default.** Gemma 4 thinking (`<|think|>` in the system prompt) burns `max_tokens` and the 75s tool-loop budget on hidden reasoning. Salesforce keys and the default worker path must **not** enable it (`GEMMA_THINKING=false`). A later opt-in on a non-Salesforce key is allowed only after measuring that a think+answer still fits the 90s worker deadline.
 
 ### Memory pressure polling
 
@@ -216,7 +220,7 @@ vm_stat                                         # free/inactive pages if you wan
 
 Use `asyncio.create_subprocess_exec`, never a blocking `subprocess.run` in the event loop. `sysctl` is cheap; spawning the `memory_pressure` binary every 5s is not, and its output format is awkward to parse — prefer the `sysctl` integer and keep `memory_pressure` for humans debugging at a terminal.
 
-On `warn` or `critical`: refuse new exclusive jobs with `429` + `Retry-After`, refuse new Chromium-backed renders, `ollama stop` anything cold, keep the 9B resident if at all possible. On recovery to `normal` for two consecutive polls, resume.
+On `warn` or `critical`: refuse new exclusive jobs with `429` + `Retry-After`, refuse new Chromium-backed renders, `ollama stop` anything cold, keep the hot Gemma resident if at all possible. On recovery to `normal` for two consecutive polls, resume.
 
 ### Disk
 
@@ -224,7 +228,7 @@ Budget **120 GB free** for the full v1 set. The 256 GB SSD variant is genuinely 
 
 | Consumer | Size |
 | --- | --- |
-| `~/.ollama` — 9B + embed | ~7 GB |
+| `~/.ollama` — Gemma E4B QAT + embed | ~6.4 GB |
 | `~/.ollama` — `gpt-oss:20b` (Phase E, opt-in) | ~14 GB |
 | `~/.cache/huggingface` — FLUX **full precision**, if you let mflux download it | **~34 GB** (see §7; avoid or reclaim) |
 | `~/Cloudiator/models` — FLUX pre-quantized 4-bit | ~7 GB |
@@ -250,7 +254,7 @@ System Settings → Energy: prevent sleep when the display is off, wake for netw
 
 Pick one in `docs/operator-checklist.md` §6: FileVault + UPS + manual unlock (recommended), FileVault with `authrestart` for planned reboots, or FileVault off with a documented compensating control. Whichever you pick, enable automatic login for the appliance account — without a GUI session the LaunchAgents in §6 never run.
 
-Thermal: M4 Mini active cooling holds 9B indefinitely. FLUX bursts are fine. Do not put the Mini in a closed cabinet.
+Thermal: M4 Mini active cooling holds Gemma E4B QAT indefinitely. FLUX bursts are fine. Do not put the Mini in a closed cabinet.
 
 ---
 
@@ -335,44 +339,84 @@ cloudflared is the only public path.
 
 ## 7. Models to download (v1)
 
-Install Ollama from https://ollama.com/download/mac. **Pulls are phase-scoped.** Pulling everything up front costs ~35 GB of disk and an hour of home bandwidth during the phase where you are trying to prove a 30-line HTTP shim works.
+Install Ollama from https://ollama.com/download/mac. **Pulls are phase-scoped.** Pulling everything up front costs tens of GB of disk and an hour of home bandwidth during the phase where you are trying to prove a 30-line HTTP shim works.
+
+### Why Gemma 4 (Arabic + images), and which bits
+
+Salesforce orgs and sites on this appliance need **Modern Standard Arabic** (and mixed AR/EN) in the same always-hot slot as tool calling. Gemma 4 is natively multilingual (35+ languages out of the box, including Arabic; pre-trained on 140+) **and** natively multimodal (text + image on every size; audio on E2B/E4B/12B). That is why it replaces `qwen3.5:9b` as the default brain.
+
+Gemma 4 **understands** images (OCR-ish VLM, documents, UI). It does **not** generate pictures. Generation stays FLUX.1-schnell 4-bit in Phase E.
+
+Pin the **official QAT Q4_0** GGUF, not the short tags:
+
+| Ollama tag | Quant | Disk (library) | Google Q4_0 weight RAM | v1 role |
+| --- | --- | --- | --- | --- |
+| **`gemma4:e4b-it-qat`** | QAT **Q4_0** | ~6.1 GB | ~4.5 GB (+ KV, + overhead) | **DEFAULT always-hot.** Arabic + vision + tools |
+| `gemma4:12b-it-qat` | QAT **Q4_0** | ~7.2 GB | ~6.7 GB | Optional **instead of** E4B if Arabic/vision quality on E4B is not enough **and** `vm.swapusage` stays 0. Still slot 1. |
+| `gemma4:e4b` / `gemma4:e4b-it-q4_K_M` | Q4_K_M | ~9.6 GB | — | Do **not** use as default. Same capability, ~3.5 GB fatter than QAT. |
+| `gemma4:e4b-it-q8_0` / `12b-it-q8_0` | Q8_0 | ~12 / ~13 GB | — | Never hot. Eats the exclusive-FLUX margin. |
+| `gemma4:*-it-bf16` / MLX bf16 | 16-bit | 16–25 GB+ | — | Never. Exceeds the 18 GB ceiling with macOS. |
+| `gemma4:26b*` / `gemma4:31b*` | Q4+ | 16–20 GB | 14.4 / 17.5 GB | **Never in v1.** Exclusive-sized and still too big next to macOS. |
+
+QAT (quantization-aware training) is Google's 4-bit checkpoint trained to survive Q4_0; it is the quality-preserving choice, not a random PTQ dump. Sources: https://ai.google.dev/gemma/docs/core (memory table) and https://ollama.com/library/gemma4/tags.
+
+Do **not** `ollama pull gemma4` / `gemma4:latest` — those currently resolve to the 9.6 GB Q4_K_M E4B, not the QAT tag.
 
 | Pull in | Model | Size | Why then |
 | --- | --- | --- | --- |
-| **Phase A** | `qwen3.5:9b` | ~6.6 GB | the default brain; nothing works without it |
+| **Phase A** | `gemma4:e4b-it-qat` | ~6.1 GB | default brain: Arabic, English, vision, tools |
 | **Phase A** | `nomic-embed-text` | ~274 MB | slot 2, `/v1/embeddings` |
-| Phase A (optional) | `llama3.2:3b` | ~2 GB | fallback if the 9B tag does not resolve or misbehaves |
+| Phase A (optional) | `gemma4:12b-it-qat` | ~7.2 GB | quality upgrade **replacing** E4B, not added beside it |
+| Phase A (optional) | `llama3.2:3b` | ~2 GB | last-resort fallback if every Gemma tag fails |
 | **Phase E**, opt-in | `gpt-oss:20b` | ~14 GB | exclusive slot only; useless until the jobs queue exists |
-| **Never** | `gpt-oss:120b`, any 70B, `qwen3.5:27b` as a default | — | exceeds the 18 GB ceiling; guaranteed swap |
-
-`qwen3.5:27b` may be pulled later as an **idle-only, manually triggered** experiment on a machine with disk to spare. It must never be a key's default model and must never be hot.
+| **Never** | `gpt-oss:120b`, any 70B, `gemma4:26b*`, `gemma4:31b*`, `qwen3.5:27b` as a default | — | exceeds the 18 GB ceiling; guaranteed swap |
 
 `HEAVY_MODEL` stays commented out in `.env` until the Phase E pull actually completes. `GET /v1/models` must be built from live `ollama tags` intersected with the key's scope — never from env alone. **Failure if skipped:** the API advertises `gpt-oss:20b`, a caller selects it, and Ollama starts a 14 GB download inside an HTTP request.
 
+### Arabic and UTF-8 (worker rules)
+
+- Prompts, tool results, and completions are **UTF-8**. Do not Latin-1 round-trip, NFC-strip, or "sanitize" Arabic letters.
+- Reply in the user's language. An Arabic user message must not be answered in English unless they asked for translation.
+- Apple Vision OCR remains the fast path for "read this invoice/barcode." Route to Gemma's VLM when the question needs layout, handwriting, or mixed AR/EN on the image.
+- Bidirectional text in the **dashboard** is Phase C polish (`dir="auto"` on chat panes). The API does not need RTL CSS.
+
+Independent Arabic-task evals sometimes rank later Qwen variants higher on ALUE / ArabicMMLU than Gemma 4. That does not change the default: Gemma 4 is the one 24GB-fit model that covers **Arabic + vision + tools** without a second generative slot. Do not coresident a Qwen chat model "just in case."
+
 ### Phase A step 0 — model tag verification gate
 
-`qwen3.5:9b` is the *intended* tag. Model libraries move. Verify before you build anything on top of it:
+`gemma4:e4b-it-qat` is the *intended* tag. Model libraries move. Verify before you build anything on top of it:
 
 ```bash
-ollama pull qwen3.5:9b && ollama show qwen3.5:9b
+ollama pull gemma4:e4b-it-qat && ollama show gemma4:e4b-it-qat
 ```
 
-Read the `show` output and confirm two things: the model supports **tools** (the tool registry in §9 depends on it) and whether it supports **vision**.
+Read the `show` output and confirm **both**: the model supports **tools** (the tool registry in §9 depends on it) **and** **vision** (Gemma 4 is a VLM; a text-only substitute is a product regression for Arabic documents).
 
-If the tag does not resolve, walk this ladder and take the first that resolves, supports tools, and fits 6–9 GB:
+If the tag does not resolve, walk this ladder and take the first that resolves, supports **tools and vision**, and fits ~4–8 GB on disk:
 
-1. the current `qwen3.5` tag in the 7–9B range on https://ollama.com/library/qwen3.5
-2. `qwen3:8b`
-3. `qwen2.5:7b-instruct`
-4. `llama3.1:8b`
+1. `gemma4:e4b-it-qat` (intended)
+2. `gemma4:12b-it-qat` (still QAT Q4_0; record the extra RAM)
+3. current E4B QAT-equivalent tag on https://ollama.com/library/gemma4/tags — **not** `gemma4:latest` unless `show` proves it is Q4_0 QAT and ~6 GB
+4. `qwen3.5:9b` only if every Gemma vision tag fails — then v1 Arabic/vision is degraded; stop and tell the operator
+5. `llama3.2:3b` last resort (no Arabic-first claim, likely no vision)
 
-Then: record the choice in `docs/operator-checklist.md` §8, set `DEFAULT_MODEL` in `.env`, and change **nothing else** — every other file refers to the model through `DEFAULT_MODEL`. Do not substitute a 27B or a 14B "since we're changing it anyway".
+Then: record the choice in `docs/operator-checklist.md` §8, set `DEFAULT_MODEL` in `.env`, and change **nothing else** — every other file refers to the model through `DEFAULT_MODEL`. Do not substitute a 26B, 31B, Q8, or bf16 "since we're changing it anyway".
 
-**On vision:** if the chosen model has no vision capability, the image path in §9 and §10 is **OCR-only** and `/v1/chat/completions` with an `image_url` returns `model_not_found`. That is an acceptable v1. If you genuinely need VLM chat, a small VLM (e.g. a 7B-class vision model, ~6 GB) occupies **slot 1** — it swaps with the 9B and pays the full cold-load cost on every alternation. It is not a third hot model. Decide once, write it in the checklist, and do not let a later phase quietly add it.
+Smoke Arabic **and** English before calling Phase A done:
+
+```bash
+# Arabic (expect Arabic in the completion, not an English apology)
+ollama run gemma4:e4b-it-qat "اكتب جملة واحدة بالفصحى عن الطقس اليوم."
+```
+
+**On vision:** Gemma 4 E4B/12B QAT is the VLM. There is no third hot vision model. If the chosen fallback has no vision, `/v1/chat/completions` with an `image_url` returns `model_not_found` and the image path is OCR-only — acceptable only as a recorded fallback, not as the intended v1.
 
 Library pages:
 
-- https://ollama.com/library/qwen3.5
+- https://ollama.com/library/gemma4
+- https://ollama.com/library/gemma4/tags
+- https://ai.google.dev/gemma/docs/core
+- https://ai.google.dev/gemma/docs/core/model_card_4
 - https://ollama.com/library/gpt-oss
 - https://ollama.com/library/nomic-embed-text
 - https://ollama.com/library/llama3.2
@@ -432,15 +476,15 @@ Benchmarks for this SKU:
 Single `asyncio.Lock` named `metal_lock` plus a state machine:
 
 ```
-states: idle_hot_9b | loading | chat_9b | exclusive_20b | exclusive_flux | exclusive_whisper | pressure_shed
+states: idle_hot_default | loading | chat_default | exclusive_20b | exclusive_flux | exclusive_whisper | pressure_shed
 ```
 
 Rules:
 
 0. **Single process.** `uvicorn --workers 1` (§6). The scheduler is in-process state; a second worker means a second scheduler and the whole section is void. Assert at startup.
 1. Tools and DuckDB **do not** take `metal_lock`.
-2. Embeddings allowed during `idle_hot_9b` and `chat_9b` (slot 2, §4).
-3. Chat 9B: acquire lock, `OLLAMA_NUM_PARALLEL=1`, send `keep_alive: -1`.
+2. Embeddings allowed during `idle_hot_default` and `chat_default` (slot 2, §4).
+3. Chat on `DEFAULT_MODEL`: acquire lock, `OLLAMA_NUM_PARALLEL=1`, send `keep_alive: -1`. Thinking off (§4).
 4. Exclusive: stop the hot model (`keep_alive=0` or `ollama stop`), **poll `/api/ps` until nothing but `nomic-embed-text` remains**, then load the target, run it, unload it, reload the hot model with `keep_alive=-1`. Never assume the stop took effect — poll.
 5. If lock wait > 2s for sync Salesforce chat → `429` with `Retry-After: 5`. Offer `POST /v1/jobs` in error `param`.
 6. If memory pressure is not `normal` → no new exclusive work, no new Chromium-backed renders; optionally no new chat.
@@ -464,7 +508,7 @@ async def run_exclusive(kind: str, run):
             await kill_orphan_subprocesses()    # terminate(), then kill() after grace
             await unload_all_generative()       # keep_alive=0, best effort
             await reload_hot_model()            # keep_alive=-1, best effort, logged on failure
-            state.set("idle_hot_9b")
+            state.set("idle_hot_default")
 ```
 
 Non-negotiable properties:
@@ -472,7 +516,7 @@ Non-negotiable properties:
 - `async with metal_lock` — never a manual `acquire()`/`release()` pair. A raised exception between them leaks the lock.
 - Subprocesses (mflux, whisper) get a hard wall-clock timeout, then `terminate()`, then `kill()` after a short grace period. A hung mflux holding 12 GB is worse than a failed job.
 - The hot-model reload is in `finally` and is **best effort**: if it fails, log it, mark health `degraded`, and let the watchdog retry — do not raise out of `finally` and mask the original error.
-- **Watchdog:** a background task checks every 30s. If `/api/ps` shows no generative model and no exclusive job is running for 60 consecutive seconds, re-warm the hot model. This is what recovers the box after an OOM kill.
+- **Watchdog:** a background task checks every 30s. If `/api/ps` shows no generative model and no exclusive job is running for 60 consecutive seconds, re-warm `DEFAULT_MODEL`. This is what recovers the box after an OOM kill.
 - Test this deliberately in Phase E: `kill -9` the mflux process mid-generation and confirm that chat works again within 60s with no human intervention.
 
 ---
@@ -493,11 +537,11 @@ Worker is a **tool host**. Every tool:
 **Router:**
 
 1. `/v1/tools/*` → library, no model.
-2. Image + “read/barcode/invoice text” → OCR or pyzbar, not VLM unless layout reasoning needed after.
+2. Image + “read/barcode/invoice text” → OCR or pyzbar, not VLM unless layout / handwriting / mixed Arabic+English on the page needs it after.
 3. CSV/JSON + chart/aggregate language → DuckDB / stats / chart, LLM only narrates.
-4. “Generate a picture of…” → FLUX if scoped else 400.
+4. “Generate a picture of…” → FLUX if scoped else 400. **Not Gemma.**
 5. Resize/blur/compare → Pillow/OpenCV, never FLUX.
-6. Unstructured language → 9B with ≤12 tools.
+6. Unstructured language (Arabic or English) → `DEFAULT_MODEL` with ≤12 tools.
 
 **Default chat tools (max 12):** `ocr_image`, `geocode`, `places_nearby`, `render_chart`, `stats_describe`, `sql_on_table`, `extract_document`, `image_transform`, `fuzzy_match`, `convert_units`.
 
@@ -522,7 +566,7 @@ Hard limits, all enforced by the worker:
 
 **Failure if skipped:** an unbounded loop runs until Cloudflare's ~100s origin timeout and Apex receives a 524 HTML page instead of an OpenAI error object.
 
-**Worker toolbelt RAM ~0.7–1.2 GB.** OK beside 9B. Unload 20B before huge DuckDB/OpenCV.
+**Worker toolbelt RAM ~0.7–1.2 GB.** OK beside Gemma E4B QAT. Unload 20B before huge DuckDB/OpenCV.
 
 **Hard bans:** unrestricted `eval`; Playwright in v1; TensorFlow/PyTorch in the worker process (mflux/whisper = subprocess); face **recognition**; video gen; captcha solvers.
 
@@ -648,7 +692,7 @@ sqlite-vec RAG, rembg, weasyprint, PaddleOCR-VL for CJK.
 
 ### Key presets
 
-- **Salesforce engineer (default):** chat, embeddings, ocr, maps, charts, stats, data, docs, text, time, image_ops. Model 9B only. `max_tokens=512`. No FLUX, no 20B, no Google, no face.
+- **Salesforce engineer (default):** chat, embeddings, ocr, maps, charts, stats, data, docs, text, time, image_ops. Model = `DEFAULT_MODEL` (Gemma E4B QAT) only. `max_tokens=512`. Arabic and English. No FLUX, no 20B, no Google, no face, no Gemma thinking.
 - **Creative:** + image_generation + diagrams
 - **Analyst:** charts/stats/data heavy
 - **Heavy:** + gpt-oss:20b exclusive
@@ -713,6 +757,8 @@ Other paths: embeddings 15s. Images are **always** a job for Salesforce keys; an
 
 `n` > 1, `logprobs`, `top_logprobs`, `best_of`, `logit_bias`, `stream: true` on a key with `force_no_stream` (see §14 for the Salesforce downgrade behaviour), `tool_choice: "required"` if unsupported by the chosen model.
 
+The worker must **not** inject Gemma thinking tokens (`<|think|>`) unless `GEMMA_THINKING=true` on a non-Salesforce key. Thinking is not an OpenAI request field; do not invent one.
+
 **Accept and pass through:** `temperature`, `top_p`, `seed`, `stop`, `max_tokens`, `presence_penalty`, `frequency_penalty`, `tools`, `tool_choice: auto|none`, `response_format: {"type":"json_object"}`.
 
 **404 `not_supported`** on endpoint families that will never exist in v1, with an OpenAI-shaped body so SDKs surface a readable error: `/v1/assistants*`, `/v1/threads*`, `/v1/fine_tuning*`, `/v1/files*`, `/v1/images/edits`, `/v1/images/variations`, `/v1/moderations`, `/v1/batches`.
@@ -733,6 +779,7 @@ Applies to `messages[].content[].image_url` and to any tool that takes an image 
 - **Resolve DNS first and check every resolved address** against loopback, RFC1918, link-local including `169.254.0.0/16`, CGNAT `100.64.0.0/10`, IPv6 ULA and loopback, and multicast. Re-check after **every** redirect; cap redirects at 2.
 - Content-Type must be an image; 25 MB and 10s caps per fetch.
 - Downscale before the model: long edge ≤ **1024 px**, JPEG q85, EXIF stripped. Max **4 images** per request.
+- Place **image parts before text** in the Ollama payload (Gemma 4 modality order). For Arabic document photos, that still goes through the same downscale; do not raise the long-edge cap to "help OCR."
 
 **Failure if skipped (SSRF, P0):** the API is OpenAI-compatible, so the image URL is attacker-controlled by design. Without this, a tenant points it at `http://169.254.169.254/` or `http://127.0.0.1:11434/` and reads the response back out through the model. **Failure if skipped (downscale):** a 12 MP phone photo becomes thousands of image tokens, silently overflows a 4k context, and drops the actual question.
 
@@ -944,7 +991,7 @@ Uploading files **from** Apex is genuinely painful: hand-rolled multipart means 
 | Phase | What | Where |
 | --- | --- | --- |
 | 0 | [docs/operator-checklist.md](docs/operator-checklist.md) §§1–6: domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy | human, before Phase B |
-| A | Ollama 9B+embed, FastAPI OpenAI shim, health, metal lock, loopback | Mini |
+| A | Ollama Gemma E4B QAT + embed, FastAPI OpenAI shim, health, metal lock, loopback | Mini |
 | B | Neon schema, key auth, tunnel, public HTTPS, 401/403 | Mini + Cloudflare + Neon |
 | C | Netlify dashboard: mint keys, scopes, usage, OpenAPI download | anywhere + Netlify |
 | D | Tool registry + OCR + maps | Mini |
@@ -962,9 +1009,9 @@ v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional).
 - OCR/geocode/Pillow/stats: &lt; 2s
 - Chart PNG: 1–4s
 - DuckDB: &lt; 30s cap
-- 9B chat: 17–22 tok/s warm; cold load 5–15s
+- Gemma E4B QAT chat: 17–22 tok/s warm target (measure on the Mini; multilingual may be slightly slower than English-only 9B-class); cold load 5–15s
 - Embeddings: tens of ms warm
-- FLUX 1024 (4-bit, weights already local and pre-quantized): 10–20s exclusive + 10–30s model-swap tax if the 9B was loaded. **First ever run is minutes, not seconds** — do the Phase E warmup offline (§7)
+- FLUX 1024 (4-bit, weights already local and pre-quantized): 10–20s exclusive + 10–30s model-swap tax if Gemma was loaded. **First ever run is minutes, not seconds** — do the Phase E warmup offline (§7)
 - 20B: exclusive; swap tax 10–30s
 - Concurrent orgs: **serialized**. Scale by queueing or a second Mini, not `NUM_PARALLEL`
 
@@ -982,7 +1029,7 @@ Phase B: from a phone on cellular (not the Mini's wifi): chat with a real key ov
 
 Phase D2: CSV → SQL group by → chart PNG URL opens; every SQL string in the §9 Family D reject list is refused.
 
-Phase E: image job completes; `kill -9` on mflux mid-generation still leaves chat working within 60s; 9B reloads without human intervention; `sysctl vm.swapusage` shows zero used.
+Phase E: image job completes; `kill -9` on mflux mid-generation still leaves chat working within 60s; Gemma reloads without human intervention; `sysctl vm.swapusage` shows zero used.
 
 Salesforce: Named Credential chat under 120s; job polled across separate transactions for a chart plus narrative.
 
@@ -1010,7 +1057,7 @@ See also [docs/troubleshooting.md](docs/troubleshooting.md).
 | Two generative models loaded | scheduler skipped the unload-and-verify | poll `/api/ps` before every exclusive load; health → degraded if violated |
 | Dashboard secret in JS | leaked keys | only server functions; grep the build output |
 | Salesforce gets HTML, `JSON.deserialize` throws | Cloudflare bot challenge on `api.` | Bot Fight Mode off + WAF skip rule (§13) |
-| 9B never comes back after an image job | exclusive teardown not in `finally` | `try/finally` + watchdog (§8) |
+| Hot Gemma never comes back after an image job | exclusive teardown not in `finally` | `try/finally` + watchdog (§8) |
 | Mini at the login screen after a power cut | FileVault + no user session | operator checklist §6; UPS; `fdesetup authrestart` for planned reboots |
 | Chat randomly cold and slow | embeddings evicting the hot model | `OLLAMA_MAX_LOADED_MODELS=2`, slot 2 reserved (§4) |
 | Two schedulers, RAM blown | `uvicorn --workers > 1` | `--workers 1` + startup assertion (§6) |
@@ -1052,7 +1099,7 @@ Not GPT-4o. Not multi-user parallel FLUX. Not a replacement for Einstein GPT com
 
 ## 21. License notes
 
-Operator must keep attributions. FLUX.1-schnell Apache 2.0. gpt-oss Apache 2.0. Qwen: check card (often Apache 2.0 for 3.5). Nominatim/OSM: share-alike on map data displays; geocode results OK with attribution. Do not scrape Google.
+Operator must keep attributions. FLUX.1-schnell Apache 2.0. gpt-oss Apache 2.0. Gemma 4: Gemma Terms of Use (https://ai.google.dev/gemma/terms) — **not** Apache; commercial use is allowed under those terms, verify before production. Nominatim/OSM: share-alike on map data displays; geocode results OK with attribution. Do not scrape Google.
 
 ---
 
@@ -1065,7 +1112,7 @@ A Salesforce org can:
 3. Upload a report CSV, SQL-aggregate, get a PNG chart URL.
 4. See usage in the dashboard.
 5. Download OpenAPI that hides FLUX if the key cannot use it, and import it into External Services.
-6. Mini reboot **with a logged-in session**: LaunchAgents bring Ollama, worker, cloudflared back; 9B warms; health green. After a *cold* boot with FileVault on, a human unlocks first — that is expected, documented in §4, and is why the health webhook exists.
+6. Mini reboot **with a logged-in session**: LaunchAgents bring Ollama, worker, cloudflared back; Gemma E4B QAT warms; health green. After a *cold* boot with FileVault on, a human unlocks first — that is expected, documented in §4, and is why the health webhook exists.
 7. Kill mflux mid-job and chat recovers on its own within 60s.
 8. `sysctl vm.swapusage` reports zero used at every measured peak in `docs/operator-checklist.md` §9.
 
