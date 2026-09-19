@@ -94,17 +94,6 @@ class Settings:
 
     health_rpm: int = field(default_factory=lambda: _int("HEALTH_RPM", 120))
 
-    @property
-    def is_hot_model(self):
-        hot = {self.default_model, self.embed_model}
-        return lambda model: model in hot
-
-    def keep_alive_for(self, model: str) -> int:
-        """PLAN.md §4 keep-alive precedence. Never omit keep_alive on a call."""
-        if model in (self.default_model, self.embed_model):
-            return -1
-        return 0
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

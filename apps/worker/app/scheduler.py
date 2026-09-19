@@ -102,7 +102,9 @@ class Scheduler:
         self.loaded: list[str] = []
         self.degraded: dict[str, str] = {}
 
-        self._normal_polls = 0
+        # Starts satisfied: the two-consecutive-normal rule exists to make
+        # recovery from warn/critical deliberate, not to shed work at boot.
+        self._normal_polls = NORMAL_POLLS_TO_RECOVER
         self._exclusive_held = False
         self._seconds_without_generative = 0.0
         self._tasks: list[asyncio.Task] = []
@@ -207,7 +209,7 @@ class Scheduler:
             finally:
                 await self._restore_hot_model()
                 self._exclusive_held = False
-                self.state = STATE_IDLE
+                self.state = STATE_IDLE if self.pressure_ok else STATE_PRESSURE_SHED
 
     async def _restore_hot_model(self) -> None:
         """Best effort, never raises: a raise here would mask the real error."""

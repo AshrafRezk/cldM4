@@ -229,6 +229,15 @@ async def test_recovery_needs_two_consecutive_normal_polls(settings):
     assert scheduler.pressure_ok
 
 
+async def test_a_fresh_scheduler_is_not_shedding_before_the_first_poll(settings):
+    """The recovery rule must not make the worker refuse work at boot."""
+    scheduler = Scheduler(settings, FakeModels())
+
+    assert scheduler.pressure_ok
+    assert scheduler.allow_exclusive()
+    assert scheduler.state == STATE_IDLE
+
+
 async def test_cpu_heavy_lock_is_separate_from_metal_lock(settings):
     scheduler = make_scheduler(settings)
 
