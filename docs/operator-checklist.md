@@ -12,7 +12,9 @@ Legend: `[ ]` not done · `[x]` done · `n/a` deliberately skipped (write why).
 
 ## 0. Before you touch the Mini (15 min)
 
-- [ ] Mini is on wired Ethernet if possible (tunnel stability + first weight downloads are tens of GB).
+- [ ] Uplink chosen (tick exactly one):
+  - ☐ **Ethernet** (preferred) — Wi-Fi off after Ethernet is up; DHCP reservation on Ethernet MAC.
+  - ☐ **Wi-Fi only** — main SSID (not guest), prefer 5 GHz, DHCP reservation on Wi-Fi MAC, single interface. Phase B must use `protocol: http2` in `~/.cloudflared/config.yml` (see [hardware-and-network.md](hardware-and-network.md) §3).
 - [ ] Free disk measured: `df -h /` → **______ GB free**. Need **≥ 120 GB** free for the full v1 model set. Below 80 GB, plan to skip FLUX 8-bit and `gpt-oss:20b`.
 - [ ] Mini is not in a closed cabinet.
 - [ ] UPS decision: ☐ have one ☐ accepting the risk (see §6, FileVault).
