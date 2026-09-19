@@ -109,14 +109,18 @@ Kaleido binary missing. Fall back to matplotlib Agg. Never fail worker import or
 
 `curl` connection refused, smoke unit tests pass, live loopback skipped. Ollama `/api/tags` is fine. macOS `pgrep -fc` prints usage (BSD pgrep has no `-c`).
 
-The LaunchAgent is crash-looping. `KeepAlive=true` plus `ThrottleInterval=10` looks "installed" (`xpcproxy` / not running) while nothing binds `:8080`.
+The LaunchAgent is crash-looping **or** stuck in lifespan warmup (uvicorn does not accept connections until startup `yield`). `KeepAlive=true` plus `ThrottleInterval=10` looks "installed" (`xpcproxy` / not running) while nothing binds `:8080`.
 
 ```bash
 tail -n 80 ~/Cloudiator/logs/worker.err
 launchctl print gui/$(id -u)/ai.cloudiator.worker | head -40
 ```
 
-If you see `zsh: no matches found` (`?` in `DATABASE_URL`) or `command not found: you@example.com` (parentheses in `NOMINATIM_USER_AGENT`), the wrapper `source`-d `.env` as zsh. Pull the bash dotenv loader and reinstall — **do not** `killall Ollama` to retry the worker (`open -a` then hits LaunchServices error -600):
+**zsh `.env` glob:** `zsh: no matches found` (`?` in `DATABASE_URL`) or `command not found: you@example.com`. Pull the bash dotenv loader.
+
+**Logging error during warmup:** `Message: 'HTTP Request: %s %s "%s %d %s"'` / `Arguments: (..., '200', 'OK')`. The redaction filter stringified httpx's status code and broke `%d`. Health stayed down because warmup was `await`ed before listen. Fixed: format-then-redact, background warmup with `stream: false` / `think: false`.
+
+Pull and reinstall — **do not** `killall Ollama` (`open -a` then hits LaunchServices error -600):
 
 ```bash
 cd ~/cldM4

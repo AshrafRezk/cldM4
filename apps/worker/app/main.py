@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from collections import defaultdict, deque
@@ -56,6 +58,20 @@ UNSUPPORTED_PREFIXES = (
 _health_hits: dict[str, deque[float]] = defaultdict(deque)
 
 
+async def _warmup_safe(ollama: OllamaClient, settings: Settings) -> None:
+    """Background pin of 9B + embedder. Failures must not take down :8080."""
+    force = os.environ.get("CLOUDIATOR_FORCE_WARMUP", "").lower() in {"1", "true", "yes"}
+    if settings.cloudiator_env.lower() == "test" and not force:
+        return
+    try:
+        await ollama.warmup()
+        log.info("ollama warmup complete")
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("ollama warmup failed; worker stays up on 127.0.0.1:8080")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
@@ -65,12 +81,17 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.ollama = ollama
     await monitor.start(settings)
-    if settings.cloudiator_env.lower() != "test":
-        await ollama.warmup()
+    warmup_task = asyncio.create_task(_warmup_safe(ollama, settings), name="ollama-warmup")
+    app.state.warmup_task = warmup_task
     log.info("worker ready version=%s host=%s port=%s", __version__, settings.host, settings.port)
     try:
         yield
     finally:
+        warmup_task.cancel()
+        try:
+            await warmup_task
+        except asyncio.CancelledError:
+            pass
         await monitor.stop()
         await ollama.aclose()
         release_pidfile(settings)

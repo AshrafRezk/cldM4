@@ -12,12 +12,15 @@ _KEY_RE = re.compile(r"sk-cld-[A-Za-z0-9_\-]+")
 
 class RedactFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = _redact(str(record.msg))
-        if record.args:
-            if isinstance(record.args, dict):
-                record.args = {k: _redact(str(v)) for k, v in record.args.items()}
-            else:
-                record.args = tuple(_redact(str(a)) for a in record.args)
+        # Format first, then redact. Stringifying args in place breaks httpx's
+        # 'HTTP Request: ... %d ...' (int 200 -> "200" -> TypeError on %d),
+        # which prints "--- Logging error ---" and can abort lifespan warmup.
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            rendered = str(record.msg)
+        record.msg = _redact(rendered)
+        record.args = ()
         return True
 
 
@@ -34,9 +37,9 @@ def configure_logging() -> None:
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
         )
-    filt = RedactFilter()
     for handler in logging.root.handlers:
-        handler.addFilter(filt)
+        if not any(isinstance(f, RedactFilter) for f in handler.filters):
+            handler.addFilter(RedactFilter())
 
 
 def headers_for_log(headers: Any) -> dict[str, str]:

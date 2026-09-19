@@ -131,7 +131,12 @@ class OllamaClient:
         return names
 
     async def warmup(self) -> None:
-        """Pin the hot chat model and the embedder (keep_alive -1)."""
+        """Pin the hot chat model and the embedder (keep_alive -1).
+
+        Must not be awaited on the lifespan startup path: loading qwen3.5:9b
+        can take longer than smoke/launchd health waits, and a thinking model
+        with stream default-true can hang `/api/generate` past the timeout.
+        """
         try:
             await self._client.post(
                 "/api/generate",
@@ -139,11 +144,13 @@ class OllamaClient:
                     "model": self.settings.default_model,
                     "prompt": "",
                     "keep_alive": -1,
+                    "stream": False,
+                    "think": False,
                     "options": {"num_predict": 0},
                 },
-                timeout=60.0,
+                timeout=180.0,
             )
-        except httpx.HTTPError as exc:
+        except Exception as exc:
             log.warning("hot model warmup failed: %s", exc)
         try:
             await self.embed(self.settings.embed_model, ["warmup"])
