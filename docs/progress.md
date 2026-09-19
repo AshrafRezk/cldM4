@@ -89,6 +89,7 @@ Do [hardware-and-network.md](hardware-and-network.md) top to bottom, then [host-
 - [x] LaunchAgent template + path substitution (`scripts/install-launchagents.sh`)
 - [x] `scripts/mac-setup.sh`, `scripts/smoke-phase-a.sh`
 - [x] Tests: `test_openai_translation.py`, `test_metal_lock.py`, `test_ssrf_guard.py`, `test_context_guard.py` (+ HTTP smoke)
+- [x] Off-Mini unit tests: **53 passed** (2026-09-19, Linux x86_64, `CLOUDIATOR_ENV=test`)
 
 Production boot still **aborts on Linux / x86_64**. Unit tests set `CLOUDIATOR_ENV=test` so they can run off-Mini.
 
