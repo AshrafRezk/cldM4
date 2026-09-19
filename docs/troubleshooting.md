@@ -179,3 +179,11 @@ ollama show "$DEFAULT_MODEL" | head
 If the tag is right and replies are still English-only, the worker may be injecting a system prompt that says "respond in English", or `GEMMA_THINKING=true` is eating `max_tokens` before the Arabic answer. Both are bugs.
 
 Gemma 4 **does not generate images**. "Generate a picture" is FLUX (Phase E). "What does this Arabic invoice say?" is OCR first, then Gemma vision.
+
+## Concurrent chats are slow, so someone wants vLLM or NUM_PARALLEL=4
+
+vLLM *does* batch better (paged KV). On this 24GB Mini, extra in-flight sequences are extra unified RAM, and vLLM-metal wants Python 3.12 while the worker is 3.11 for Vision. v1 serializes: FastAPI `metal_lock`, `OLLAMA_NUM_PARALLEL=1`, `429` + jobs if the lock wait exceeds 2s. See `PLAN.md` §4.
+
+Do not install vllm-metal into the worker venv. Do not pull `gemma4:*-mlx` for "better cache" — Gemma 4 hybrid KV prefix reuse is the GGUF/llama.cpp path, not Ollama MLX.
+
+If the *second* identical-prefix chat is as slow as the first, the worker is mutating the system prompt or tools JSON (timestamps, shuffled keys, request ids). That is a product bug, not a missing engine.

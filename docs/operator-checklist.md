@@ -170,7 +170,7 @@ An appliance with no alerting is an appliance that is down and nobody knows. If 
 
 `PLAN.md` names `gemma4:e4b-it-qat` (Gemma 4 E4B, official QAT **Q4_0**). That tag is the Arabic + vision + tools default. If it does not resolve on build day, Phase A walks the fallback ladder. **Write down what you actually installed** — every later phase, the `DEFAULT_MODEL` env var, and the dashboard presets depend on it.
 
-Do **not** install `gemma4` / `gemma4:latest` (those are the ~9.6 GB Q4_K_M E4B). Do **not** pull `gemma4:26b*` or `gemma4:31b*`.
+Do **not** install `gemma4` / `gemma4:latest` (those are the ~9.6 GB Q4_K_M E4B). Do **not** pull `gemma4:26b*` or `gemma4:31b*`. Do **not** use `gemma4:*-mlx` as DEFAULT (Gemma 4 prefix cache). Do **not** install vLLM in Phase A.
 
 | Slot | Planned | Actually installed | Size on disk | Tools? | Vision? | Arabic smoke? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -198,6 +198,8 @@ The RAM table in `PLAN.md` §4 is an estimate. Replace it with what your machine
 | Gemma tokens/sec warm (English) | Phase A curl timing | ______ tok/s |
 | Gemma tokens/sec warm (Arabic) | Phase A curl timing | ______ tok/s |
 | Gemma cold load time | Phase A | ______ s |
+| TTFT first chat (new prefix) | Phase A curl | ______ s |
+| TTFT second chat (same system+tools prefix) | Phase A curl | ______ s — should be lower |
 | Peak memory during FLUX 4-bit 1024² | Activity Monitor during Phase E | ______ GB |
 | Peak memory during FLUX 8-bit 1024² (only if you enable it) | | ______ GB |
 | FLUX 1024² wall clock | Phase E | ______ s |

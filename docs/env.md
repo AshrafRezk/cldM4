@@ -17,6 +17,7 @@ Template: [.env.example](../.env.example).
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | yes |
 | `DEFAULT_MODEL` | `gemma4:e4b-it-qat` (or the tag verified in Phase A step 0) | yes |
 | `EMBED_MODEL` | `nomic-embed-text` | yes |
+| `INFERENCE_BACKEND` | `ollama` | yes — v1. vLLM-metal is not a v1 value |
 | `HEAVY_MODEL` | `gpt-oss:20b` | no — **keep commented out until the Phase E pull completes** |
 | `VISION_MODEL` | | no — Gemma 4 *is* the VLM. Only set this if the tag gate fell back to a text-only model; it shares slot 1, see `PLAN.md` §7 |
 | `GEMMA_THINKING` | `false` | yes — do not enable Gemma thinking mode; Salesforce keys must stay false |
@@ -24,7 +25,7 @@ Template: [.env.example](../.env.example).
 | `MAX_TOKENS_DEFAULT` | `512` | yes |
 | `MPLBACKEND` | `Agg` | yes |
 
-`DEFAULT_MODEL` is the single place the model name lives. If Phase A's tag gate picked something other than `gemma4:e4b-it-qat`, change it here and in `docs/operator-checklist.md` §8 — nowhere else. Never point it at `gemma4` / `gemma4:latest` (Q4_K_M ~9.6 GB) or at `gemma4:26b` / `31b`.
+`DEFAULT_MODEL` is the single place the model name lives. If Phase A's tag gate picked something other than `gemma4:e4b-it-qat`, change it here and in `docs/operator-checklist.md` §8 — nowhere else. Never point it at `gemma4` / `gemma4:latest` (Q4_K_M ~9.6 GB), `gemma4:*-mlx`, or `gemma4:26b` / `31b`. `INFERENCE_BACKEND=ollama` until a documented v1.1 exclusive vLLM experiment exists (`PLAN.md` §4).
 
 ## Mini worker — limits and budgets
 

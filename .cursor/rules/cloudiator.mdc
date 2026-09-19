@@ -9,7 +9,8 @@ You are building a Mac Mini M4 24GB inference appliance. `PLAN.md` wins over blo
 - Always send an explicit `keep_alive`: `-1` for the hot model and embedder, `0` for everything else.
 - Exclusive slot work goes in `try/finally`: kill orphans, reload the hot model, release the lock.
 - Never tunnel or expose `11434`. Never put inference in Netlify Functions.
-- One Metal-heavy model at a time. Do not `ollama pull` 70B, 120B, `gemma4:26b*`, `gemma4:31b*`, or default-hot 27B. Default chat is `gemma4:e4b-it-qat` (QAT Q4_0). `gpt-oss:20b` is Phase E only.
+- One Metal-heavy model at a time. Do not `ollama pull` 70B, 120B, `gemma4:26b*`, `gemma4:31b*`, or `gemma4:*-mlx` as DEFAULT. Default chat is `gemma4:e4b-it-qat` (QAT Q4_0 GGUF). `gpt-oss:20b` is Phase E only.
+- `OLLAMA_NUM_PARALLEL=1`. Do not install vLLM in the worker venv. Queue in FastAPI; vLLM-metal is v1.1 exclusive only.
 - Python 3.11 arm64 only. Abort on x86_64/Rosetta.
 - FastAPI owns the tool loop: max 8 iterations, 75s budget, scope re-checked every call.
 - Vision `image_url` is SSRF-exposed: https/data only, resolve DNS, block private ranges, downscale to 1024px.

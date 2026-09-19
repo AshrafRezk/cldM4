@@ -49,7 +49,7 @@ c) Model tag gate (PLAN.md section 7): ollama pull gemma4:e4b-it-qat && ollama s
 d) Smoke-test Apple Vision early even though OCR is Phase D: python -c "import Vision" in the venv. If it fails with a framework error, rebuild the venv against /opt/homebrew/opt/python@3.11/bin/python3.11.
 
 1. Create apps/worker as FastAPI + uv + Python 3.11. Commit .python-version (3.11) and uv.lock. uv python pin 3.11.
-2. scripts/mac-setup.sh: the arm64 gate from step 0, brew deps from docs/host-setup.md, Time Machine and Spotlight exclusions, newsyslog log rotation, then ollama pull for the DEFAULT model (`gemma4:e4b-it-qat`) and nomic-embed-text only (llama3.2:3b optional). Do NOT pull gpt-oss:20b, gemma4:26b, gemma4:31b, Q8/bf16 Gemma, 27B, 70B, or 120B in this phase.
+2. scripts/mac-setup.sh: the arm64 gate from step 0, brew deps from docs/host-setup.md, Time Machine and Spotlight exclusions, newsyslog log rotation, then ollama pull for the DEFAULT model (`gemma4:e4b-it-qat`) and nomic-embed-text only (llama3.2:3b optional). Do NOT pull gpt-oss:20b, gemma4:26b, gemma4:31b, gemma4:*-mlx, Q8/bf16 Gemma, 27B, 70B, or 120B in this phase. Do NOT install vllm-metal.
 3. Implement:
    - GET /v1/health — unauthenticated, local-only, no Neon call, no secrets. Returns ok, free_mb, loaded, queue_depth, pressure, free_disk_gb, db, version.
    - POST /v1/chat/completions (OpenAI JSON in/out, call Ollama 127.0.0.1:11434)
@@ -61,6 +61,7 @@ d) Smoke-test Apple Vision early even though OCR is Phase D: python -c "import V
    - X-Request-Id on every response including errors
    - num_ctx default 4096, max_tokens default 512, and a pre-flight token estimate that returns 400 context_length_exceeded instead of letting Ollama silently truncate
    - Explicit keep_alive on every Ollama call: -1 for the hot model and the embedder, 0 for anything else (PLAN.md section 4). GEMMA_THINKING=false; do not inject thinking tokens.
+   - Prefix-cache hygiene (PLAN.md section 4): byte-stable system prompt, canonical tools JSON, no request ids in Ollama messages. Do not pull gemma4:*-mlx. Do not install vllm-metal / raise OLLAMA_NUM_PARALLEL.
    - The unsupported-parameter matrix from PLAN.md section 10 (reject n>1, logprobs, top_logprobs, best_of, logit_bias)
    - SSRF guard for vision image_url inputs: https and data: only, DNS-resolve and reject private ranges, re-check redirects, downscale to 1024px long edge, max 4 images
 4. Bind 127.0.0.1:8080 only, uvicorn --workers 1. Assert single-process at startup and refuse to boot if WEB_CONCURRENCY is anything but 1. No --reload in the LaunchAgent.
@@ -392,8 +393,10 @@ Tests: tests/test_sf_stream_downgrade.py, tests/test_response_size_cap.py.
 
 ## What not to do in any phase
 
-- `ollama pull` 70B / 120B / default 27B / `gemma4:26b*` / `gemma4:31b*` / Gemma Q8 or bf16 as the hot model
+- `ollama pull` 70B / 120B / default 27B / `gemma4:26b*` / `gemma4:31b*` / `gemma4:*-mlx` as DEFAULT / Gemma Q8 or bf16 as the hot model
 - `ollama pull gpt-oss:20b` before Phase E
+- `OLLAMA_NUM_PARALLEL` anything other than 1
+- Install vllm-metal (or any second Metal server) in the worker 3.11 venv or beside Ollama in v1
 - `uvicorn --workers` anything other than 1; no gunicorn; no `--reload` in a LaunchAgent
 - `OLLAMA_MAX_LOADED_MODELS` anything other than 2, and slot 2 is `nomic-embed-text` only
 - Let Ollama run the tool loop

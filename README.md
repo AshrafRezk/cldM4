@@ -48,7 +48,8 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 - **No video generation** in v1.
 - Inference **never** runs on Netlify (timeouts).
 - One Metal-heavy model at a time on 24GB, enforced by the worker's scheduler and `uvicorn --workers 1`.
-- Default chat is **Gemma 4 E4B QAT** (`gemma4:e4b-it-qat`, 4-bit) for Arabic + English + image understanding. Image *generation* is still FLUX 4-bit, exclusive.
+- Default chat is **Gemma 4 E4B QAT GGUF** (`gemma4:e4b-it-qat`, 4-bit) for Arabic + English + image understanding. Image *generation* is still FLUX 4-bit, exclusive.
+- Inference in v1 is **Ollama GGUF, one in-flight generation**. vLLM-metal (paged KV / continuous batching) is a v1.1 exclusive experiment, not a Phase A install.
 - Libraries first, models last.
 - The FastAPI worker is the only thing that validates API keys. Cloudflare does TLS, DDoS, and a WAF skip rule — Salesforce Apex cannot answer a bot challenge.
 - Admin and dashboard sit behind Cloudflare Access. No shared password anywhere.

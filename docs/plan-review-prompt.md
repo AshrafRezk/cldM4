@@ -57,6 +57,7 @@ B. Mini / Metal / RAM
 - macOS Sequoia Local Network permission for cloudflared
 - Ollama .app vs brew ollama conflict
 - Exclusive slot teardown if mflux crashes mid-job (always reload DEFAULT_MODEL / Gemma in finally)
+- vLLM-metal vs Ollama: do not raise NUM_PARALLEL; prefix-cache hygiene; Python 3.12 vs worker 3.11
 - Disk-full and artifact TTL
 - memory_pressure polling implementation note
 - First-run mflux weight download size vs 25s HTTP

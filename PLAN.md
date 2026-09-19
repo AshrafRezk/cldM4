@@ -56,16 +56,16 @@ This is not ChatGPT quality. It is an always-on, scoped, Salesforce-callable inf
 | Public HTTPS | Cloudflare named Tunnel | No port forward, works behind CGNAT |
 | Auth in v1 | **FastAPI worker is the only authenticator.** Cloudflare does TLS, DDoS, WAF skip, and rate limiting — never key validation | Avoid a second proxy timeout hop. A gateway Worker is **not** in v1; do not create `apps/gateway/` |
 | Admin auth | Cloudflare Access on `app.<domain>` and `/v1/admin*`. No shared password anywhere | The dashboard mints API keys; a shared password on a public URL is the weakest link in the system |
-| LLM runtime | Official Ollama.app + GGUF | Simplest; MLX optional later for 10–20% speed |
+| LLM runtime | Official Ollama.app + **GGUF** (llama.cpp). Not Ollama `*:mlx` tags. Not vLLM in v1 | Prefix cache works on GGUF; Arabic VLM + tools stay in one 3.11 process. **vLLM-metal is v1.1 exclusive**, see §4 |
 | Default chat (Arabic + English + vision) | `gemma4:e4b-it-qat` (Gemma 4 E4B, official QAT **Q4_0**) | One always-hot slot that covers MSA/Arabic, tools, and image *understanding*; see §7 |
 | Image generation | mflux FLUX.1-schnell quantized | Apple Silicon native; exclusive RAM slot. **Gemma 4 does not generate images** |
 | OCR | Apple Vision (`ocrmac`) first; Gemma VLM only if layout/handwriting needs it | Instant, zero extra weights for the common path |
 | Maps | Nominatim + Overpass + OSRM | No Google key required |
 | Charts/stats/data | matplotlib/plotly, scipy, DuckDB | LLMs lie about numbers |
-| Docker for inference | Forbidden | Docker Desktop does not pass Metal well |
-| Concurrency | 1 generation at a time, **`uvicorn --workers 1`** | 24GB unified memory; `metal_lock` is in-process and does not survive multiple workers |
+| Docker for inference | Forbidden | Docker Desktop does not pass Metal well. vLLM-metal also runs **native**, never in Docker |
+| Concurrency | 1 in-flight generation. Queue, then `429`. Not continuous batching | 24GB KV. Raising `OLLAMA_NUM_PARALLEL` is not vLLM; it allocates N KV slots and swaps |
 | Salesforce long work | Jobs API + poll | Apex max 120s callout |
-| Python | 3.11, **arm64 only** | pyobjc/Vision and MLX under Rosetta are broken or pointlessly slow |
+| Python | 3.11, **arm64 only** for the worker | pyobjc/Vision. vLLM-metal needs its **own** 3.12 venv if/when v1.1 runs |
 
 ---
 
@@ -207,6 +207,51 @@ OLLAMA_ORIGINS=http://127.0.0.1:8080
 Context caps: default `num_ctx=4096`, max `8192` on the hot Gemma. Salesforce keys: `max_tokens=512` (about 25–40s at 15–22 tok/s, inside 120s). Gemma 4's *trained* window is 128K (E4B) / 256K (12B) — **do not use it**. KV cache at those lengths will swap a 24 GB Mini. Ollama **silently drops the oldest tokens** when a prompt exceeds `num_ctx`; the worker must detect this before the call and return `400 context_length_exceeded` instead (§10).
 
 **Thinking mode is off by default.** Gemma 4 thinking (`<|think|>` in the system prompt) burns `max_tokens` and the 75s tool-loop budget on hidden reasoning. Salesforce keys and the default worker path must **not** enable it (`GEMMA_THINKING=false`). A later opt-in on a non-Salesforce key is allowed only after measuring that a think+answer still fits the 90s worker deadline.
+
+### Inference, queues, and KV cache (vLLM vs Ollama)
+
+"VLM is better than Ollama for queuing; cache/tokens are grouped" is the **vLLM** argument (PagedAttention, continuous batching, automatic prefix cache). It is true on hardware with KV headroom. It is the wrong v1 swap on this Mini.
+
+Measured on an M4 Mini with a **0.6B** model: vLLM-metal ~2× p50 vs Ollama under 3 req/s because it batches decode across in-flight sequences instead of running them one-at-a-time. A larger Ollama model at that rate timed out; vLLM did not. Write-up: https://kraghavan.ca/llm-infrastructure/inference/2026/04/16/vllm-ollama-apple-silicon-experiment2.html. Plugin: https://github.com/vllm-project/vllm-metal (Python **3.12** arm64, native Metal, not Docker).
+
+That experiment's KV cache peaked at **~4%** because the model was tiny. Gemma E4B QAT + 4k ctx + `max-num-seqs=4` is a different envelope: every extra parallel sequence is another resident KV page on the same 16 GB model budget. Continuous batching does not create RAM.
+
+| Temptation | Why it is wrong on this box | v1 rule |
+| --- | --- | --- |
+| Install vLLM-metal as the chat server in Phase A | Needs Python 3.12; worker is pinned **3.11** for Vision. Two Metal owners next to mflux. Gemma 4 on vllm-metal is **text** paged attention; native multimodal rows are Qwen3-VL / PaddleOCR-VL, not Gemma. Arabic *document* vision would regress. FastAPI would lose the tool loop. | Do not install vLLM in the worker venv. Do not run it beside Ollama. |
+| `OLLAMA_NUM_PARALLEL=4` "like vLLM batching" | Ollama parallel slots are **separate KV arenas**, not paged sharing. 4× cache → swap → sub-1 tok/s. | Keep `OLLAMA_NUM_PARALLEL=1`. |
+| Pull `gemma4:e4b-mlx` for "faster Metal" | Ollama's MLX runner has failed to reuse Gemma 4 `RotatingKVCache` prefixes (hybrid sliding-window + global layers). GGUF/llama.cpp is the path that actually hits prefix cache between turns. | Default tag stays `gemma4:e4b-it-qat` **GGUF**. Never `*:mlx` as DEFAULT. |
+| Raise `num_ctx` toward 128K because vLLM pages it | Pages still occupy unified memory. 128K on 24GB swaps. | `num_ctx=4096`, max 8192. |
+
+**v1 queue (this is the product, not a missing engine):**
+
+1. FastAPI `metal_lock` — one in-flight Metal generation. Sync Salesforce chat that waits **> 2s** for the lock → `429 metal_busy` + `Retry-After: 5` + pointer to `POST /v1/jobs`.
+2. Ollama `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_QUEUE=32`, `OLLAMA_FLASH_ATTENTION=1`.
+3. Jobs SQLite queue for FLUX / 20B / anything that may miss the 90s sync budget.
+4. Scale-out is a **second Mini**, not a bigger batch size.
+
+**Prefix cache the worker must not destroy** (llama.cpp, sequential turns, `keep_alive: -1`):
+
+- Byte-stable **system** prompt. No timestamps, request ids, or per-org names in the system string.
+- Tools JSON with **stable key order** (canonical dump). Shuffling the tool list every call is a 100% cache miss and a full prefill of the 4k prefix.
+- Do not put `X-Request-Id` into Ollama messages.
+- Second identical-prefix chat should show a shorter TTFT than the first; record both in `docs/operator-checklist.md` §9. If they are equal, the worker is mutating the prefix.
+
+**Vision token grouping** (Gemma 4 VLM *inside* Ollama, not a second runtime):
+
+- Image parts **before** text (Gemma 4 modality order).
+- Long edge ≤ 1024, max 4 images — that is the visual-token budget. A 12 MP phone photo is a prefill queue killer, not "better OCR."
+- Repeated identical images can share a visual prefix; unique images always miss. OCR-first still avoids the VLM for "read this barcode."
+
+**v1.1 — vLLM-metal, exclusive, after v1 is green** (not Phase A, not a second always-on server):
+
+- Separate venv: native arm64 **Python 3.12**, e.g. `~/.venv-vllm-metal`. Worker stays 3.11.
+- Same `metal_lock` contract as FLUX: unload Ollama generative model, poll `/api/ps`, run vLLM, tear down, reload Gemma GGUF.
+- Start at `--max-model-len 4096 --max-num-seqs 1`. Raise seqs only if `vm.swapusage` stays 0 under a realistic Salesforce mix.
+- Treat as **text** until Gemma 4 *vision* is verified on the Metal paged backend. Arabic VLM stays on Ollama until that day.
+- Never Docker. Never coresident with Ollama or mflux.
+
+**Failure if skipped:** "just use vLLM" in the worker venv, or `NUM_PARALLEL=4`, looks like a throughput fix and is how this 24GB box dies under the second concurrent org.
 
 ### Memory pressure polling
 
@@ -369,7 +414,7 @@ Do **not** `ollama pull gemma4` / `gemma4:latest` — those currently resolve to
 | Phase A (optional) | `gemma4:12b-it-qat` | ~7.2 GB | quality upgrade **replacing** E4B, not added beside it |
 | Phase A (optional) | `llama3.2:3b` | ~2 GB | last-resort fallback if every Gemma tag fails |
 | **Phase E**, opt-in | `gpt-oss:20b` | ~14 GB | exclusive slot only; useless until the jobs queue exists |
-| **Never** | `gpt-oss:120b`, any 70B, `gemma4:26b*`, `gemma4:31b*`, `qwen3.5:27b` as a default | — | exceeds the 18 GB ceiling; guaranteed swap |
+| **Never** | `gpt-oss:120b`, any 70B, `gemma4:26b*`, `gemma4:31b*`, `gemma4:*-mlx` as default, `qwen3.5:27b` as a default | — | 26B/31B exceed the ceiling; MLX Ollama tags break Gemma 4 prefix cache |
 
 `HEAVY_MODEL` stays commented out in `.env` until the Phase E pull actually completes. `GET /v1/models` must be built from live `ollama tags` intersected with the key's scope — never from env alone. **Failure if skipped:** the API advertises `gpt-oss:20b`, a caller selects it, and Ollama starts a 14 GB download inside an HTTP request.
 
@@ -484,7 +529,7 @@ Rules:
 0. **Single process.** `uvicorn --workers 1` (§6). The scheduler is in-process state; a second worker means a second scheduler and the whole section is void. Assert at startup.
 1. Tools and DuckDB **do not** take `metal_lock`.
 2. Embeddings allowed during `idle_hot_default` and `chat_default` (slot 2, §4).
-3. Chat on `DEFAULT_MODEL`: acquire lock, `OLLAMA_NUM_PARALLEL=1`, send `keep_alive: -1`. Thinking off (§4).
+3. Chat on `DEFAULT_MODEL`: acquire lock, `OLLAMA_NUM_PARALLEL=1`, send `keep_alive: -1`. Thinking off. Messages sent to Ollama must keep a **byte-stable prefix** (system + tools) so llama.cpp can reuse KV (§4).
 4. Exclusive: stop the hot model (`keep_alive=0` or `ollama stop`), **poll `/api/ps` until nothing but `nomic-embed-text` remains**, then load the target, run it, unload it, reload the hot model with `keep_alive=-1`. Never assume the stop took effect — poll.
 5. If lock wait > 2s for sync Salesforce chat → `429` with `Retry-After: 5`. Offer `POST /v1/jobs` in error `param`.
 6. If memory pressure is not `normal` → no new exclusive work, no new Chromium-backed renders; optionally no new chat.
@@ -1000,7 +1045,7 @@ Uploading files **from** Apex is genuinely painful: hand-rolled multipart means 
 | E | mflux exclusive + jobs queue | Mini |
 | F | Salesforce pack + optional Whisper | Mini + a Salesforce org |
 
-v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional).
+v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional), **vLLM-metal exclusive text experiment** (separate Python 3.12 venv, `max-num-seqs=1`, Gemma vision stays on Ollama until proven).
 
 ---
 
@@ -1010,10 +1055,11 @@ v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional).
 - Chart PNG: 1–4s
 - DuckDB: &lt; 30s cap
 - Gemma E4B QAT chat: 17–22 tok/s warm target (measure on the Mini; multilingual may be slightly slower than English-only 9B-class); cold load 5–15s
+- Second chat with the **same** system+tools prefix: TTFT should drop vs the first (llama.cpp prefix cache). If it does not, the worker is mutating the prefix (§4)
 - Embeddings: tens of ms warm
 - FLUX 1024 (4-bit, weights already local and pre-quantized): 10–20s exclusive + 10–30s model-swap tax if Gemma was loaded. **First ever run is minutes, not seconds** — do the Phase E warmup offline (§7)
 - 20B: exclusive; swap tax 10–30s
-- Concurrent orgs: **serialized**. Scale by queueing or a second Mini, not `NUM_PARALLEL`
+- Concurrent orgs: **serialized**. Scale by queueing or a second Mini, not `NUM_PARALLEL`, not vLLM `max-num-seqs` in v1
 
 These are targets, not measurements. Fill in `docs/operator-checklist.md` §9 with what your Mini actually does during Phases A and E, and treat any non-zero swap as a failed target regardless of the tok/s number.
 
@@ -1060,6 +1106,8 @@ See also [docs/troubleshooting.md](docs/troubleshooting.md).
 | Hot Gemma never comes back after an image job | exclusive teardown not in `finally` | `try/finally` + watchdog (§8) |
 | Mini at the login screen after a power cut | FileVault + no user session | operator checklist §6; UPS; `fdesetup authrestart` for planned reboots |
 | Chat randomly cold and slow | embeddings evicting the hot model | `OLLAMA_MAX_LOADED_MODELS=2`, slot 2 reserved (§4) |
+| Concurrent chats swap / tok/s collapse | `OLLAMA_NUM_PARALLEL>1` or vLLM coresident | keep parallel=1; queue; vLLM is v1.1 exclusive only (§4) |
+| Second turn as slow as the first | prefix mutated, or `*:mlx` Gemma tag | stable system+tools JSON; GGUF QAT tag (§4) |
 | Two schedulers, RAM blown | `uvicorn --workers > 1` | `--workers 1` + startup assertion (§6) |
 | Disk full, everything down at once | no artifact TTL, no log rotation | janitor + `MIN_FREE_DISK_GB` + `newsyslog` (§4) |
 | Apex 401 but `curl` 200 | External Credential principal not granted | permission set (§14) |
@@ -1083,6 +1131,9 @@ Not GPT-4o. Not multi-user parallel FLUX. Not a replacement for Einstein GPT com
 - Apple Silicon remote LLM: https://dev.to/instatunnel/secure-remote-access-for-your-local-apple-silicon-llm-a-complete-guide-48eh
 - Ollama FAQ tunnel/queue: https://docs.ollama.com/faq
 - NUM_PARALLEL: https://www.ssdnodes.com/learn/ollama-num-parallel-and-max-queue
+- vLLM-metal (Apple Silicon, not v1): https://github.com/vllm-project/vllm-metal
+- vLLM vs Ollama on M4 Mini (tiny-model numbers): https://kraghavan.ca/llm-infrastructure/inference/2026/04/16/vllm-ollama-apple-silicon-experiment2.html
+- Gemma 4 / hybrid prefix-cache caveats (MLX): https://github.com/ml-explore/mlx-lm/issues/980
 - MLX: https://github.com/ml-explore/mlx
 - DuckDB: https://duckdb.org/docs/
 - Vega-Lite: https://vega.github.io/vega-lite/

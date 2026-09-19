@@ -82,7 +82,7 @@ Cursor’s own note: daily Agent users often land **$60–$100/mo**. Pro Plus is
 ## 5. Chat hygiene (this is what makes it “great”)
 
 - One phase, one PR-sized commit, one green DoD.
-- If the agent proposes Docker, 70B, `gemma4:26b`/`31b`, Netlify inference, loading FLUX beside the chat model, `--workers 4`, a shared admin password, or letting Ollama run the tool loop: stop, point at `PLAN.md`, retry. Do not “let it cook.”
+- If the agent proposes Docker, 70B, `gemma4:26b`/`31b`, vLLM in the worker venv, `OLLAMA_NUM_PARALLEL>1`, Netlify inference, loading FLUX beside the chat model, `--workers 4`, a shared admin password, or letting Ollama run the tool loop: stop, point at `PLAN.md`, retry. Do not “let it cook.”
 - After every GPU-ish change: `ollama ps` must show **at most one generative model** (plus `nomic-embed-text`, which is expected).
 - After every worker change: `pgrep -fc "uvicorn app.main:app"` must be **1**.
 - After Phase B: test HTTPS from a **phone**, not only localhost.

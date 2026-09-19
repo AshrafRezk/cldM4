@@ -140,13 +140,13 @@ Required:
 ```
 OLLAMA_HOST=127.0.0.1:11434
 OLLAMA_MAX_LOADED_MODELS=2     # slot 1 = one generative model, slot 2 = nomic-embed-text ONLY
-OLLAMA_NUM_PARALLEL=1
+OLLAMA_NUM_PARALLEL=1          # not vLLM batching; extra slots are extra KV on 24GB
 OLLAMA_MAX_QUEUE=32
 OLLAMA_FLASH_ATTENTION=1
 OLLAMA_KEEP_ALIVE=30m          # safety net only; the worker always sends explicit keep_alive
 ```
 
-`MAX_LOADED_MODELS=2` is deliberate and is explained in `PLAN.md` §4: with `1`, every embeddings call evicts the chat model and the next chat pays a 5–15s cold load. The "one Metal-heavy model" rule is enforced by the worker's scheduler, not by this number. Do **not** raise it to 4.
+`MAX_LOADED_MODELS=2` is deliberate and is explained in `PLAN.md` §4: with `1`, every embeddings call evicts the chat model and the next chat pays a 5–15s cold load. The "one Metal-heavy model" rule is enforced by the worker's scheduler, not by this number. Do **not** raise it to 4. Do **not** raise `NUM_PARALLEL` to copy vLLM — that is how the Mini swaps. Queue in FastAPI instead (`PLAN.md` §4).
 
 Verify the running server actually has the env:
 
