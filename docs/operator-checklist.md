@@ -178,14 +178,14 @@ Off-Mini library check (2026-09-19): `qwen3.5:9b` exists on https://ollama.com/l
 
 | Slot | Planned | Actually installed | Size on disk | Tools? | Vision? |
 | --- | --- | --- | --- | --- | --- |
-| Default chat | `qwen3.5:9b` | ______________ | ______ | ☐ | ☐ |
-| Embeddings | `nomic-embed-text` | ______________ | ______ | n/a | n/a |
-| Fallback (optional) | `llama3.2:3b` | ______________ | ______ | ☐ | n/a |
-| Heavy (Phase E, opt-in) | `gpt-oss:20b` | ______________ | ______ | ☐ | ☐ |
-| Vision (only if needed) | — | ______________ | ______ | n/a | ☐ |
+| Default chat | `qwen3.5:9b` | `qwen3.5:9b` | 6.6 GB | [x] | [x] |
+| Embeddings | `nomic-embed-text` | `nomic-embed-text` | ~274 MB | n/a | n/a |
+| Fallback (optional) | `llama3.2:3b` | not pulled | — | ☐ | n/a |
+| Heavy (Phase E, opt-in) | `gpt-oss:20b` | not pulled | — | ☐ | ☐ |
+| Vision (only if needed) | — | built into `qwen3.5:9b` (slot 1) | n/a | n/a | [x] |
 
-- [ ] `DEFAULT_MODEL` in `.env` matches the "actually installed" row.
-- [ ] If the default chat model has **no** vision capability, the router is OCR-only for images and the `/v1/chat/completions` vision path returns `model_not_found`. Confirmed and acceptable: ☐
+- [x] `DEFAULT_MODEL` stays `qwen3.5:9b` (`.env.example` / Mini `.env`). Mini `ollama show` listed capabilities: completion, **vision**, **tools**, thinking (2026-09-19).
+- [x] Vision is present on the default chat model. OCR-only fallback is not required.
 
 ---
 

@@ -3,7 +3,7 @@
 This is the living status board. Operator blanks still live in [operator-checklist.md](operator-checklist.md). Phase commands live in [cursor-phases.md](cursor-phases.md).
 
 **Last updated:** 2026-09-19  
-**Current phase:** A (code in git; Mini proofs not yet run)  
+**Current phase:** A (Mini install finished; live health/chat proofs still to paste)  
 **This Mini (from operator screenshots):** 2024 Mac mini, **Apple M4, 24 GB**, serial `F47YLJF2M`, **443 GB free**, hostname `cloudiator.local`, Wi-Fi **Ash & Mimi** `192.168.100.51` (MAC `d0:11:e5:94:6b:23`), `uname -m` = **arm64**, auto-login **Cloudiator**, FileVault **Off (policy C)**, network time on, **no UPS**. Keyboard in the room.
 
 **Account note:** The appliance login **Cloudiator** is the original user renamed in Users & Groups. Unix short name / `$HOME` is still **`ashrafrezk`** (`ashrafrezk@cloudiator` in Terminal). A second Admin named **Ashraf** exists for updates. Install Ollama, `~/Cloudiator/.env`, and LaunchAgents on **this** session — do not switch users.
@@ -43,26 +43,18 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 
 Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 
-#### Then software on the Mini (this is the remaining manual work)
+#### Then software on the Mini
 
-- [x] **Cursor** is in `/Applications` (screenshot 2026-09-19). Still set Privacy Mode on and Auto off per [cursor-settings.md](cursor-settings.md) when you use it on this Mini.
-- [x] **Ollama.app** is in `/Applications`; CLI `/usr/local/bin/ollama` **0.34.2**; no Homebrew ollama. Open it so the menu-bar app is running.
-- [ ] **Xcode Command Line Tools** — Mini Terminal: `xcode-select: No developer tools were found`. `git clone` never created `~/cldM4`, so `.env` and `mac-setup.sh` did not run.
+- [x] **Cursor** in `/Applications`. Still set Privacy Mode on / Auto off when using it here.
+- [x] **Ollama.app** 0.34.2 at `/usr/local/bin/ollama`; no Homebrew ollama.
+- [x] Xcode Command Line Tools, Homebrew, repo `~/cldM4` on `cursor/phase-a-openai-shim-ee9d`, `~/Cloudiator/.env` chmod 600.
+- [x] `mac-setup.sh` finished: pulled **`qwen3.5:9b`** (6.6 GB, tools + vision + thinking) and **`nomic-embed-text`** (~274 MB). LaunchAgent `gui/501/ai.cloudiator.worker` installed (`state` was `xpcproxy` at install time — confirm it is serving below).
 
-#### Then software on the Mini (remaining)
+**Next (prove Phase A, still on the Mini):**
 
-- [ ] Install Xcode CLT (GUI prompt or `xcode-select --install`), wait until `git --version` prints a version
-- [x] Repo cloned at `~/cldM4` on branch `cursor/phase-a-openai-shim-ee9d`; `~/Cloudiator/.env` copied (`chmod 600`).
-- [ ] **Homebrew** — `mac-setup.sh` aborted: `Homebrew missing`. Install from https://brew.sh then re-run the script.
-
-#### Then software on the Mini (remaining)
-
-- [ ] Copy repo `.env.example` → `~/Cloudiator/.env`, `chmod 600`, **outside git**
-- [ ] Run `scripts/mac-setup.sh` **on the Mini** (arm64 gate, brew deps, exclusions, newsyslog, `qwen3.5:9b` + `nomic-embed-text` pulls only). Overnight is fine on Wi-Fi (~7 GB).
-- [ ] Run each binary once in Terminal so Sequoia **Local Network** permission is granted, then `scripts/install-launchagents.sh`
-- [ ] Set the Ollama.app env from `infra/launchagents/ollama.env` (`OLLAMA_MAX_LOADED_MODELS=2`)
-- [ ] Run the Phase A **Prove it** commands in [cursor-phases.md](cursor-phases.md) and paste results into operator-checklist **§8–9**
-- [ ] `ollama show qwen3.5:9b` — confirm **tools**; note **vision**. Tag was verified on ollama.com (6.6 GB, text+image, tools) but **your Mini must still pull and show it**
+- [ ] Set Ollama.app env (`OLLAMA_MAX_LOADED_MODELS=2` …) then quit/reopen Ollama
+- [ ] `cd ~/cldM4 && ./scripts/smoke-phase-a.sh`
+- [ ] `curl` loopback health + a short chat; `ollama ps` shows at most one generative model; `sysctl vm.swapusage` used = 0
 
 ### Before Phase B (operator-checklist §§1–5 must have no blanks)
 
@@ -89,7 +81,7 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 | Phase | What | Status |
 | --- | --- | --- |
 | 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | Hardware Day 0 **done**. Cloud accounts §§1–5 still needed **before Phase B** |
-| **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
+| **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code in git. Mini pull + LaunchAgent installed.** Prove health/chat next |
 | B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
 | C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |
 | D | Tool registry, OCR, maps, artifact signing, tool loop | **Not started** |
