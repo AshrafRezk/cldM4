@@ -131,6 +131,31 @@ async def test_a_model_that_is_not_on_disk_is_a_404(client):
     assert response.json()["error"]["code"] == "model_not_found"
 
 
+async def test_a_forbidden_image_url_is_a_url_error_not_a_model_error(client):
+    """Precedence matters: the default model usually has no vision support, and
+    the caller still needs to hear that the URL was refused."""
+    async with client:
+        response = await client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": "http://169.254.169.254/latest/meta-data/"},
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "url_not_allowed"
+
+
 async def test_an_image_without_a_vision_model_is_a_404(client):
     async with client:
         response = await client.post(

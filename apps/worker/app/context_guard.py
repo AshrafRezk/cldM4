@@ -97,8 +97,15 @@ def estimate_prompt_tokens(
 def enforce_context(prompt_tokens: int, max_tokens: int, num_ctx: int) -> None:
     if prompt_tokens + max_tokens <= num_ctx:
         return
+    headroom = num_ctx - prompt_tokens
+    if headroom > 0:
+        advice = f"Shorten the prompt or lower max_tokens to {headroom}."
+    else:
+        advice = (
+            f"The prompt alone exceeds the context; shorten it by at least "
+            f"{prompt_tokens - num_ctx + max_tokens} tokens."
+        )
     raise context_length_exceeded(
         f"This request needs about {prompt_tokens} prompt tokens plus {max_tokens} completion "
-        f"tokens, which exceeds the {num_ctx}-token context for this model. Shorten the prompt "
-        f"or lower max_tokens to {max(1, num_ctx - prompt_tokens)}."
+        f"tokens, which exceeds the {num_ctx}-token context for this model. {advice}"
     )

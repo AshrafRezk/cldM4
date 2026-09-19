@@ -54,7 +54,16 @@ def test_over_budget_is_rejected_with_both_numbers():
 def test_rejection_suggests_a_workable_max_tokens():
     with pytest.raises(CloudiatorError) as caught:
         enforce_context(prompt_tokens=4000, max_tokens=512, num_ctx=4096)
-    assert "96" in caught.value.message
+    assert "lower max_tokens to 96" in caught.value.message
+
+
+def test_a_prompt_that_alone_overflows_says_so_instead_of_suggesting_max_tokens_1():
+    with pytest.raises(CloudiatorError) as caught:
+        enforce_context(prompt_tokens=7505, max_tokens=512, num_ctx=4096)
+
+    message = caught.value.message
+    assert "prompt alone exceeds the context" in message
+    assert "max_tokens to 1" not in message
 
 
 def test_token_estimate_grows_with_text():

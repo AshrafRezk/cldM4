@@ -253,6 +253,26 @@ def downscale_to_jpeg(data: bytes, *, max_edge: int) -> bytes:
     return buffer.getvalue()
 
 
+def validate_image_inputs(messages: list[dict[str, Any]], *, settings) -> list[str]:
+    """Cheap pre-validation: no DNS, no fetch, no decode.
+
+    Runs before the vision-capability check so a forbidden URL is always
+    `url_not_allowed` rather than `model_not_found` on an appliance whose
+    default model happens to have no vision support. A caller who sent
+    `file:///etc/passwd` needs to hear that, not a note about models.
+    """
+    urls = extract_image_urls(messages)
+    if len(urls) > settings.vision_max_images:
+        raise url_not_allowed(
+            f"{len(urls)} images in one request exceeds the limit of "
+            f"{settings.vision_max_images}."
+        )
+    for url in urls:
+        if not url.startswith("data:"):
+            validate_url(url)
+    return urls
+
+
 def extract_image_urls(messages: list[dict[str, Any]]) -> list[str]:
     urls: list[str] = []
     for message in messages:

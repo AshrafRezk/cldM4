@@ -21,6 +21,7 @@ from app.ssrf import (
     fetch_image,
     prepare_messages_for_ollama,
     resolve_and_validate,
+    validate_image_inputs,
     validate_url,
 )
 
@@ -312,3 +313,43 @@ async def test_more_than_four_images_is_rejected(settings):
 async def test_plain_string_messages_pass_through_untouched(settings):
     messages = [{"role": "user", "content": "say hi"}]
     assert await prepare_messages_for_ollama(messages, settings=settings) == messages
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["http://169.254.169.254/latest/meta-data/", "file:///etc/passwd", "ftp://host/a.png"],
+)
+def test_prevalidation_rejects_a_forbidden_scheme_without_touching_the_network(settings, url):
+    """A forbidden URL must not be reported as a model problem."""
+    messages = [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": url}}]}]
+
+    with pytest.raises(CloudiatorError) as caught:
+        validate_image_inputs(messages, settings=settings)
+
+    assert caught.value.code == "url_not_allowed"
+
+
+def test_prevalidation_counts_images(settings):
+    parts = [
+        {"type": "image_url", "image_url": {"url": data_uri(png_bytes())}}
+        for _ in range(settings.vision_max_images + 1)
+    ]
+
+    with pytest.raises(CloudiatorError) as caught:
+        validate_image_inputs([{"role": "user", "content": parts}], settings=settings)
+
+    assert caught.value.code == "url_not_allowed"
+
+
+def test_prevalidation_allows_https_and_data_uris(settings):
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": "https://images.example.com/a.png"}},
+                {"type": "image_url", "image_url": {"url": data_uri(png_bytes())}},
+            ],
+        }
+    ]
+
+    assert len(validate_image_inputs(messages, settings=settings)) == 2

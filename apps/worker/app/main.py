@@ -26,7 +26,7 @@ from .gates import BootRefused, run_boot_gates
 from .logging_setup import configure_logging
 from .ollama import OllamaClient, normalize_tag
 from .scheduler import Scheduler
-from .ssrf import extract_image_urls, prepare_messages_for_ollama
+from .ssrf import prepare_messages_for_ollama, validate_image_inputs
 from .translation import (
     build_options,
     chat_response_to_openai,
@@ -245,10 +245,14 @@ async def chat_completions(request: Request) -> JSONResponse:
 
     model = await _resolve_model(body.get("model"), fallback=settings.default_model)
 
-    image_urls = extract_image_urls(messages)
+    image_urls = validate_image_inputs(messages, settings=settings)
     if image_urls and not (settings.vision_model or settings.default_model_has_vision):
-        raise model_not_found(
-            f"{model} (no vision capability is configured; use the OCR tools instead)"
+        raise CloudiatorError(
+            404,
+            "model_not_found",
+            f"{model} does not accept image inputs on this appliance. Extract text from images "
+            "with the OCR tools instead.",
+            param="model",
         )
     prepared = await prepare_messages_for_ollama(messages, settings=settings)
 
