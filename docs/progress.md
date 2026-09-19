@@ -1,0 +1,117 @@
+# Execution checklist
+
+This is the living status board. Operator blanks still live in [operator-checklist.md](operator-checklist.md). Phase commands live in [cursor-phases.md](cursor-phases.md).
+
+**Last updated:** 2026-09-19  
+**Current phase:** A (code in git; Mini proofs not yet run)  
+**This environment:** Linux x86_64 Cloud Agent — **not** the Mac Mini M4. Metal, Apple Vision, Ollama.app, and LaunchAgents cannot be production-tested here.
+
+Legend: **done** · **not done** · **you (manual on the Mini / in vendor dashboards)**
+
+---
+
+## You must do (nothing in git can finish these)
+
+These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks. The agent cannot complete them from this cloud VM.
+
+### Day 0 — hardware and Mac Mini (before / during Phase A)
+
+Do [hardware-and-network.md](hardware-and-network.md) top to bottom, then [host-setup.md](host-setup.md).
+
+- [ ] Confirm **Mac mini M4, 24 GB**, `uname -m` → `arm64`, **≥ 120 GB free**
+- [ ] Ethernet, DHCP reservation, Wi-Fi off, **no WAN port forwards** for 22 / 8080 / 11434
+- [ ] Energy: computer must not sleep; set time automatically
+- [ ] Tick **exactly one** FileVault/boot policy in operator-checklist **§6** (A recommended: FileVault + UPS + manual unlock)
+- [ ] Automatic login for the appliance user (LaunchAgents will not start without a GUI session)
+- [ ] Install **Cursor Pro Plus** on the Mini, Privacy Mode on, Auto off ([cursor-settings.md](cursor-settings.md))
+- [ ] Install **official Ollama.app** (not `brew install ollama`)
+- [ ] Copy repo `.env.example` → `~/Cloudiator/.env`, `chmod 600`, **outside git**
+- [ ] Run `scripts/mac-setup.sh` **on the Mini** (arm64 gate, brew deps, exclusions, newsyslog, `qwen3.5:9b` + `nomic-embed-text` pulls only)
+- [ ] Run each binary once in Terminal so Sequoia **Local Network** permission is granted, then `scripts/install-launchagents.sh`
+- [ ] Set the Ollama.app env from `infra/launchagents/ollama.env` (`OLLAMA_MAX_LOADED_MODELS=2`)
+- [ ] Run the Phase A **Prove it** commands in [cursor-phases.md](cursor-phases.md) and paste results into operator-checklist **§8–9**
+- [ ] `ollama show qwen3.5:9b` — confirm **tools**; note **vision**. Tag was verified on ollama.com (6.6 GB, text+image, tools) but **your Mini must still pull and show it**
+
+### Before Phase B (operator-checklist §§1–5 must have no blanks)
+
+- [ ] Domain whose nameservers are Cloudflare; zone **Active**
+- [ ] Cloudflare: named tunnel `cloudiator-mini`, DNS `api.<domain>` proxied
+- [ ] Bot Fight Mode **OFF**, Browser Integrity Check off, no Turnstile, no “I’m Under Attack” on `api.`
+- [ ] WAF Skip rule on `Bearer sk-cld-`; rate limit keyed on **Authorization**, not IP
+- [ ] Cloudflare Access on `app.<domain>` and `api.<domain>/v1/admin*` — record team domain + **AUD**
+- [ ] Neon project, **pooled** `DATABASE_URL`, schema from `docs/schema.md`
+- [ ] Nominatim contact email (real mailbox) for `NOMINATIM_USER_AGENT`
+- [ ] Phone-on-cellular test of `https://api.<domain>/v1/health` after the tunnel is up
+
+### Later (not this PR)
+
+- [ ] Netlify site for the dashboard (Phase C)
+- [ ] Salesforce Named Credential + permission set on the External Credential **principal** (Phase F)
+- [ ] Phase E FLUX warmup **in Terminal**, never from the worker (`mflux` + local 4-bit weights)
+- [ ] Slack (or similar) health webhook before calling it production
+
+---
+
+## Phase status
+
+| Phase | What | Status |
+| --- | --- | --- |
+| 0 | Operator inputs (domain, Cloudflare, Neon, boot policy) | **You** — checklist §§1–6 still blank |
+| **A** | FastAPI OpenAI shim, health, metal lock, SSRF, context guard, LaunchAgent templates, tests | **Code done in git.** Mini live proofs **you** |
+| B | Neon keys, argon2id, tunnel, public HTTPS, Salesforce OpenAPI 3.0.3 | **Not started** (blocked on Phase 0 + A Mini proofs) |
+| C | Netlify dashboard, mint keys, usage, OpenAPI download | **Not started** |
+| D | Tool registry, OCR, maps, artifact signing, tool loop | **Not started** |
+| D2 | Charts, stats, DuckDB sandbox | **Not started** |
+| D3 | Image ops, docs, Graphviz, SF IDs | **Not started** |
+| E | FLUX exclusive slot, jobs queue, optional `gpt-oss:20b` | **Not started** |
+| F | Salesforce pack, optional Whisper | **Not started** |
+
+---
+
+## Phase A — done in this repository
+
+- [x] `apps/worker` FastAPI + uv + Python **3.11** pin (`.python-version`)
+- [x] `GET /v1/health` — unauthenticated, no Neon, no secrets; `db` is `"skipped"` until Phase B
+- [x] `POST /v1/chat/completions` OpenAI JSON ↔ Ollama `/api/chat`
+- [x] `POST /v1/embeddings` + `nomic-embed-text` `search_query:` prefix
+- [x] `GET /v1/models` from live `ollama tags` only (never from `HEAVY_MODEL` env)
+- [x] `metal_lock` + state machine; lock released if the body raises
+- [x] `cpu_heavy_lock` semaphore capacity 1
+- [x] Memory poller every 5s via `asyncio.create_subprocess_exec` (`sysctl` on Darwin)
+- [x] `X-Request-Id` on success and error responses
+- [x] `num_ctx` 4096, `max_tokens` 512, pre-flight `400 context_length_exceeded`
+- [x] Explicit `keep_alive`: `-1` hot model + embedder, `0` anything else
+- [x] Qwen3.5 `think: false` by default (avoids burning `max_tokens` inside `<think>`)
+- [x] Reject `n>1`, `logprobs`, `top_logprobs`, `best_of`, `logit_bias`
+- [x] SSRF guard: `https`/`data:` only; DNS-resolve; block loopback, RFC1918, link-local, CGNAT; downscale to 1024px; max 4 images
+- [x] Bind documented as `127.0.0.1:8080`, `uvicorn --workers 1`; refuse `WEB_CONCURRENCY≠1`
+- [x] Refuse to boot unless `OLLAMA_MAX_LOADED_MODELS=2` (production)
+- [x] LaunchAgent template + path substitution (`scripts/install-launchagents.sh`)
+- [x] `scripts/mac-setup.sh`, `scripts/smoke-phase-a.sh`
+- [x] Tests: `test_openai_translation.py`, `test_metal_lock.py`, `test_ssrf_guard.py`, `test_context_guard.py` (+ HTTP smoke)
+
+Production boot still **aborts on Linux / x86_64**. Unit tests set `CLOUDIATOR_ENV=test` so they can run off-Mini.
+
+## Phase A — not done until you run it on the Mini
+
+- [ ] `uname -m` and venv Python both **arm64**
+- [ ] `ollama pull qwen3.5:9b && ollama show qwen3.5:9b` (tools + vision recorded in §8)
+- [ ] `ollama pull nomic-embed-text` only — **do not** pull `gpt-oss:20b` / 27B / 70B / 120B
+- [ ] `pgrep -fc "uvicorn app.main:app"` → **1**
+- [ ] `lsof` shows **127.0.0.1:8080**, not `*:8080`
+- [ ] Live `curl` chat + embeddings against loopback
+- [ ] `ollama ps` → at most **one** generative model (+ `nomic-embed-text`)
+- [ ] `sysctl vm.swapusage` → used **0.00M**
+- [ ] `~/Library/LaunchAgents/ai.cloudiator.worker.plist` loaded via `launchctl bootstrap` (not `load`)
+- [ ] `python -c "import Vision"` in the venv
+
+Rollback (Mini): `launchctl bootout gui/$UID/ai.cloudiator.worker`, `git checkout -- apps/worker scripts`, `rm -rf apps/worker/.venv`. Models stay on disk.
+
+---
+
+## What this agent will not do in later chats unless you ask
+
+- Phase B+ while operator-checklist §§1–5 are blank
+- `ollama pull` of 20B/27B/70B/120B
+- Docker for inference, Netlify inference, `apps/gateway/`
+- Filling real domain / Neon / Cloudflare secrets into git

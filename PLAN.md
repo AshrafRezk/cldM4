@@ -3,7 +3,7 @@
 **Product name:** Cloudiator (repo `cldM4`)  
 **Hardware:** Apple Mac Mini M4, 24GB unified memory  
 **Git:** https://github.com/AshrafRezk/cldM4.git  
-**Status:** Plan only. Implement on the Mini, one phase at a time.  
+**Status:** Phase A **code** is in git (`apps/worker`). Mini live proofs and [docs/operator-checklist.md](docs/operator-checklist.md) are still open. Tracker: [docs/progress.md](docs/progress.md). Implement remaining work **on the Mini**, one phase at a time.  
 **Video:** out of v1.
 
 This file is the source of truth. If Cursor on the Mini disagrees with a blog post, **this file wins**.

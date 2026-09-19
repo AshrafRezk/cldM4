@@ -1,5 +1,9 @@
 # Operator checklist — fill this in BEFORE Phase B
 
+**Execution tracker:** [progress.md](progress.md) (done vs not done vs manual). This file stays the fill-in-the-blanks form. Do not commit real secrets.
+
+**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Sections **0–7 and 9–11 below are still yours.** Section 8: the `qwen3.5:9b` tag exists on ollama.com (tools + image input, ~6.6 GB) but is **not installed on your Mini until you pull it**.
+
 Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.
 
 This is the human's job, not the agent's. Every blank below becomes a value in `~/Cloudiator/.env`, a Cloudflare setting, or a Salesforce config field. **Phase B cannot pass its definition of done with blanks in sections 1–5.**
@@ -169,6 +173,8 @@ An appliance with no alerting is an appliance that is down and nobody knows. If 
 ## 8. Model decisions recorded (filled during Phase A step 0)
 
 `PLAN.md` names `qwen3.5:9b`. If that tag does not resolve on build day, Phase A walks the fallback ladder. **Write down what you actually installed** — every later phase, the `DEFAULT_MODEL` env var, and the dashboard presets depend on it.
+
+Off-Mini library check (2026-09-19): `qwen3.5:9b` exists on https://ollama.com/library/qwen3.5:9b (~6.6 GB, text + image input, tools). That is **not** a substitute for `ollama pull` / `ollama show` on your Mini — fill "Actually installed" only after those commands succeed.
 
 | Slot | Planned | Actually installed | Size on disk | Tools? | Vision? |
 | --- | --- | --- | --- | --- | --- |

@@ -12,6 +12,7 @@ Template: [.env.example](../.env.example).
 | `HOST` | `127.0.0.1` | yes |
 | `PORT` | `8080` | yes |
 | `WEB_CONCURRENCY` | `1` | yes — the worker refuses to boot on any other value |
+| `OLLAMA_MAX_LOADED_MODELS` | `2` | yes on the worker **and** Ollama.app — slot 2 is the embedder only |
 | `PUBLIC_BASE_URL` | `https://api.example.com` | yes (artifact URLs) |
 | `DATABASE_URL` | pooled Neon URL (`...-pooler...`) | yes from Phase B |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | yes |
