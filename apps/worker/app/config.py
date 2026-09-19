@@ -54,7 +54,7 @@ class Settings:
     ollama_max_loaded_models: str | None = field(
         default_factory=lambda: _opt("OLLAMA_MAX_LOADED_MODELS")
     )
-    default_model: str = field(default_factory=lambda: _str("DEFAULT_MODEL", "qwen3.5:9b"))
+    default_model: str = field(default_factory=lambda: _str("DEFAULT_MODEL", "gemma4:e4b-it-qat"))
     embed_model: str = field(default_factory=lambda: _str("EMBED_MODEL", "nomic-embed-text"))
     heavy_model: str | None = field(default_factory=lambda: _opt("HEAVY_MODEL"))
     vision_model: str | None = field(default_factory=lambda: _opt("VISION_MODEL"))

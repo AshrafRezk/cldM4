@@ -16,7 +16,7 @@ VENV_PY="$ROOT/apps/worker/.venv/bin/python"
 LABEL="ai.cloudiator.worker"
 
 load_env_file "$HOME/Cloudiator/.env"
-DEFAULT_MODEL="${DEFAULT_MODEL:-qwen3.5:9b}"
+DEFAULT_MODEL="${DEFAULT_MODEL:-gemma4:e4b-it-qat}"
 EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"
 
 # Read one field out of a JSON body without requiring jq.

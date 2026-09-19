@@ -16,17 +16,19 @@ Template: [.env.example](../.env.example).
 | `DATABASE_URL` | pooled Neon URL (`...-pooler...`) | yes from Phase B |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | yes |
 | `OLLAMA_MAX_LOADED_MODELS` | `2` | yes — the worker asserts this and refuses to boot on any other value |
-| `DEFAULT_MODEL` | the tag verified in Phase A step 0 | yes |
-| `DEFAULT_MODEL_HAS_VISION` | `false` | yes — `true` only if `ollama show` reported vision |
+| `DEFAULT_MODEL` | `gemma4:e4b-it-qat` (or the tag verified in Phase A step 0) | yes |
+| `DEFAULT_MODEL_HAS_VISION` | `true` | yes — `true` for Gemma 4 QAT; `false` only on a text-only fallback |
 | `EMBED_MODEL` | `nomic-embed-text` | yes |
+| `INFERENCE_BACKEND` | `ollama` | yes — v1. vLLM-metal is not a v1 value |
 | `HEAVY_MODEL` | `gpt-oss:20b` | no — **keep commented out until the Phase E pull completes** |
-| `VISION_MODEL` | | no — shares slot 1, see `PLAN.md` §7 |
-| `NUM_CTX` | `4096` | yes |
+| `VISION_MODEL` | | no — Gemma 4 *is* the VLM. Only set this if the tag gate fell back to a text-only model; it shares slot 1, see `PLAN.md` §7 |
+| `GEMMA_THINKING` | `false` | yes — do not enable Gemma thinking mode; Salesforce keys must stay false |
+| `NUM_CTX` | `4096` | yes — Gemma's 128K/256K window is not usable on 24GB |
 | `NUM_CTX_MAX` | `8192` | yes — the worker clamps `num_ctx` to this |
 | `MAX_TOKENS_DEFAULT` | `512` | yes |
 | `MPLBACKEND` | `Agg` | yes |
 
-`DEFAULT_MODEL` is the single place the model name lives. If Phase A's tag gate picked something other than `qwen3.5:9b`, change it here and in `docs/operator-checklist.md` §8 — nowhere else.
+`DEFAULT_MODEL` is the single place the model name lives. If Phase A's tag gate picked something other than `gemma4:e4b-it-qat`, change it here and in `docs/operator-checklist.md` §8 — nowhere else. Never point it at `gemma4` / `gemma4:latest` (Q4_K_M ~9.6 GB), `gemma4:*-mlx`, or `gemma4:26b` / `31b`. `INFERENCE_BACKEND=ollama` until a documented v1.1 exclusive vLLM experiment exists (`PLAN.md` §4).
 
 ## Mini worker — limits and budgets
 

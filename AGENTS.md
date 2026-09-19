@@ -7,6 +7,6 @@ Read `PLAN.md`, `docs/hardware-and-network.md`, and `docs/cursor-settings.md` be
 - `uvicorn --workers 1`. `OLLAMA_MAX_LOADED_MODELS=2` (slot 2 is the embedder only). Explicit `keep_alive` on every call.
 - Python 3.11 arm64 only; abort on Rosetta.
 - FastAPI owns the tool loop: 8 iterations, 75s budget.
-- No Docker for inference. No Netlify inference. No 70B/120B pulls. `gpt-oss:20b` is Phase E only.
+- No Docker for inference. No Netlify inference. No 70B/120B/`gemma4:26b`/`gemma4:31b` pulls. Default chat is `gemma4:e4b-it-qat` GGUF. `gpt-oss:20b` is Phase E only. vLLM-metal is not v1.
 - Cloudflare Access for admin and dashboard; no shared password.
 - Libraries first, models last. Do not commit secrets.

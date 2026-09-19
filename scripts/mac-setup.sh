@@ -30,7 +30,7 @@ done
 require_arm64_macos
 
 load_env_file "$HOME/Cloudiator/.env"
-DEFAULT_MODEL="${DEFAULT_MODEL:-qwen3.5:9b}"
+DEFAULT_MODEL="${DEFAULT_MODEL:-gemma4:e4b-it-qat}"
 EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"
 CLOUDIATOR_HOME="$HOME/Cloudiator"
 
@@ -199,7 +199,7 @@ else
     ollama show llama3.2:3b >/dev/null 2>&1 || ollama pull llama3.2:3b >/dev/null 2>&1
     pass "fallback llama3.2:3b available"
   fi
-  info "gpt-oss:20b, 27B, 70B, and 120B are NOT pulled here. 20B is Phase E and opt-in."
+  info "gpt-oss:20b, gemma4:26b/31b, 27B, 70B, and 120B are NOT pulled here. 20B is Phase E and opt-in."
 fi
 
 section "Next"

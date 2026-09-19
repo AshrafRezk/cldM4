@@ -19,7 +19,7 @@ DO_PULL=1
 [ "${1:-}" = "--no-pull" ] && DO_PULL=0
 
 load_env_file "$HOME/Cloudiator/.env"
-DEFAULT_MODEL="${DEFAULT_MODEL:-qwen3.5:9b}"
+DEFAULT_MODEL="${DEFAULT_MODEL:-gemma4:e4b-it-qat}"
 EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"
 VENV="$ROOT/apps/worker/.venv"
 
@@ -192,7 +192,7 @@ section "Gate c — model tag verification (PLAN.md §7)"
 if command -v ollama >/dev/null 2>&1; then
   assert_model_allowed "$DEFAULT_MODEL"
   if ! ollama show "$DEFAULT_MODEL" >/dev/null 2>&1 && [ "$DO_PULL" = "1" ]; then
-    info "pulling $DEFAULT_MODEL (this is the ~6.6 GB download; Wi-Fi makes it slower)"
+    info "pulling $DEFAULT_MODEL (this is the ~6.1 GB QAT Q4_0 download; Wi-Fi makes it slower)"
     ollama pull "$DEFAULT_MODEL" || true
   fi
 
@@ -211,11 +211,15 @@ if command -v ollama >/dev/null 2>&1; then
     fi
   else
     fail "tag does not resolve: $DEFAULT_MODEL"
-    info "Walk the ladder in PLAN.md §7 and take the first that resolves, supports tools, and fits 6-9 GB:"
-    info "  1. the current qwen3.5 tag in the 7-9B range on https://ollama.com/library/qwen3.5"
-    info "  2. qwen3:8b    3. qwen2.5:7b-instruct    4. llama3.1:8b"
+    info "Walk the ladder in PLAN.md §7 and take the first that resolves, supports tools and vision, and fits ~4-8 GB:"
+    info "  1. gemma4:e4b-it-qat (intended)"
+    info "  2. gemma4:12b-it-qat (still QAT Q4_0; record the extra RAM)"
+    info "  3. current E4B QAT-equivalent tag on https://ollama.com/library/gemma4/tags"
+    info "     — not gemma4:latest unless show proves it is Q4_0 QAT and ~6 GB"
+    info "  4. qwen3.5:9b only if every Gemma vision tag fails — stop and tell the operator"
+    info "  5. llama3.2:3b last resort"
     info "Then set DEFAULT_MODEL in ~/Cloudiator/.env, record it in docs/operator-checklist.md §8,"
-    info "and change nothing else. Do not substitute a 27B or a 14B."
+    info "and change nothing else. Do not substitute a 26B, 31B, Q8, or bf16."
     info "STOP and confirm the choice before continuing Phase A."
   fi
 

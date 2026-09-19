@@ -170,18 +170,22 @@ An appliance with no alerting is an appliance that is down and nobody knows. If 
 
 ## 8. Model decisions recorded (filled during Phase A step 0)
 
-`PLAN.md` names `qwen3.5:9b`. If that tag does not resolve on build day, Phase A walks the fallback ladder. **Write down what you actually installed** — every later phase, the `DEFAULT_MODEL` env var, and the dashboard presets depend on it.
+`PLAN.md` names `gemma4:e4b-it-qat` (Gemma 4 E4B, official QAT **Q4_0**). That tag is the Arabic + vision + tools default. If it does not resolve on build day, Phase A walks the fallback ladder. **Write down what you actually installed** — every later phase, the `DEFAULT_MODEL` env var, and the dashboard presets depend on it.
 
-| Slot | Planned | Actually installed | Size on disk | Tools? | Vision? |
-| --- | --- | --- | --- | --- | --- |
-| Default chat | `qwen3.5:9b` | ______________ | ______ | ☐ | ☐ |
-| Embeddings | `nomic-embed-text` | ______________ | ______ | n/a | n/a |
-| Fallback (optional) | `llama3.2:3b` | ______________ | ______ | ☐ | n/a |
-| Heavy (Phase E, opt-in) | `gpt-oss:20b` | ______________ | ______ | ☐ | ☐ |
-| Vision (only if needed) | — | ______________ | ______ | n/a | ☐ |
+Do **not** install `gemma4` / `gemma4:latest` (those are the ~9.6 GB Q4_K_M E4B). Do **not** pull `gemma4:26b*` or `gemma4:31b*`. Do **not** use `gemma4:*-mlx` as DEFAULT (Gemma 4 prefix cache). Do **not** install vLLM in Phase A.
 
-- [ ] `DEFAULT_MODEL` in `.env` matches the "actually installed" row.
-- [ ] If the default chat model has **no** vision capability, the router is OCR-only for images and the `/v1/chat/completions` vision path returns `model_not_found`. Confirmed and acceptable: ☐
+| Slot | Planned | Actually installed | Size on disk | Tools? | Vision? | Arabic smoke? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Default chat | `gemma4:e4b-it-qat` | ______________ | ______ | ☐ | ☐ | ☐ |
+| Quality upgrade (optional, **replaces** E4B) | `gemma4:12b-it-qat` | ______________ | ______ | ☐ | ☐ | ☐ |
+| Embeddings | `nomic-embed-text` | ______________ | ______ | n/a | n/a | n/a |
+| Fallback (optional) | `llama3.2:3b` | ______________ | ______ | ☐ | n/a | n/a |
+| Heavy (Phase E, opt-in) | `gpt-oss:20b` | ______________ | ______ | ☐ | ☐ | n/a |
+
+- [ ] `DEFAULT_MODEL` in `.env` matches the "actually installed" default-chat (or 12B upgrade) row. Only one generative chat model is hot.
+- [ ] Arabic smoke: a short فصحى prompt returned Arabic, not an English apology.
+- [ ] Quant is QAT Q4_0 (`ollama show` / file type), not Q8 or bf16. ☐
+- [ ] If the default chat model has **no** vision capability (fallback only), the router is OCR-only for images and the `/v1/chat/completions` vision path returns `model_not_found`. Confirmed and acceptable: ☐
 - [ ] `DEFAULT_MODEL_HAS_VISION` in `.env` matches the Vision column above. `scripts/phase-a-gates.sh` prints what `ollama show` reported.
 
 ---
@@ -193,9 +197,12 @@ The RAM table in `PLAN.md` §4 is an estimate. Replace it with what your machine
 | Measurement | Command | Your value |
 | --- | --- | --- |
 | Idle free memory, nothing loaded | `vm_stat` / Activity Monitor | ______ GB |
-| Resident with 9B hot | `ollama ps` | ______ GB |
-| 9B tokens/sec warm | Phase A curl timing | ______ tok/s |
-| 9B cold load time | Phase A | ______ s |
+| Resident with Gemma E4B QAT hot (or 12B QAT if that is DEFAULT) | `ollama ps` | ______ GB |
+| Gemma tokens/sec warm (English) | Phase A curl timing | ______ tok/s |
+| Gemma tokens/sec warm (Arabic) | Phase A curl timing | ______ tok/s |
+| Gemma cold load time | Phase A | ______ s |
+| TTFT first chat (new prefix) | Phase A curl | ______ s |
+| TTFT second chat (same system+tools prefix) | Phase A curl | ______ s — should be lower |
 | Peak memory during FLUX 4-bit 1024² | Activity Monitor during Phase E | ______ GB |
 | Peak memory during FLUX 8-bit 1024² (only if you enable it) | | ______ GB |
 | FLUX 1024² wall clock | Phase E | ______ s |

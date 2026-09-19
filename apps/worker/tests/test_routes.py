@@ -132,8 +132,8 @@ async def test_a_model_that_is_not_on_disk_is_a_404(client):
 
 
 async def test_a_forbidden_image_url_is_a_url_error_not_a_model_error(client):
-    """Precedence matters: the default model usually has no vision support, and
-    the caller still needs to hear that the URL was refused."""
+    """Scheme validation runs before the vision-capability check, so a forbidden
+    URL is url_not_allowed even when the default model has no vision."""
     async with client:
         response = await client.post(
             "/v1/chat/completions",

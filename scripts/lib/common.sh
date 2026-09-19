@@ -49,9 +49,13 @@ require_arm64_macos() {
 # Models that do not fit the 18 GB ceiling, and the Phase E model, must never be
 # pulled by a setup script (PLAN.md §7).
 assert_model_allowed() {
-  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-    *:20b*|*:27b*|*:70b*|*:72b*|*:120b*)
-      die "Refusing to pull '$1'. 20B is exclusive-slot, Phase E, and opt-in; 27B/70B/120B exceed the 18 GB ceiling and guarantee swap (PLAN.md §7)."
+  lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    gemma4|gemma4:latest)
+      die "Refusing '$1'. That is the ~9.6 GB Q4_K_M tag. Pin gemma4:e4b-it-qat (PLAN.md §7)."
+      ;;
+    *:26b*|*:31b*|*:20b*|*:27b*|*:70b*|*:72b*|*:120b*|*-mlx|*:mlx|*-q8_0*|*-bf16*)
+      die "Refusing to pull '$1'. 20B is exclusive-slot, Phase E, and opt-in; 26B/31B/27B/70B/120B, MLX, Q8, and bf16 exceed the 18 GB ceiling or break Gemma 4 prefix cache (PLAN.md §7)."
       ;;
   esac
 }

@@ -33,7 +33,7 @@ If this is an M4 **Pro** 24 GB, the plan still applies (same memory ceiling). If
 ### Desk and cooling
 
 - Sit the Mini **on a hard, open surface**. Not in a closed cabinet, not under a monitor sandwich, not on carpet.
-- Leave the rear vents and the bottom clear. M4 active cooling holds 9B chat indefinitely; FLUX bursts raise fan noise. A closed box causes thermal throttle then swap-like slowness.
+- Leave the rear vents and the bottom clear. M4 active cooling holds Gemma E4B QAT chat indefinitely; FLUX bursts raise fan noise. A closed box causes thermal throttle then swap-like slowness.
 - Ambient: normal office. Do not put it next to a heater.
 
 ### Cables (minimum)
@@ -159,7 +159,7 @@ Do not put the Mini on **guest / AP isolation** Wi-Fi. The laptop would not reac
 
 ### ISP quality
 
-- First week downloads: **~20–80 GB** (9B + embed + later FLUX ~7–34 GB first run + optional 20B). Use Ethernet. Overnight pulls are fine.
+- First week downloads: **~20–80 GB** (Gemma E4B QAT + embed + later FLUX ~7–34 GB first run + optional 20B). Use Ethernet. Overnight pulls are fine.
 - Watch **data caps**.
 - Unstable Wi-Fi + QUIC = random 502s. If tunnel flaps, set `protocol: http2` in `~/.cloudflared/config.yml` (see host-setup.md).
 
