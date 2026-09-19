@@ -34,16 +34,14 @@ These are blocked on your Mac Mini, accounts, or Cloudflare/Neon/Netlify clicks.
 - [x] **FileVault Off (policy C).** macOS: “FileVault can’t be turned on because automatic login is enabled.” Compensating control: home desk, keyboard, Screen Sharing LAN-only, no UPS.
 - [x] Wi-Fi **Ash & Mimi**, DHCP `192.168.100.51`, router `192.168.100.1`, MAC `d0:11:e5:94:6b:23`, proxies off.
 
-#### Still you — hardware leftovers (short)
+#### Router (done)
 
 - [x] Router `192.168.100.1` (WE / Huawei **HG8145V5**): **DHCP Static IP** binds MAC `d0:11:e5:94:6b:23` → `192.168.100.51` (saved row, 2026-09-19).
 - [x] **Forward Rules empty:** IPv4 Port Mapping, Port Trigger, IP Mapping, and DMZ all have no rows. WAN 22 / 5900 / 8080 / 11434 are not forwarded. Do not add any.
 
-Hardware Day 0 is done. Next is software on the Mini.
+Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 
-Hardware Day 0 is otherwise done. Next is software on the Mini.
-
-#### Then software on the Mini (this is the real remaining manual work)
+#### Then software on the Mini (this is the remaining manual work)
 
 - [ ] Install **Cursor Pro Plus** on the Mini, Privacy Mode on, Auto off ([cursor-settings.md](cursor-settings.md))
 - [ ] Install **official Ollama.app** (not `brew install ollama`)
