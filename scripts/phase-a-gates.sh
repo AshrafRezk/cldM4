@@ -70,10 +70,13 @@ if [ -n "${SWAP_USED:-}" ]; then
   esac
 fi
 
-if pmset -g 2>/dev/null | awk '$1=="sleep"{exit ($2==0)?0:1}'; then
+SLEEP_LINE="$(pmset -g 2>/dev/null | awk '$1=="sleep"{print $2; exit}')"
+if [ -z "${SLEEP_LINE:-}" ]; then
+  warn "energy: could not read the sleep setting from pmset -g"
+elif [ "$SLEEP_LINE" = "0" ]; then
   pass "energy: computer sleep is disabled"
 else
-  warn "energy: computer sleep is not 0. System Settings → Energy: prevent sleeping when the display is off"
+  warn "energy: computer sleep is ${SLEEP_LINE}. System Settings → Energy: prevent sleeping when the display is off. Cursor cannot fix a sleeping origin"
 fi
 
 if systemsetup -getusingnetworktime 2>/dev/null | grep -qi "on"; then
