@@ -2,7 +2,7 @@
 
 **Execution tracker:** [progress.md](progress.md) (done vs not done vs manual). This file stays the fill-in-the-blanks form. Do not commit real secrets.
 
-**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Hardware Day 0 is **done** (including DHCP Static IP + empty Forward Rules). Remaining: Mini software (Ollama + `mac-setup.sh`). Cloud accounts §§1–5 before Phase B.
+**Code vs you (2026-09-19):** Phase A FastAPI shim is in `apps/worker`. Hardware Day 0 is **done**. Mini clone + `mac-setup.sh` + Ollama tags are **done**. Remaining on the Mini: worker listening on `127.0.0.1:8080`, then live health/chat. Cloud accounts §§1–5 before Phase B.
 
 Hardware, cables, LAN, and “what is public” live in **[hardware-and-network.md](hardware-and-network.md)**. Do that document first; this file is the account/DNS/boot blanks.
 

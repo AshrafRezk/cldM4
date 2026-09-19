@@ -976,7 +976,7 @@ These are targets, not measurements. Fill in `docs/operator-checklist.md` §9 wi
 
 Exact commands live in each phase's definition of done in [docs/cursor-phases.md](docs/cursor-phases.md). The summary:
 
-Phase A: `uname -m` and the venv Python both arm64; `curl` loopback chat and embed; `ollama ps` shows **at most one generative model** (plus `nomic-embed-text`); `pgrep -fc uvicorn` is 1; health JSON has no secrets.
+Phase A: `uname -m` and the venv Python both arm64; `curl` loopback chat and embed; `ollama ps` shows **at most one generative model** (plus `nomic-embed-text`); exactly one `uvicorn app.main:app` process (macOS `pgrep` has no `-c`); health JSON has no secrets.
 
 Phase B: from a phone on cellular (not the Mini's wifi): chat with a real key over HTTPS; bad key → 401 JSON, not a Cloudflare HTML page; `nmap`/`curl` cannot reach 11434 from the WAN; the WAF skip rule is proven with a non-browser User-Agent; `?target=salesforce` OpenAPI imports into External Services.
 

@@ -5,11 +5,13 @@
   <key>Label</key><string>ai.cloudiator.worker</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/bin/bash</string>
     <string>__DATA__/run-worker.sh</string>
   </array>
   <key>WorkingDirectory</key><string>__REPO__/apps/worker</string>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>MPLBACKEND</key><string>Agg</string>
     <key>WEB_CONCURRENCY</key><string>1</string>
     <key>OLLAMA_MAX_LOADED_MODELS</key><string>2</string>

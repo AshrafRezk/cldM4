@@ -117,6 +117,7 @@ grep -q '^WEB_CONCURRENCY=1' "$ENV_FILE" || echo "WEB_CONCURRENCY=1" >> "$ENV_FI
 
 echo
 echo "Phase A software install finished."
-echo "Next: run scripts/smoke-phase-a.sh, then fill docs/operator-checklist.md §8–9 from ollama show / timings."
-echo "Ollama env (set on the Ollama.app / its LaunchAgent, not only the worker):"
+echo "Next: ./scripts/install-launchagents.sh if :8080 is down, then ./scripts/smoke-phase-a.sh"
+echo "Do not killall Ollama to retry the worker (LaunchServices error -600)."
+echo "Ollama env (GUI session; also installed as ai.cloudiator.ollama-env):"
 cat "$ROOT/infra/launchagents/ollama.env"

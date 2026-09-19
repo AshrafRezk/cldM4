@@ -330,6 +330,6 @@ Hardware/network is green when:
 - [ ] No WAN port forwards for 22/8080/11434 (Screen Sharing is LAN-only already)
 - [ ] Phone-on-cellular test of `api.` is possible after Phase B (you already own the domain)
 - [x] No UPS (accepted). [x] Automatic login for `Cloudiator`. [x] FileVault policy **C** (Off)
-- [ ] Cursor Pro Plus on this machine, repo cloned, next file is host-setup.md
+- [x] Cursor Pro Plus on this machine (app in Applications). [x] repo cloned at `~/cldM4` on `cursor/phase-a-openai-shim-ee9d`; `mac-setup.sh` ran. Next: worker on `127.0.0.1:8080`.
 
 Operator: ____________________  Date: ____________

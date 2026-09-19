@@ -80,7 +80,7 @@ d) Smoke-test Apple Vision early even though OCR is Phase D: python -c "import V
 ```bash
 uname -m                                          # arm64
 apps/worker/.venv/bin/python -c "import platform;print(platform.machine())"   # arm64
-pgrep -fc "uvicorn app.main:app"                  # exactly 1
+(pgrep -f "uvicorn app.main:app" || true) | wc -l | tr -d ' '   # exactly 1 (macOS pgrep has no -c)
 lsof -nP -iTCP:8080 -sTCP:LISTEN                  # bound to 127.0.0.1, NOT *:8080
 curl -s http://127.0.0.1:8080/v1/health | jq      # ok=true, no secrets, no key hashes
 curl -sD- -o/dev/null http://127.0.0.1:8080/v1/health | grep -i x-request-id

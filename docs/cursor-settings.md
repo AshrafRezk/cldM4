@@ -84,7 +84,7 @@ Cursor’s own note: daily Agent users often land **$60–$100/mo**. Pro Plus is
 - One phase, one PR-sized commit, one green DoD.
 - If the agent proposes Docker, 70B, Netlify inference, loading FLUX beside the chat model, `--workers 4`, a shared admin password, or letting Ollama run the tool loop: stop, point at `PLAN.md`, retry. Do not “let it cook.”
 - After every GPU-ish change: `ollama ps` must show **at most one generative model** (plus `nomic-embed-text`, which is expected).
-- After every worker change: `pgrep -fc "uvicorn app.main:app"` must be **1**.
+- After every worker change: `(pgrep -f "uvicorn app.main:app" || true) | wc -l` must be **1** (macOS `pgrep` has no `-c`).
 - After Phase B: test HTTPS from a **phone**, not only localhost.
 - Keep the Mini awake (see `docs/host-setup.md`). Cursor Agent cannot fix a sleeping origin.
 

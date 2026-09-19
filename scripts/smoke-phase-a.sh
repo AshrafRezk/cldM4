@@ -3,7 +3,19 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DATA="${CLOUDIATOR_DATA:-$HOME/Cloudiator}"
 cd "$ROOT"
+
+count_uvicorn() {
+  # BSD pgrep (macOS) has no -c. GNU pgrep -fc is Linux-only.
+  local pids
+  pids="$(pgrep -f 'uvicorn app.main:app' 2>/dev/null || true)"
+  if [[ -z "$pids" ]]; then
+    echo 0
+    return
+  fi
+  echo "$pids" | wc -l | tr -d ' '
+}
 
 echo "== architecture =="
 echo "uname -m: $(uname -m)  (Mini must be arm64)"
@@ -22,10 +34,18 @@ else
 fi
 
 echo
-echo "== live loopback (skipped unless 127.0.0.1:8080 is up) =="
+echo "== live loopback (required on Darwin; skipped elsewhere unless 127.0.0.1:8080 is up) =="
 if ! curl -sf --max-time 2 http://127.0.0.1:8080/v1/health >/dev/null; then
-  echo "worker not listening on 127.0.0.1:8080 — start it on the Mini, then re-run."
-  echo "On the Mini: launchctl print gui/\$UID/ai.cloudiator.worker"
+  echo "worker not listening on 127.0.0.1:8080"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo "---- $DATA/logs/worker.err (last 50) ----"
+    tail -n 50 "$DATA/logs/worker.err" 2>/dev/null || echo "(no worker.err yet)"
+    echo
+    echo "Re-install the LaunchAgent (do not killall Ollama):"
+    echo "  cd ~/cldM4 && git pull && ./scripts/install-launchagents.sh"
+    exit 1
+  fi
+  echo "skipped live loopback (not Darwin / worker not up)."
   exit 0
 fi
 
@@ -47,9 +67,7 @@ if command -v lsof >/dev/null 2>&1; then
   lsof -nP -iTCP:8080 -sTCP:LISTEN || true
 fi
 
-if command -v pgrep >/dev/null 2>&1; then
-  echo "uvicorn processes: $(pgrep -fc 'uvicorn app.main:app' || true)  (must be 1 on the Mini)"
-fi
+echo "uvicorn processes: $(count_uvicorn)  (must be 1 on the Mini)"
 
 DEFAULT_MODEL="${DEFAULT_MODEL:-qwen3.5:9b}"
 if curl -sf --max-time 1 http://127.0.0.1:11434/api/tags >/dev/null; then

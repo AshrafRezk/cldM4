@@ -131,7 +131,7 @@ ollama pull nomic-embed-text
 # gpt-oss:20b belongs to Phase E, not now. It is ~14GB.
 ```
 
-Set the environment on the Ollama app (its settings pane if it persists env) or via a LaunchAgent wrapper. Documented macOS env: https://docs.ollama.com/faq
+Set the environment on the Ollama app (its settings pane if it persists env) or via `ai.cloudiator.ollama-env` (`scripts/install-launchagents.sh`). `launchctl setenv` lasts for this GUI session only; the LaunchAgent re-applies it at login. **Do not** `killall Ollama` then `open -a Ollama` — LaunchServices returns error **-600**. If the app is gone, `open /Applications/Ollama.app`. Documented macOS env: https://docs.ollama.com/faq
 
 Required:
 
@@ -165,6 +165,7 @@ Phase A creates `~/Library/LaunchAgents/ai.cloudiator.worker.plist`. **Substitut
   <key>Label</key><string>ai.cloudiator.worker</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/bin/bash</string>
     <string>/Users/REPLACE/Cloudiator/run-worker.sh</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/REPLACE/cldM4/apps/worker</string>
@@ -181,18 +182,9 @@ Phase A creates `~/Library/LaunchAgents/ai.cloudiator.worker.plist`. **Substitut
 </plist>
 ```
 
-A wrapper script is easier than an env dict, because the `.env` file is the single source of truth:
+A wrapper script is easier than an env dict, because the `.env` file is the single source of truth. **Use bash, not zsh**, and parse `KEY=VALUE` rather than `source`-ing the file: zsh `NOMATCH` treats `?` in `DATABASE_URL=...sslmode=require` as a glob and exits before uvicorn starts (KeepAlive crash loop, nothing on `:8080`). Parentheses in `NOMINATIM_USER_AGENT=... (email)` are a subshell in both shells.
 
-```bash
-#!/bin/zsh
-# /Users/REPLACE/Cloudiator/run-worker.sh   (chmod +x)
-set -a
-source /Users/REPLACE/Cloudiator/.env
-set +a
-export MPLBACKEND=Agg
-cd /Users/REPLACE/cldM4/apps/worker
-exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
-```
+The installed wrapper is `infra/launchagents/run-worker.sh` (bash dotenv loader). Do not replace it with `set -a; source ~/.env`.
 
 `--workers 1` is mandatory, not a default to rely on. `metal_lock` is an in-process `asyncio.Lock`; two workers means two schedulers that each think they own Metal, and the first concurrent FLUX + 20B pair asks a 24 GB machine for ~25 GB. No `--reload` here either — the reloader forks.
 
@@ -207,7 +199,7 @@ launchctl print   gui/$UID/ai.cloudiator.worker | head -20     # state = running
 # and verify it is actually serving, not just "running":
 lsof -nP -iTCP:8080 -sTCP:LISTEN        # 127.0.0.1:8080, never *:8080
 curl -s http://127.0.0.1:8080/v1/health | jq
-pgrep -fc "uvicorn app.main:app"        # exactly 1
+(pgrep -f "uvicorn app.main:app" || true) | wc -l | tr -d ' '   # exactly 1 (macOS pgrep has no -c)
 
 # to remove:
 launchctl bootout gui/$UID/ai.cloudiator.worker

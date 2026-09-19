@@ -19,7 +19,7 @@ Swap. Check `sysctl vm.swapusage` (used must be 0.00M) and `sysctl -n kern.memor
 
 - `ollama ps`, then `ollama stop <name>` on anything unexpected
 - Confirm `OLLAMA_MAX_LOADED_MODELS=2` and `OLLAMA_NUM_PARALLEL=1` — **not 4**
-- `pgrep -fc "uvicorn app.main:app"` must be **1**. More than one means `--workers > 1` and two schedulers each loading models
+- `(pgrep -f "uvicorn app.main:app" || true) | wc -l` must be **1**. macOS `pgrep` has no `-c` (`pgrep -fc` prints usage). More than one means `--workers > 1` and two schedulers each loading models
 - Do not run FLUX and the chat model together
 - Lower `num_ctx` to 4096
 - Quit Chrome/Electron apps on the Mini. A stray `mmdc` Chromium is 0.4–1.2 GB
@@ -104,6 +104,35 @@ Kaleido binary missing. Fall back to matplotlib Agg. Never fail worker import or
 ## Mermaid renders leave Chromium processes behind
 
 `mmdc` spawns a headless Chromium per render and orphans it on timeout. Kill the process tree, not the parent. If this keeps happening, set `ENABLE_MERMAID=false` — Graphviz is the default renderer and the fallback. `pgrep -fl chrome` should be empty when nothing is rendering.
+
+## Worker not listening on 127.0.0.1:8080 after mac-setup
+
+`curl` connection refused, smoke unit tests pass, live loopback skipped. Ollama `/api/tags` is fine. macOS `pgrep -fc` prints usage (BSD pgrep has no `-c`).
+
+The LaunchAgent is crash-looping. `KeepAlive=true` plus `ThrottleInterval=10` looks "installed" (`xpcproxy` / not running) while nothing binds `:8080`.
+
+```bash
+tail -n 80 ~/Cloudiator/logs/worker.err
+launchctl print gui/$(id -u)/ai.cloudiator.worker | head -40
+```
+
+If you see `zsh: no matches found` (`?` in `DATABASE_URL`) or `command not found: you@example.com` (parentheses in `NOMINATIM_USER_AGENT`), the wrapper `source`-d `.env` as zsh. Pull the bash dotenv loader and reinstall — **do not** `killall Ollama` to retry the worker (`open -a` then hits LaunchServices error -600):
+
+```bash
+cd ~/cldM4
+git pull
+./scripts/install-launchagents.sh
+curl -sS http://127.0.0.1:8080/v1/health
+./scripts/smoke-phase-a.sh
+```
+
+Foreground uvicorn only if that still fails:
+
+```bash
+cd ~/cldM4/apps/worker
+export WEB_CONCURRENCY=1 OLLAMA_MAX_LOADED_MODELS=2 CLOUDIATOR_ENV=production MPLBACKEND=Agg
+CLOUDIATOR_ENV_FILE="$HOME/Cloudiator/.env" .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
+```
 
 ## Ollama works in the app, FastAPI gets connection refused
 
