@@ -46,7 +46,13 @@ Hardware Day 0 is done. Logout of the router. Next is software on the Mini.
 #### Then software on the Mini (this is the remaining manual work)
 
 - [x] **Cursor** is in `/Applications` (screenshot 2026-09-19). Still set Privacy Mode on and Auto off per [cursor-settings.md](cursor-settings.md) when you use it on this Mini.
-- [x] **Ollama.app** is in `/Applications` (llama icon). Open it once so it sits in the menu bar and owns `127.0.0.1:11434`. Do not `brew install ollama`.
+- [x] **Ollama.app** is in `/Applications`; CLI `/usr/local/bin/ollama` **0.34.2**; no Homebrew ollama. Open it so the menu-bar app is running.
+- [ ] **Xcode Command Line Tools** — Mini Terminal: `xcode-select: No developer tools were found`. `git clone` never created `~/cldM4`, so `.env` and `mac-setup.sh` did not run.
+
+#### Then software on the Mini (remaining)
+
+- [ ] Install Xcode CLT (GUI prompt or `xcode-select --install`), wait until `git --version` prints a version
+- [ ] Clone `cldM4`, checkout `cursor/phase-a-openai-shim-ee9d`, `~/Cloudiator/.env`, run `scripts/mac-setup.sh`
 
 #### Then software on the Mini (remaining)
 
