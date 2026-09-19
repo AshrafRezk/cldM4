@@ -120,6 +120,8 @@ launchctl print gui/$(id -u)/ai.cloudiator.worker | head -40
 
 **Logging / warmup:** `Message: 'HTTP Request: %s %s "%s %d %s"'` — redaction filter vs httpx `%d`. **`FileNotFoundError` in `memory.py` `_run` / `sysctl`:** launchd `EnvironmentVariables` **replaces** PATH. Our plist used to omit `/usr/sbin`, so `sysctl` (at `/usr/sbin/sysctl`) was missing and lifespan crashed before listen. The worker now execs `/usr/sbin/sysctl` and treats a miss as pressure `normal` instead of exiting.
 
+**`Bootstrap failed: 5: Input/output error`:** the agent is already loaded (or `bootout` has not finished). Do not abort. `kickstart` without `-k` if `:8080` is already healthy — `kickstart -k` SIGTERMs the process that just answered health.
+
 Pull and reinstall — **do not** `killall Ollama` (`open -a` then hits LaunchServices error -600):
 
 ```bash

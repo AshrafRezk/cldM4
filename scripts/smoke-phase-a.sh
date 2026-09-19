@@ -35,14 +35,30 @@ fi
 
 echo
 echo "== live loopback (required on Darwin; skipped elsewhere unless 127.0.0.1:8080 is up) =="
-if ! curl -sf --max-time 2 http://127.0.0.1:8080/v1/health >/dev/null; then
+wait_for_health() {
+  local attempts="${1:-1}" i
+  for i in $(seq 1 "$attempts"); do
+    if curl -sf --max-time 2 http://127.0.0.1:8080/v1/health >/dev/null; then
+      return 0
+    fi
+    [[ "$i" -lt "$attempts" ]] && sleep 2
+  done
+  return 1
+}
+
+HEALTH_ATTEMPTS=1
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  HEALTH_ATTEMPTS=20
+fi
+if ! wait_for_health "$HEALTH_ATTEMPTS"; then
   echo "worker not listening on 127.0.0.1:8080"
   if [[ "$(uname -s)" == "Darwin" ]]; then
     echo "---- $DATA/logs/worker.err (last 50) ----"
     tail -n 50 "$DATA/logs/worker.err" 2>/dev/null || echo "(no worker.err yet)"
     echo
-    echo "Re-install the LaunchAgent (do not killall Ollama):"
-    echo "  cd ~/cldM4 && git pull && ./scripts/install-launchagents.sh"
+    echo "Start without a full reinstall (do not killall Ollama):"
+    echo "  launchctl kickstart gui/\$(id -u)/ai.cloudiator.worker"
+    echo "  curl -sS http://127.0.0.1:8080/v1/health"
     exit 1
   fi
   echo "skipped live loopback (not Darwin / worker not up)."

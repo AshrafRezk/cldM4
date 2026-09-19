@@ -40,20 +40,48 @@ if [[ "$UNAME_S" != "Darwin" ]]; then
 fi
 
 UID_NUM="$(id -u)"
-bootstrap_label() {
-  local label="$1" plist="$2"
-  launchctl bootout "gui/$UID_NUM/$label" 2>/dev/null || true
-  launchctl bootstrap "gui/$UID_NUM" "$plist"
-  launchctl enable "gui/$UID_NUM/$label"
-  launchctl kickstart -k "gui/$UID_NUM/$label"
+DOMAIN="gui/$UID_NUM"
+
+# launchctl bootstrap error 5 (EIO) = already loaded / bootout not finished.
+# Do not abort the worker install if the one-shot ollama-env agent races.
+ensure_agent() {
+  local label="$1" plist="$2" required="${3:-0}"
+  local target="$DOMAIN/$label"
+  if launchctl print "$target" >/dev/null 2>&1; then
+    launchctl bootout "$target" 2>/dev/null || true
+    sleep 2
+  fi
+  if ! launchctl bootstrap "$DOMAIN" "$plist" 2>/tmp/cloudiator-bootstrap.err; then
+    if grep -qiE 'Input/output error|already loaded|Duplicate' /tmp/cloudiator-bootstrap.err 2>/dev/null; then
+      echo "$label already loaded (bootstrap error 5); continuing"
+    else
+      echo "bootstrap $label:" >&2
+      cat /tmp/cloudiator-bootstrap.err >&2 || true
+      if [[ "$required" == "1" ]]; then
+        abort "bootstrap $label failed"
+      fi
+    fi
+  fi
+  launchctl enable "$target" 2>/dev/null || true
 }
 
-bootstrap_label "ai.cloudiator.ollama-env" \
-  "$HOME/Library/LaunchAgents/ai.cloudiator.ollama-env.plist"
-bootstrap_label "ai.cloudiator.worker" \
-  "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist"
+ensure_agent "ai.cloudiator.ollama-env" \
+  "$HOME/Library/LaunchAgents/ai.cloudiator.ollama-env.plist" 0
+launchctl kickstart "$DOMAIN/ai.cloudiator.ollama-env" 2>/dev/null || true
 
-echo "Waiting for 127.0.0.1:8080 (lifespan warmup can take ~60s on first 9B load)..."
+ensure_agent "ai.cloudiator.worker" \
+  "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist" 1
+
+if curl -sf --max-time 1 http://127.0.0.1:8080/v1/health >/dev/null; then
+  echo "worker already healthy on 127.0.0.1:8080; skipping kickstart -k"
+else
+  # -k kills a running job. Only use it when nothing is listening.
+  launchctl kickstart -k "$DOMAIN/ai.cloudiator.worker" 2>/dev/null \
+    || launchctl kickstart "$DOMAIN/ai.cloudiator.worker" 2>/dev/null \
+    || true
+fi
+
+echo "Waiting for 127.0.0.1:8080..."
 ok=0
 for _ in $(seq 1 45); do
   if curl -sf --max-time 2 http://127.0.0.1:8080/v1/health >/dev/null; then
@@ -65,7 +93,7 @@ done
 if [[ "$ok" -ne 1 ]]; then
   echo "abort: worker did not become healthy on 127.0.0.1:8080" >&2
   echo "---- launchctl print ----" >&2
-  launchctl print "gui/$UID_NUM/ai.cloudiator.worker" | head -40 >&2 || true
+  launchctl print "$DOMAIN/ai.cloudiator.worker" | head -40 >&2 || true
   echo "---- tail $DATA/logs/worker.err ----" >&2
   tail -n 80 "$DATA/logs/worker.err" >&2 || true
   echo "---- tail $DATA/logs/worker.log ----" >&2
@@ -73,7 +101,7 @@ if [[ "$ok" -ne 1 ]]; then
   exit 1
 fi
 
-launchctl print "gui/$UID_NUM/ai.cloudiator.worker" | head -20
+launchctl print "$DOMAIN/ai.cloudiator.worker" | head -20
 echo
 curl -sS http://127.0.0.1:8080/v1/health
 echo
