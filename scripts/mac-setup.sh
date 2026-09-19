@@ -9,6 +9,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 . "$SCRIPT_DIR/lib/common.sh"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -153,6 +154,15 @@ if command -v uv >/dev/null 2>&1; then
     .venv/bin/python -c 'import Vision' >/dev/null 2>&1 \
       && pass "import Vision works (Phase D OCR)" \
       || warn "import Vision failed. Rebuild against /opt/homebrew/opt/python@3.11/bin/python3.11"
+
+    # tiktoken fetches its BPE table on first use. Do that here, not on the
+    # first request: the worker never loads it from a request path, so an
+    # un-warmed cache silently downgrades the context guard to a heuristic.
+    if .venv/bin/python -c 'from app.context_guard import prewarm_encoder; raise SystemExit(0 if prewarm_encoder() else 1)' >/dev/null 2>&1; then
+      pass "tiktoken encoder cached for the context guard"
+    else
+      warn "could not cache the tiktoken encoder; the context guard falls back to a character heuristic"
+    fi
   fi
   cd "$ROOT" || exit 1
 else
@@ -160,7 +170,7 @@ else
 fi
 
 if [ -f "$HOME/Cloudiator/.env" ]; then
-  pass "~/Cloudiator/.env exists"
+  pass "$HOME/Cloudiator/.env exists"
   PERMS="$(stat -f '%OLp' "$HOME/Cloudiator/.env" 2>/dev/null)"
   [ "$PERMS" = "600" ] && pass ".env is chmod 600" || warn ".env is mode $PERMS; run chmod 600 ~/Cloudiator/.env"
 else
