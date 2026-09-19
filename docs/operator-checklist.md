@@ -154,7 +154,7 @@ Then, regardless of choice:
 - [x] **n/a standard-user split.** Both `Cloudiator` and `Ashraf` are Admin. Appliance user is `Cloudiator`.
 - [x] Keyboard in the room. Screen lock / FileVault pre-boot still cannot be typed via Screen Sharing — physical keyboard is the unlock path if FileVault is ever turned on.
 
-Who is allowed to log in / SSH to this Mini: Users `Cloudiator` and `Ashraf` (Admins). Screen Sharing: Administrators only, LAN `192.168.100.51`.
+Who is allowed to log in / SSH to this Mini: Display name **Cloudiator** (Unix `ashrafrezk`, this is the auto-login appliance account) and **Ashraf** (second Admin). Screen Sharing: Administrators only, LAN `192.168.100.51`. Do not create a third user. `$HOME` for env/LaunchAgents is `/Users/ashrafrezk`.
 
 ---
 
