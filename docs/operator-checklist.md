@@ -126,7 +126,7 @@ The OSM Foundation blocks clients with a generic or missing `User-Agent`, and bl
 | Item | Value | Done |
 | --- | --- | --- |
 | Contact email that goes in the User-Agent (must be a real, monitored mailbox) | `ashrafrmattar@gmail.com` | [x] |
-| `NOMINATIM_USER_AGENT` value | `Cloudiator/0.1 (ashrafrmattar@gmail.com)` | [x] |
+| `NOMINATIM_USER_AGENT` value | `"Cloudiator/0.1 (ashrafrmattar@gmail.com)"` (quotes required in the `.env` file) | [x] |
 | Read the usage policy | https://operations.osmfoundation.org/policies/nominatim/ | [ ] |
 | Expected geocode volume per day | dogfood / low until Salesforce orgs are live | [x] |
 

@@ -6,6 +6,10 @@
     python -m app.dbtool revoke-key <public_id>
     python -m app.dbtool list-keys
 
+Configuration comes from `~/Cloudiator/.env` (override with CLOUDIATOR_ENV_FILE)
+unless the variables are already in the environment, so these commands work in a
+plain shell without sourcing anything first.
+
 Key minting lives here rather than behind an HTTP route on purpose: in v1 the
 only things that mint keys are this CLI and the Phase C dashboard talking to Neon
 directly, so there is no mint endpoint on the public surface to protect.
@@ -19,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,12 +35,47 @@ from .auth import (
     hash_secret,
     mint_secret,
 )
-from .config import get_settings
+from .config import get_settings, reset_settings_cache
 from .db import DatabaseUnavailable, Neon, pooled_endpoint
 from .openapi_filter import schema_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 NEON_SQL = REPO_ROOT / "infra" / "neon.sql"
+DEFAULT_ENV_FILE = Path("~/Cloudiator/.env")
+
+
+def load_env_file(path: Path) -> list[str]:
+    """Fill in variables the shell did not already set. Returns what was loaded.
+
+    The LaunchAgent wrapper reads `~/Cloudiator/.env` for the worker; an
+    interactive shell does not, and "DATABASE_URL is not set" about a file that
+    plainly sets it is a confusing way to learn the difference. Anything already
+    in the environment wins, so a one-off override still works.
+
+    This is a KEY=VALUE parser, not a shell source: unquoted parentheses in
+    NOMINATIM_USER_AGENT survive, and `$(...)` is not executed.
+    """
+    if not path.is_file():
+        return []
+    loaded: list[str] = []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :]
+        name, separator, value = line.partition("=")
+        name = name.strip()
+        if not separator or not name or name in os.environ:
+            continue
+        if not name.isidentifier():
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ[name] = value
+        loaded.append(name)
+    return loaded
 
 
 def _presets() -> dict[str, Any]:
@@ -219,9 +259,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def _run(args: argparse.Namespace) -> int:
+    env_file = Path(os.environ.get("CLOUDIATOR_ENV_FILE") or DEFAULT_ENV_FILE).expanduser()
+    if loaded := load_env_file(env_file):
+        print(f"read {len(loaded)} variables from {env_file}", file=sys.stderr)
+        reset_settings_cache()
     settings = get_settings()
     if not settings.database_url:
-        print("DATABASE_URL is not set. Source ~/Cloudiator/.env first.", file=sys.stderr)
+        print(
+            f"DATABASE_URL is not set, and {env_file} does not set it either. "
+            "It belongs in that file (chmod 600, outside git).",
+            file=sys.stderr,
+        )
         return 2
     if not pooled_endpoint(settings.database_url):
         print(

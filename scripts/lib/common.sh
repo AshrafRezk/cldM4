@@ -71,11 +71,8 @@ file_mode() {
   fi
 }
 
-load_env_file() {
-  if [ -f "$1" ]; then
-    set -a
-    # shellcheck disable=SC1090
-    . "$1"
-    set +a
-  fi
-}
+# KEY=VALUE parser — never `source` the file. Unquoted parentheses in
+# NOMINATIM_USER_AGENT are a zsh parse error and would abort every script here
+# plus the LaunchAgent wrapper. See scripts/lib/load-env.sh.
+# shellcheck source=load-env.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/load-env.sh"

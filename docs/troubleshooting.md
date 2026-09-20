@@ -97,6 +97,26 @@ Somebody has to type the password. For planned reboots use `sudo fdesetup authre
 
 Forgot `setTimeout(120000)`. Default is 10s.
 
+## Worker will not stay up after `launchctl kickstart` / `worker.err` says `parse error near '('`
+
+`~/Cloudiator/.env` line around `NOMINATIM_USER_AGENT=Cloudiator/0.1 (you@example.com)`. Unquoted parentheses are a zsh syntax error. The LaunchAgent wrapper used to `source` that file under `set -e`, so the worker never reached uvicorn and KeepAlive crash-looped it. Every variable *after* that line was also skipped in any interactive `source`.
+
+Immediate, on the Mini, no git pull required:
+
+```bash
+# quote the value — the parentheses are part of the OSM User-Agent, not shell
+# edit ~/Cloudiator/.env so the line is:
+# NOMINATIM_USER_AGENT="Cloudiator/0.1 (ashrafrmattar@gmail.com)"
+
+tail -40 ~/Cloudiator/logs/worker.err
+launchctl print gui/$UID/ai.cloudiator.worker | head -20
+launchctl kickstart -k gui/$UID/ai.cloudiator.worker
+sleep 8
+curl -s http://127.0.0.1:8080/v1/health | jq
+```
+
+After pulling a revision that ships `scripts/lib/load-env.sh`, re-run `scripts/install-launchagents.sh` so `~/Cloudiator/run-worker.sh` is not still the old `source` wrapper. Then even an unquoted User-Agent will load. Quote it anyway; it is the documented form.
+
 ## Nominatim 403 / HTML error page
 
 Missing or generic User-Agent, or more than 1 req/s. Set `NOMINATIM_USER_AGENT` to an app name plus a real contact email, and use a process-wide 1 rps lock on cache **misses**. If a chat loop is geocoding lists, the geocode cache is not working — check `GEOCODE_CACHE_DB`. A block lands on your home IP and takes out everything else on that connection.

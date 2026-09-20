@@ -20,6 +20,22 @@ git push
 
 Then on the Mini: `git pull`.
 
+## If `.env:59: parse error near '('`
+
+That is `NOMINATIM_USER_AGENT`. Quote it, then restart — do not `source` the file. Details: [troubleshooting.md](troubleshooting.md). The key you already minted is fine.
+
+```bash
+# in ~/Cloudiator/.env, the line must be:
+# NOMINATIM_USER_AGENT="Cloudiator/0.1 (ashrafrmattar@gmail.com)"
+
+tail -40 ~/Cloudiator/logs/worker.err
+launchctl kickstart -k gui/$UID/ai.cloudiator.worker
+sleep 8
+curl -s http://127.0.0.1:8080/v1/health | jq
+# then: export SMOKE_API_KEY=sk-cld-... and scripts/smoke-phase-b.sh --local
+# then the tunnel steps below
+```
+
 ## Mini — Phase B (new chat, do this next)
 
 Cursor **Pro Plus**. Agent mode. **Auto off.** Privacy Mode on. Model: **Claude Opus 5**. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`.
@@ -28,7 +44,7 @@ Before the agent:
 
 - `git pull`
 - Confirm loopback still works: `curl -s http://127.0.0.1:8080/v1/health`
-- Put password-manager values in `~/Cloudiator/.env` (`chmod 600`, **outside** git): pooled `DATABASE_URL` (`-pooler`), `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` = **api** app AUD, `CF_ACCESS_TEAM_DOMAIN`, `ADMIN_TOKEN`, `NOMINATIM_USER_AGENT=Cloudiator/0.1 (ashrafrmattar@gmail.com)`
+- Put password-manager values in `~/Cloudiator/.env` (`chmod 600`, **outside** git): pooled `DATABASE_URL` (`-pooler`), `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` = **api** app AUD, `CF_ACCESS_TEAM_DOMAIN`, `ADMIN_TOKEN`, `NOMINATIM_USER_AGENT="Cloudiator/0.1 (ashrafrmattar@gmail.com)"` (the quotes are required — unquoted parentheses are a zsh parse error)
 - Schema is already applied in Neon. Do not recreate tables unless the agent finds them missing.
 - Tunnel name: `cloudiator-mini` → `http://127.0.0.1:8080` only. Never `11434`.
 
@@ -46,6 +62,7 @@ launchctl kickstart -k gui/$UID/ai.cloudiator.worker
 cd apps/worker && .venv/bin/python -m app.dbtool mint-key \
   --tenant cloudiator --name 'Phase B smoke' --preset salesforce_engineer && cd -
 # the plaintext key is printed once; put it in the password manager
+# the CLI reads ~/Cloudiator/.env itself — do not `source` that file in zsh
 
 cloudflared tunnel login                          # browser, by hand, zone must be Active
 cloudflared tunnel run cloudiator-mini            # ONCE interactively: Local Network prompt, then Ctrl-C

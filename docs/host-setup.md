@@ -188,13 +188,16 @@ A wrapper script is easier than an env dict, because the `.env` file is the sing
 ```bash
 #!/bin/zsh
 # /Users/REPLACE/Cloudiator/run-worker.sh   (chmod +x)
-set -a
-source /Users/REPLACE/Cloudiator/.env
-set +a
+# Do not `source` the env file: unquoted parentheses in NOMINATIM_USER_AGENT
+# are a zsh parse error, and `set -e` then exits before uvicorn starts.
+. /Users/REPLACE/cldM4/scripts/lib/load-env.sh
+load_env_file /Users/REPLACE/Cloudiator/.env
 export MPLBACKEND=Agg
 cd /Users/REPLACE/cldM4/apps/worker
 exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 ```
+
+`scripts/install-launchagents.sh` renders this from `infra/launchd/run-worker.sh`. After pulling a wrapper change, re-run that installer so `~/Cloudiator/run-worker.sh` is not a stale copy.
 
 `--workers 1` is mandatory, not a default to rely on. `metal_lock` is an in-process `asyncio.Lock`; two workers means two schedulers that each think they own Metal, and the first concurrent FLUX + 20B pair asks a 24 GB machine for ~25 GB. No `--reload` here either — the reloader forks.
 

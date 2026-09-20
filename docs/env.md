@@ -107,7 +107,7 @@ Public `/v1/admin/*` is Cloudflare Access + JWT validation, not a bearer token. 
 | Name | Notes |
 | --- | --- |
 | `NOMINATIM_URL` | `https://nominatim.openstreetmap.org` |
-| `NOMINATIM_USER_AGENT` | `Cloudiator/0.1 (real@mailbox)` — **yes, or OSM blocks your home IP**, which takes out everything else on that connection |
+| `NOMINATIM_USER_AGENT` | `"Cloudiator/0.1 (real@mailbox)"` — **quote it**. Unquoted parentheses are a zsh parse error and used to kill the LaunchAgent wrapper. **Yes, or OSM blocks your home IP**, which takes out everything else on that connection |
 | `NOMINATIM_MAX_ROWS_PER_REQUEST` | `25`. Bulk geocoding the public instance is against the usage policy |
 | `OVERPASS_URLS` | comma-separated mirrors for failover |
 | `OSRM_URL` | `https://router.project-osrm.org` |
