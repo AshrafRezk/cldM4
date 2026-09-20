@@ -203,7 +203,17 @@ class OllamaClient:
         return [name for name in await self.loaded_models() if name and name != embed]
 
     async def set_keep_alive(self, model: str, keep_alive: int) -> None:
-        """Load (keep_alive=-1) or unload (keep_alive=0) without generating."""
+        """Load (keep_alive=-1) or unload (keep_alive=0) without a real generation.
+
+        Embedders 400 on `/api/generate` (`"nomic-embed-text" does not support
+        generate`). They have to go through `/api/embed`. Chat models use
+        `/api/generate` with an empty prompt, which is Ollama's documented
+        keep-alive / unload trick.
+        """
+        if normalize_tag(model) == normalize_tag(self.embed_model):
+            payload = {"model": model, "input": ".", "keep_alive": keep_alive}
+            await self._post("/api/embed", payload, timeout=60.0)
+            return
         payload = {"model": model, "prompt": "", "keep_alive": keep_alive}
         await self._post("/api/generate", payload, timeout=60.0)
 
