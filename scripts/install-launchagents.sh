@@ -60,6 +60,13 @@ render() {
 
 render "$ROOT/infra/launchd/run-worker.sh" "$WRAPPER_DEST"
 chmod +x "$WRAPPER_DEST" && pass "chmod +x $WRAPPER_DEST"
+if grep -E '^[[:space:]]*source |^[[:space:]]*\. .*Cloudiator/\.env' "$WRAPPER_DEST" >/dev/null; then
+  rm -f "$WRAPPER_DEST"
+  die "rendered wrapper still sources .env — that is a zsh parse-error crash loop"
+fi
+grep -q 'load_env_file' "$WRAPPER_DEST" \
+  && pass "wrapper parses .env with load_env_file" \
+  || die "rendered wrapper is missing load_env_file"
 render "$ROOT/infra/launchd/$LABEL.plist" "$PLIST_DEST"
 
 section "Bootstrap (launchctl bootstrap, not the deprecated load)"

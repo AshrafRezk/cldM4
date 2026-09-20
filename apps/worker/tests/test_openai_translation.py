@@ -275,6 +275,33 @@ async def test_every_ollama_call_sends_keep_alive():
     assert seen[0]["stream"] is False
 
 
+async def test_embedder_keep_alive_uses_embed_not_generate():
+    """nomic-embed-text 400s on /api/generate. Slot 2 has to be warmed via /api/embed."""
+    import httpx
+
+    seen: list[tuple[str, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, json.loads(request.content)))
+        return httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
+
+    client = OllamaClient(
+        "http://127.0.0.1:11434",
+        default_model="gemma4:e4b-it-qat",
+        embed_model="nomic-embed-text",
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        await client.warm_embedder()
+        await client.set_keep_alive("nomic-embed-text:latest", 0)
+    finally:
+        await client.aclose()
+
+    assert [path for path, _ in seen] == ["/api/embed", "/api/embed"]
+    assert [payload["keep_alive"] for _, payload in seen] == [-1, 0]
+    assert all("prompt" not in payload for _, payload in seen)
+
+
 async def test_a_missing_model_is_a_404_not_a_download():
     import httpx
 

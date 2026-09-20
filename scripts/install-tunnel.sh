@@ -75,24 +75,39 @@ esac
 section "Named tunnel"
 
 tunnel_uuid() {
-  "$CLOUDFLARED" tunnel list --output json 2>/dev/null | "$PY" -c '
-import json, sys
-try:
-    tunnels = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-for tunnel in tunnels:
-    if tunnel.get("name") == sys.argv[1] and not tunnel.get("deleted_at"):
-        print(tunnel.get("id", ""))
-        break
-' "$TUNNEL_NAME"
+  "$CLOUDFLARED" tunnel list --output json 2>/dev/null \
+    | "$PY" "$ROOT/scripts/lib/parse_tunnel_list.py" "$TUNNEL_NAME"
+}
+
+# Last-resort: the credentials file is named after the UUID. After a create that
+# the JSON list cannot see, this is how install-tunnel.sh finishes instead of
+# aborting with a tunnel that already exists.
+credentials_uuid() {
+  shopt -s nullglob
+  set -- "$HOME/.cloudflared"/????????-????-????-????-????????????.json
+  shopt -u nullglob
+  if [ "$#" -eq 1 ]; then
+    basename "$1" .json
+  fi
 }
 
 UUID="$(tunnel_uuid)"
 if [ -z "$UUID" ]; then
+  UUID="$(credentials_uuid)"
+fi
+if [ -z "$UUID" ]; then
   info "creating tunnel $TUNNEL_NAME"
-  "$CLOUDFLARED" tunnel create "$TUNNEL_NAME" || die "could not create the tunnel"
-  UUID="$(tunnel_uuid)"
+  CREATE_LOG="$(mktemp)"
+  if "$CLOUDFLARED" tunnel create "$TUNNEL_NAME" >"$CREATE_LOG" 2>&1; then
+    cat "$CREATE_LOG"
+    UUID="$(sed -n 's/.*with id \([0-9a-f-]\{36\}\).*/\1/p' "$CREATE_LOG" | head -1)"
+  else
+    cat "$CREATE_LOG"
+    # Name already taken from a previous half-finished run: look it up again.
+    UUID="$(tunnel_uuid)"
+    [ -n "$UUID" ] || UUID="$(credentials_uuid)"
+  fi
+  rm -f "$CREATE_LOG"
 fi
 
 [ -n "$UUID" ] || die "could not determine the tunnel UUID"
