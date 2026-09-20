@@ -1,0 +1,30 @@
+{
+  "x-cloudiator-always": true,
+  "components": {
+    "schemas": {
+      "ErrorBody": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" },
+          "type": { "type": "string" },
+          "param": { "type": "string" },
+          "code": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "$ref": "#/components/schemas/ErrorBody" }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

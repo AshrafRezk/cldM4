@@ -1,0 +1,74 @@
+{
+  "capabilities": [
+    "chat",
+    "embeddings",
+    "image_generation",
+    "transcriptions",
+    "tools.ocr",
+    "tools.maps",
+    "tools.charts",
+    "tools.stats",
+    "tools.data",
+    "tools.docs",
+    "tools.text",
+    "tools.time",
+    "tools.units",
+    "tools.fx",
+    "tools.diagrams",
+    "tools.image_ops",
+    "tools.audio_ops",
+    "tools.google_places",
+    "tools.face_detect"
+  ],
+  "presets": {
+    "salesforce_engineer": {
+      "capabilities": [
+        "chat",
+        "embeddings",
+        "tools.ocr",
+        "tools.maps",
+        "tools.charts",
+        "tools.stats",
+        "tools.data",
+        "tools.docs",
+        "tools.text",
+        "tools.time",
+        "tools.image_ops"
+      ],
+      "max_tokens": 512,
+      "max_context": 4096,
+      "force_no_stream": true,
+      "log_prompts": false,
+      "max_response_bytes": 1048576,
+      "models": []
+    },
+    "creative": {
+      "capabilities": [
+        "chat",
+        "embeddings",
+        "image_generation",
+        "tools.diagrams",
+        "tools.ocr",
+        "tools.image_ops"
+      ]
+    },
+    "analyst": {
+      "capabilities": [
+        "chat",
+        "embeddings",
+        "tools.charts",
+        "tools.stats",
+        "tools.data",
+        "tools.docs",
+        "tools.text"
+      ]
+    },
+    "heavy": {
+      "capabilities": ["chat", "embeddings"],
+      "note": "gpt-oss:20b is exclusive and Phase E only; do not list it until pulled"
+    },
+    "speech": {
+      "capabilities": ["chat", "transcriptions", "tools.audio_ops"]
+    }
+  }
+}

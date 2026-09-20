@@ -1,0 +1,46 @@
+{
+  "x-cloudiator-always": true,
+  "paths": {
+    "/v1/models": {
+      "get": {
+        "operationId": "modelsGet",
+        "summary": "Live ollama tags intersected with this key's models scope",
+        "responses": {
+          "200": {
+            "description": "Model list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ModelList" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Model": {
+        "type": "object",
+        "required": ["id", "object", "owned_by"],
+        "properties": {
+          "id": { "type": "string" },
+          "object": { "type": "string" },
+          "created": { "type": "integer" },
+          "owned_by": { "type": "string" }
+        }
+      },
+      "ModelList": {
+        "type": "object",
+        "required": ["object", "data"],
+        "properties": {
+          "object": { "type": "string" },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Model" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "x-cloudiator-always": true,
+  "paths": {
+    "/v1/usage": {
+      "get": {
+        "operationId": "usageGet",
+        "summary": "Usage rollup for this key",
+        "responses": {
+          "200": {
+            "description": "Usage",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UsageRollup" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usage/events": {
+      "get": {
+        "operationId": "usageEventsGet",
+        "summary": "Recent usage events for this key",
+        "responses": {
+          "200": {
+            "description": "Events",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UsageEventList" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UsageRollup": {
+        "type": "object",
+        "properties": {
+          "calls": { "type": "integer" },
+          "errors": { "type": "integer" },
+          "prompt_tokens": { "type": "integer" },
+          "completion_tokens": { "type": "integer" }
+        }
+      },
+      "UsageEvent": {
+        "type": "object",
+        "properties": {
+          "request_id": { "type": "string" },
+          "route": { "type": "string" },
+          "model": { "type": "string" },
+          "status": { "type": "integer" },
+          "latency_ms": { "type": "integer" }
+        }
+      },
+      "UsageEventList": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/UsageEvent" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "x-cloudiator-scope": ["embeddings"],
+  "paths": {
+    "/v1/embeddings": {
+      "post": {
+        "operationId": "embeddingsPost",
+        "summary": "OpenAI-compatible embeddings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmbeddingsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Embeddings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EmbeddingsResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EmbeddingsRequest": {
+        "type": "object",
+        "required": ["model", "input"],
+        "properties": {
+          "model": { "type": "string" },
+          "input": { "type": "string" }
+        }
+      },
+      "EmbeddingItem": {
+        "type": "object",
+        "required": ["object", "embedding", "index"],
+        "properties": {
+          "object": { "type": "string" },
+          "embedding": {
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "index": { "type": "integer" }
+        }
+      },
+      "EmbeddingsResponse": {
+        "type": "object",
+        "required": ["object", "data", "model"],
+        "properties": {
+          "object": { "type": "string" },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EmbeddingItem" }
+          },
+          "model": { "type": "string" }
+        }
+      }
+    }
+  }
+}

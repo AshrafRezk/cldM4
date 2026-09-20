@@ -1,0 +1,14 @@
+# Copy to ~/.cloudflared/config.yml on the Mini. Never commit the real file.
+# 11434 must never appear in this file.
+
+tunnel: TUNNEL_UUID
+credentials-file: /Users/REPLACE/.cloudflared/TUNNEL_UUID.json
+no-autoupdate: true
+protocol: quic
+ingress:
+  - hostname: api.YOURDOMAIN
+    service: http://127.0.0.1:8080
+    originRequest:
+      connectTimeout: 10s
+      disableChunkedEncoding: false
+  - service: http_status:404

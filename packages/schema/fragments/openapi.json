@@ -1,0 +1,54 @@
+{
+  "x-cloudiator-always": true,
+  "paths": {
+    "/v1/openapi.json": {
+      "get": {
+        "operationId": "openapiGet",
+        "summary": "OpenAPI filtered by this key's scopes",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "salesforce emits OpenAPI 3.0.3 restricted subset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OpenApiDocument" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OpenApiDocument": {
+        "type": "object",
+        "required": ["openapi", "info", "paths"],
+        "properties": {
+          "openapi": { "type": "string" },
+          "info": { "$ref": "#/components/schemas/OpenApiInfo" },
+          "paths": { "$ref": "#/components/schemas/OpenApiPaths" }
+        }
+      },
+      "OpenApiInfo": {
+        "type": "object",
+        "required": ["title", "version"],
+        "properties": {
+          "title": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      },
+      "OpenApiPaths": {
+        "type": "object"
+      }
+    }
+  }
+}

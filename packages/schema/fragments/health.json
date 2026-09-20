@@ -1,0 +1,41 @@
+{
+  "x-cloudiator-always": true,
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "operationId": "healthGet",
+        "summary": "Local health. No secrets, no Neon round trip.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Health",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "required": ["ok", "db", "version"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "free_mb": { "type": "integer" },
+          "loaded": { "type": "array", "items": { "type": "string" } },
+          "queue_depth": { "type": "integer" },
+          "outbox_depth": { "type": "integer" },
+          "pressure": { "type": "string" },
+          "free_disk_gb": { "type": "number" },
+          "db": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      }
+    }
+  }
+}

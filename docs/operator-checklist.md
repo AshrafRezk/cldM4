@@ -26,11 +26,11 @@ Legend: `[ ]` not done · `[x]` done · `n/a` deliberately skipped (write why).
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Registrar | ____________________ | [ ] |
-| Apex domain | `____________________` | [ ] |
-| Nameservers pointed at Cloudflare | (Cloudflare dashboard shows zone **Active**) | [ ] |
-| API hostname | `api.____________________` | [ ] |
-| Dashboard hostname | `app.____________________` | [ ] |
+| Registrar | Cloudflare Registrar | [x] |
+| Apex domain | `cloudiator.org` | [x] |
+| Nameservers pointed at Cloudflare | Cloudflare dashboard: zone **Active** (`DNS Setup: Full`) | [x] |
+| API hostname | `api.cloudiator.org` | [x] |
+| Dashboard hostname | `app.cloudiator.org` | [x] |
 
 Do **not** proceed to the tunnel until the Cloudflare zone status is **Active**. A pending zone gives you a working `cloudflared` and a DNS name that resolves nowhere, which looks exactly like a tunnel bug.
 
@@ -40,48 +40,48 @@ Do **not** proceed to the tunnel until the Cloudflare zone status is **Active**.
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Account email | ____________________ | [ ] |
-| Zone ID | ____________________ | [ ] |
+| Account email | stored in password manager | [x] |
+| Zone ID | stored in password manager | [x] |
 | Tunnel name | `cloudiator-mini` | [ ] |
 | Tunnel UUID | ____________________ | [ ] |
 | Credentials file path | `~/.cloudflared/<UUID>.json` | [ ] |
-| DNS: `api` CNAME → `<UUID>.cfargotunnel.com`, **proxied** (orange cloud) | | [ ] |
+| DNS: `api` CNAME → `<UUID>.cfargotunnel.com`, **proxied** (orange cloud) | Mini, after Phase A | [ ] |
 
 ### 2a. Zone settings that must be changed — Salesforce Apex is not a browser
 
 Apex cannot run JavaScript, hold cookies, or solve a challenge. Any Cloudflare feature that answers with an interstitial page turns every Salesforce callout into an HTML body that Apex cannot parse. **This is the single most common way Phase F fails.**
 
-- [ ] **Bot Fight Mode: OFF** (Security → Bots). Super Bot Fight Mode: off, or "Allow" for definitely-automated.
-- [ ] **Security Level: Essentially Off** for `api.<domain>` (Security → Settings, or a Configuration Rule scoped to the hostname).
-- [ ] **Browser Integrity Check: OFF** for `api.<domain>`.
-- [ ] **No Turnstile / managed challenge** on `api.<domain>`. Ever.
-- [ ] **"I'm Under Attack" mode is never enabled on this zone** while Salesforce orgs depend on it. If you must enable it during an attack, expect all Apex traffic to fail until you turn it off.
+- [x] **Bot Fight Mode: OFF** (Security → Bots). Super Bot Fight Mode: off, or "Allow" for definitely-automated.
+- [ ] **Security Level: Essentially Off** for `api.cloudiator.org` (Security → Settings, or a Configuration Rule scoped to the hostname). Skip rule also skips Security Level for `Bearer sk-cld-`.
+- [ ] **Browser Integrity Check: OFF** for `api.cloudiator.org`. Skip rule also skips BIC for `Bearer sk-cld-`.
+- [x] **No Turnstile / managed challenge** on `api.cloudiator.org`. Ever.
+- [x] **"I'm Under Attack" mode is never enabled on this zone** while Salesforce orgs depend on it. If you must enable it during an attack, expect all Apex traffic to fail until you turn it off.
 
 ### 2b. WAF Skip rule (create it, then test it)
 
 Security → WAF → Custom rules → **Skip**.
 
 ```
-(http.host eq "api.<domain>" and starts_with(http.request.headers["authorization"][0], "Bearer sk-cld-"))
+(http.host eq "api.cloudiator.org" and starts_with(http.request.headers["authorization"][0], "Bearer sk-cld-"))
 ```
 
 Skip: **All managed rules**, **Super Bot Fight Mode**, **Rate limiting rules**, **Browser Integrity Check**.
 
-- [ ] Rule created and enabled, placed **above** every other custom rule.
-- [ ] Verified: a `curl` with a valid `Authorization: Bearer sk-cld-...` header returns JSON, from a network that is not the Mini.
+- [x] Rule created and enabled (`skip-sk-cld-salesforce`), placed **above** every other custom rule.
+- [ ] Verified: a `curl` with a valid `Authorization: Bearer sk-cld-...` header returns JSON, from a network that is not the Mini. (Needs the Mini tunnel.)
 
 ### 2c. Rate limiting
 
-- [ ] Rate limiting rule on `api.<domain>` keyed on the **Authorization header**, not IP. Salesforce egress IPs are shared across many orgs — an IP-keyed limit lets one tenant throttle another.
-- [ ] Limit chosen: ______ requests / ______ seconds. Start generous (e.g. 120/60) and tighten. Per-key `rpm` in the worker is the real enforcement; this rule is only DDoS insurance.
+- [x] Cloudflare free plan cannot key rate limiting on the Authorization header (IP only, 10s period only). Left empty on purpose. Per-key `rpm` in the worker is the real enforcement.
+- [ ] Limit chosen: n/a (worker `rpm` only until a paid CF plan can do 120/60 on Authorization).
 
 ### 2d. Cloudflare Access (dashboard + admin)
 
-- [ ] Zero Trust team domain: `____________________.cloudflareaccess.com`
-- [ ] Access application on `app.<domain>` — policy: allow email `____________________` (and any other operator).
-- [ ] Access application on `api.<domain>/v1/admin*` — same policy.
-- [ ] Application **AUD tag** (needed by the worker to verify the JWT): `____________________`
-- [ ] Verified: an incognito window on `app.<domain>` is challenged by Access, not by a password form.
+- [x] Zero Trust team domain: stored in password manager (`*.cloudflareaccess.com`)
+- [x] Access application on `app.cloudiator.org` — policy: allow email `ashrafrmattar@gmail.com`
+- [x] Access application on `api.cloudiator.org/v1/admin*` — same allow email
+- [x] Application **AUD tag** (needed by the worker to verify the JWT): stored in password manager — use the **api** app AUD as `CF_ACCESS_AUD`
+- [ ] Verified: an incognito window on `app.cloudiator.org` is challenged by Access, not by a password form. (Needs Phase C + DNS.)
 
 There is **no shared admin password** in v1. The dashboard has no login screen of its own.
 
@@ -91,14 +91,14 @@ There is **no shared admin password** in v1. The dashboard has no login screen o
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Project name | ____________________ | [ ] |
-| Region (pick nearest the Mini) | ____________________ | [ ] |
-| Database name | `neondb` | [ ] |
-| **Pooled** connection string (contains `-pooler`) | stored in password manager | [ ] |
-| Schema from `docs/schema.md` applied | | [ ] |
-| IP allowlist | **off** (home ISP IP rotates) — or document your static egress plan | [ ] |
+| Project name | `cloudiator` | [x] |
+| Region (pick nearest the Mini) | AWS Europe West 2 (London) | [x] |
+| Database name | `neondb` | [x] |
+| **Pooled** connection string (contains `-pooler`) | stored in password manager | [x] |
+| Schema from `docs/schema.md` applied | `infra/neon.sql` ran 2026-09-20 | [x] |
+| IP allowlist | **off** (none set) | [x] |
 
-- [ ] You understand the compute auto-suspends when idle: the first query after a quiet period takes ~0.5–3s. The worker must never block a chat on Neon (60s key cache + usage outbox handle this).
+- [x] You understand the compute auto-suspends when idle: the first query after a quiet period takes ~0.5–3s. The worker must never block a chat on Neon (60s key cache + usage outbox handle this).
 - [ ] Retention job from `docs/schema.md` scheduled or diarised — raw `usage_events` older than 30 days get deleted, otherwise the free tier fills up and **key minting starts failing**.
 
 ---
@@ -125,10 +125,10 @@ The OSM Foundation blocks clients with a generic or missing `User-Agent`, and bl
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Contact email that goes in the User-Agent (must be a real, monitored mailbox) | ____________________ | [ ] |
-| `NOMINATIM_USER_AGENT` value | `Cloudiator/0.1 (____________________)` | [ ] |
+| Contact email that goes in the User-Agent (must be a real, monitored mailbox) | `ashrafrmattar@gmail.com` | [x] |
+| `NOMINATIM_USER_AGENT` value | `Cloudiator/0.1 (ashrafrmattar@gmail.com)` | [x] |
 | Read the usage policy | https://operations.osmfoundation.org/policies/nominatim/ | [ ] |
-| Expected geocode volume per day | ______ | [ ] |
+| Expected geocode volume per day | dogfood / low until Salesforce orgs are live | [x] |
 
 - [ ] If expected volume exceeds a few thousand a day, or you need bursts above 1 rps, plan to self-host Nominatim or buy a geocoder **before** go-live. The public instance is not a production dependency.
 - [ ] Attribution "© OpenStreetMap contributors" is present wherever geocode results are displayed to end users.
@@ -229,10 +229,23 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ## 11. Sign-off before Phase B starts
 
-- [ ] Sections 1–5 have no blanks.
-- [ ] Section 6 has exactly one option ticked.
-- [ ] `~/Cloudiator/.env` exists, is `chmod 600`, and is **not** inside the git working tree.
-- [ ] `git status` is clean of secrets; `.env` is ignored.
-- [ ] You can state, out loud, what happens to Salesforce traffic if you enable Bot Fight Mode.
+Laptop cloud (2026-09-20): domain, Neon schema, WAF Skip, Access apps. Still open: §0 hardware, §4 Netlify (Phase C), §5 Nominatim policy read, §6 boot policy, tunnel (Mini after Phase A).
 
-Operator: ____________________  Date: ____________
+- [x] Sections 1–3 public rows filled. Secrets stay in the password manager, not this file.
+- [ ] Section 6 has exactly one option ticked. (Mini)
+- [ ] `~/Cloudiator/.env` exists, is `chmod 600`, and is **not** inside the git working tree. (Mini)
+- [ ] `git status` is clean of secrets; `.env` is ignored.
+- [x] You can state, out loud, what happens to Salesforce traffic if you enable Bot Fight Mode. (HTML interstitial; Apex cannot parse it.)
+
+Operator: Ashraf / laptop cloud  Date: 2026-09-20
+
+---
+
+## 12. Next steps (after laptop cloud setup)
+
+Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
+
+1. **This laptop:** `git push` so GitHub has this commit. Do not commit `.env` or connection strings.
+2. **Mini — Phase A only** (new Cursor chat, Opus, Auto off). Ethernet, `uname -m` → arm64, FileVault policy in §6, then the Phase A prompt in [cursor-phases.md](cursor-phases.md). Loopback chat must work before any tunnel.
+3. **Mini — Phase B remainder:** named tunnel `cloudiator-mini` to `127.0.0.1:8080` only (never 11434), worker key auth, usage outbox. Prove HTTPS from a **phone on cellular**.
+4. **Later:** Netlify dashboard (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
