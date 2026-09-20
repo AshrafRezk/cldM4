@@ -1,0 +1,23 @@
+# Template. scripts/install-tunnel.sh substitutes __TUNNEL_UUID__, __HOME__,
+# __HOSTNAME__, and __PROTOCOL__ and writes the result to ~/.cloudflared/config.yml.
+#
+# There is exactly one `service:` line pointing at a port, and that port is 8080.
+# If 11434 ever appears here, the Ollama API is on the public internet with no
+# authentication at all: rotate every sk-cld- key and assume the models were used
+# by strangers (PLAN.md §13).
+
+tunnel: __TUNNEL_UUID__
+credentials-file: __HOME__/.cloudflared/__TUNNEL_UUID__.json
+# A self-update restarts the tunnel mid-job.
+no-autoupdate: true
+# quic is the default; http2 is the fallback when an ISP or router breaks QUIC UDP,
+# and is what a Wi-Fi-only install should use (docs/hardware-and-network.md §3).
+protocol: __PROTOCOL__
+ingress:
+  - hostname: __HOSTNAME__
+    service: http://127.0.0.1:8080
+    originRequest:
+      connectTimeout: 10s
+      # Streaming for browser keys needs chunked encoding left alone.
+      disableChunkedEncoding: false
+  - service: http_status:404
