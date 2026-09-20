@@ -108,6 +108,8 @@ launchctl print gui/$UID/ai.cloudiator.worker | head -20   # state = running
 
 **Model: Claude Opus 5.**
 
+Filled copy-paste for this appliance (`cloudiator.org`, Neon already applied): [next-steps.md](next-steps.md) (section **Copy-paste into the Mini Agent chat**).
+
 Do not start this phase until [operator-checklist.md](operator-checklist.md) §§1–5 have no blanks.
 
 ```

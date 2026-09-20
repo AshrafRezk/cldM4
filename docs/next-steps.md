@@ -30,7 +30,30 @@ Before the agent:
 - Schema is already applied in Neon. Do not recreate tables unless the agent finds them missing.
 - Tunnel name: `cloudiator-mini` → `http://127.0.0.1:8080` only. Never `11434`.
 
-Paste the **shared opener** plus **Phase B only** from [cursor-phases.md](cursor-phases.md). Prove HTTPS from a **phone on cellular**.
+Prove HTTPS from a **phone on cellular**.
+
+### Copy-paste into the Mini Agent chat
+
+New chat. Agent. Opus 5. Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`. Paste **everything** in the block below:
+
+```
+You are implementing Cloudiator from this repo. Read PLAN.md, docs/cursor-settings.md, docs/next-steps.md, and the docs/ files. Do not skip RAM rules. Do not use Docker for Ollama. Do not put inference in Netlify. Work only on the current phase. Commit when the phase definition of done is met if I ask you to commit.
+
+Phase A is already green on this Mini (gemma4:e4b-it-qat). Domain is cloudiator.org. Neon project cloudiator already has infra/neon.sql applied. Pooled DATABASE_URL, CF_ACCESS_AUD (the api app), CF_ACCESS_TEAM_DOMAIN, and NOMINATIM_USER_AGENT belong in ~/Cloudiator/.env (chmod 600, outside git). Do not recreate the Neon project or tables unless they are missing. Do not scaffold apps/gateway/. Do not expose 11434.
+
+Phase B only. Do not start the dashboard UI except a stub if needed.
+
+1. Apply docs/schema.md to Neon. Put the POOLED DATABASE_URL in the Mini .env (chmod 600, never commit).
+2. Neon client config per PLAN.md section 11: pool min 0 / max 2, pre-ping, 300s recycle, 3s connect timeout, 5s statement timeout. Neon must never be on the critical path of a chat response.
+3. API keys: mint sk-cld-{public_id}_{secret}, argon2id with time_cost=2, memory_cost=65536, parallelism=1, hash_len=32, salt_len=16. Look up by public_id, constant-time verify. 401/403/429 in OpenAI error shape.
+4. Cache key lookups 60s (positive and negative) so argon2id is off the hot path. Add POST /v1/admin/cache/flush. Strip Authorization from every log path including exception handlers.
+5. Per-key rpm token bucket in-process, 429 + Retry-After.
+6. usage_outbox in the Mini SQLite: write locally, flush to Neon every 10s in batches of 500, cap 100k rows dropping oldest, expose outbox_depth in /v1/health. A chat must succeed with Neon completely down.
+7. Named Cloudflare Tunnel to http://127.0.0.1:8080 only, config from docs/host-setup.md, no-autoupdate true. No quick tunnels. 11434 must never appear in the ingress. Tunnel name cloudiator-mini. Hostname api.cloudiator.org.
+8. GET /v1/openapi.json filtered by key scopes, plus ?target=salesforce emitting the restricted OpenAPI 3.0.3 subset from PLAN.md section 10. Reuse packages/schema if present.
+9. /v1/admin/* verifies the Cf-Access-Jwt-Assertion JWT against the Access JWKS and CF_ACCESS_AUD. ADMIN_TOKEN is accepted only for requests arriving on loopback.
+10. Tests: apps/worker/tests/test_auth.py, test_key_cache.py, test_usage_outbox.py, test_openapi_filter.py, scripts/smoke-phase-b.sh.
+```
 
 ## Later
 

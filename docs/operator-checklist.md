@@ -229,7 +229,7 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ## 11. Sign-off before Phase B starts
 
-Laptop cloud (2026-09-20): domain, Neon schema, WAF Skip, Access apps. Still open: §0 hardware, §4 Netlify (Phase C), §5 Nominatim policy read, §6 boot policy, tunnel (Mini after Phase A).
+Laptop cloud (2026-09-20): domain, Neon schema, WAF Skip, Access apps. Phase A is on `main`. Still open: §4 Netlify (Phase C), §5 Nominatim policy read, tunnel + key auth (Mini Phase B).
 
 - [x] Sections 1–3 public rows filled. Secrets stay in the password manager, not this file.
 - [ ] Section 6 has exactly one option ticked. (Mini)
@@ -246,7 +246,7 @@ Operator: Ashraf / laptop cloud  Date: 2026-09-20
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
 1. **This laptop:** `git push` (if this commit is not on GitHub yet).
-2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md`. Paste **Phase B only**.
+2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`. Paste the block in [next-steps.md](next-steps.md) **Copy-paste into the Mini Agent chat**.
 3. Mini `.env`: pooled `DATABASE_URL`, `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` (api app), `CF_ACCESS_TEAM_DOMAIN`, Nominatim UA. `chmod 600`, outside git.
 4. Named tunnel `cloudiator-mini` → `127.0.0.1:8080` only. Prove from a **phone on cellular**.
 5. **Later:** Netlify (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
