@@ -18,7 +18,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from . import __version__
 from .admin import AccessVerifier, AdminGuard
@@ -33,6 +33,7 @@ from .auth import (
     require_capability,
 )
 from .config import get_settings
+from .cors import allowed_origins, cors_headers
 from .context_guard import enforce_context, estimate_prompt_tokens, prewarm_encoder
 from .db import DatabaseUnavailable, Neon, pooled_endpoint
 from .errors import CloudiatorError, mini_offline, model_not_found, not_supported
@@ -227,10 +228,17 @@ async def request_context_middleware(request: Request, call_next):
     """
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     request.state.request_id = request_id
+    cors = cors_headers(request.headers.get("origin"), allowed_origins(settings))
+
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers={"X-Request-Id": request_id, **cors})
+
     request.state.usage = UsageEvent(route=request.url.path, status=0, request_id=request_id)
     started = time.monotonic()
     response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
+    for name, value in cors.items():
+        response.headers[name] = value
 
     event: UsageEvent = request.state.usage
     event.status = response.status_code

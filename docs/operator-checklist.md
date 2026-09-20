@@ -107,15 +107,15 @@ There is **no shared admin password** in v1. The dashboard has no login screen o
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Team / site name | ____________________ | [ ] |
-| Site URL | ____________________ | [ ] |
-| Custom domain `app.<domain>` attached | | [ ] |
-| Env `DATABASE_URL` set (server-side only) | | [ ] |
-| Env `PUBLIC_API_URL` = `https://api.<domain>` | | [ ] |
-| Env `ADMIN_SESSION_SECRET` set | | [ ] |
+| Team / site name | Cloudastick / `cloudiator` | [x] |
+| Site URL | `https://cloudiator.netlify.app` | [x] |
+| Custom domain `app.<domain>` attached | CNAME `app` → `cloudiator.netlify.app` (proxied), then add domain in Netlify | [ ] |
+| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env (password manager) | [ ] |
+| Env `PUBLIC_API_URL` = `https://api.<domain>` | `https://api.cloudiator.org` | [x] |
+| Env `ADMIN_SESSION_SECRET` set | Netlify site env; copy into the password manager | [x] |
 
-- [ ] Confirmed `DATABASE_URL` does **not** appear in the built client bundle: `npm run build` then grep `dist/` for `neon.tech`.
-- [ ] No Netlify Function calls Ollama or the Mini for inference. Ever.
+- [x] Confirmed `DATABASE_URL` does **not** appear in the built client bundle: `cd apps/dashboard && npm test` (grep `dist/` for `neon.tech` finds nothing).
+- [x] No Netlify Function calls Ollama or the Mini for inference. The playground POSTs to `https://api.cloudiator.org/v1/chat/completions` from the browser.
 
 ---
 

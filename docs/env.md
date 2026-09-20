@@ -13,6 +13,7 @@ Template: [.env.example](../.env.example).
 | `PORT` | `8080` | yes |
 | `WEB_CONCURRENCY` | `1` | yes — the worker refuses to boot on any other value |
 | `PUBLIC_BASE_URL` | `https://api.example.com` | yes (artifact URLs) |
+| `DASHBOARD_ORIGIN` | `https://app.example.com` | no — derived as `app.` from `PUBLIC_BASE_URL` when unset. CORS allowlist for the Phase C playground |
 | `DATABASE_URL` | pooled Neon URL (`...-pooler...`) | yes from Phase B |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | yes |
 | `OLLAMA_MAX_LOADED_MODELS` | `2` | yes — the worker asserts this and refuses to boot on any other value |
@@ -135,10 +136,11 @@ Ollama's own variables belong on the **Ollama LaunchAgent / app**, not only on F
 | `DATABASE_URL` | Neon, **server functions only** |
 | `ADMIN_SESSION_SECRET` | cookie signing |
 | `PUBLIC_API_URL` | `https://api.example.com` shown in snippets |
+| `DEV_ACCESS_EMAIL` | **local `netlify dev` only** — never set in production |
 
 There is no admin password variable. The dashboard is protected by Cloudflare Access on `app.<domain>`; server functions read `Cf-Access-Authenticated-User-Email` and trust nothing else.
 
-Verify `DATABASE_URL` never reaches the browser: `npm run build && grep -r neon.tech dist/` must find nothing.
+Verify `DATABASE_URL` never reaches the browser: `cd apps/dashboard && npm test` (build, then grep `dist/` for `neon.tech`).
 
 ## Cloudflare
 
