@@ -19,6 +19,15 @@ load_env_file "$HOME/Cloudiator/.env"
 DEFAULT_MODEL="${DEFAULT_MODEL:-gemma4:e4b-it-qat}"
 EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"
 
+# From Phase B onwards every route but /v1/health needs a key. Set SMOKE_API_KEY
+# to one minted with `python -m app.dbtool mint-key` and the inference checks
+# below keep working; without it they are 401s and this script says so.
+KEY="${SMOKE_API_KEY:-}"
+AUTH_HEADER="X-Cloudiator-No-Key: 1"
+if [ -n "$KEY" ]; then
+  AUTH_HEADER="Authorization: Bearer $KEY"
+fi
+
 # Read one field out of a JSON body without requiring jq.
 json_field() {
   "$VENV_PY" -c '
@@ -36,6 +45,9 @@ print(data)
 }
 
 printf '%sPhase A smoke%s  (model: %s)\n' "$C_BOLD" "$C_OFF" "$DEFAULT_MODEL"
+if [ -z "$KEY" ]; then
+  info "no SMOKE_API_KEY: after Phase B the inference checks below need one"
+fi
 
 # --------------------------------------------------------------------------
 section "Architecture"
@@ -101,14 +113,15 @@ REQ_ID="$(curl -sD- -o /dev/null --max-time 5 "$BASE/v1/health" 2>/dev/null | gr
 [ -n "$REQ_ID" ] && pass "X-Request-Id present ($REQ_ID)" || fail "no X-Request-Id header"
 
 ERR_REQ_ID="$(curl -sD- -o /dev/null --max-time 5 -X POST "$BASE/v1/chat/completions" \
-  -H 'content-type: application/json' -d '{"messages":[{"role":"user","content":"hi"}],"n":4}' \
+  -H "$AUTH_HEADER" -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"hi"}],"n":4}' \
   2>/dev/null | grep -ic '^x-request-id:')"
 [ "$ERR_REQ_ID" = "1" ] && pass "X-Request-Id present on errors too" || fail "errors carry no X-Request-Id"
 
 # --------------------------------------------------------------------------
 section "GET /v1/models — built from live ollama tags"
 
-MODELS="$(curl -fsS --max-time 10 "$BASE/v1/models" 2>/dev/null)"
+MODELS="$(curl -fsS --max-time 10 "$BASE/v1/models" -H "$AUTH_HEADER" 2>/dev/null)"
 if [ -z "$MODELS" ]; then
   fail "no answer from /v1/models"
 else
@@ -128,7 +141,7 @@ fi
 section "POST /v1/chat/completions"
 
 CHAT="$(curl -fsS --max-time 120 "$BASE/v1/chat/completions" \
-  -H 'content-type: application/json' \
+  -H "$AUTH_HEADER" -H 'content-type: application/json' \
   -d "{\"model\":\"$DEFAULT_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"say hi\"}],\"max_tokens\":16}" \
   2>/dev/null)"
 if [ -z "$CHAT" ]; then
@@ -150,7 +163,7 @@ fi
 section "POST /v1/embeddings"
 
 EMB="$(curl -fsS --max-time 30 "$BASE/v1/embeddings" \
-  -H 'content-type: application/json' \
+  -H "$AUTH_HEADER" -H 'content-type: application/json' \
   -d "{\"model\":\"$EMBED_MODEL\",\"input\":[\"hello\",\"world\"]}" 2>/dev/null)"
 if printf '%s' "$EMB" | grep -q '"embedding"'; then
   pass "embeddings returned vectors"
@@ -165,7 +178,7 @@ check_code() {
   local label="$1" expect_status="$2" expect_code="$3" path="$4" body="$5"
   local out status code
   out="$(curl -s -o /tmp/cloudiator-smoke.json -w '%{http_code}' --max-time 30 \
-    "$BASE$path" -H 'content-type: application/json' -d "$body" 2>/dev/null)"
+    "$BASE$path" -H "$AUTH_HEADER" -H 'content-type: application/json' -d "$body" 2>/dev/null)"
   status="$out"
   code="$(json_field error.code < /tmp/cloudiator-smoke.json)"
   if [ "$status" = "$expect_status" ] && [ "$code" = "$expect_code" ]; then
@@ -179,8 +192,15 @@ check_code "n=2 rejected"            400 not_supported            /v1/chat/compl
   "{\"model\":\"$DEFAULT_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"n\":2}"
 check_code "logit_bias rejected"     400 not_supported            /v1/chat/completions \
   "{\"model\":\"$DEFAULT_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"logit_bias\":{\"1\":1}}"
-check_code "unknown model is a 404"  404 model_not_found          /v1/chat/completions \
-  '{"model":"gpt-oss:20b","messages":[{"role":"user","content":"hi"}]}'
+# With a key in play, a model the key has no scope for is refused before the
+# "is it on disk" check, so the answer is 403 rather than 404 (PLAN.md §10).
+if [ -n "$KEY" ]; then
+  check_code "out-of-scope model"     403 scope_denied             /v1/chat/completions \
+    '{"model":"gpt-oss:20b","messages":[{"role":"user","content":"hi"}]}'
+else
+  check_code "unknown model is a 404" 404 model_not_found          /v1/chat/completions \
+    '{"model":"gpt-oss:20b","messages":[{"role":"user","content":"hi"}]}'
+fi
 check_code "oversized prompt"        400 context_length_exceeded  /v1/chat/completions \
   "{\"model\":\"$DEFAULT_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$(printf 'word %.0s' $(seq 1 6000))\"}]}"
 check_code "http image_url blocked"  400 url_not_allowed          /v1/chat/completions \
