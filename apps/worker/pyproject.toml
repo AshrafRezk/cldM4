@@ -11,6 +11,11 @@ dependencies = [
     "httpx>=0.27",
     "tiktoken>=0.7",
     "pillow>=10.3",
+    # Phase B. asyncpg talks to the pooled Neon endpoint; argon2-cffi hashes
+    # the key secrets; PyJWT verifies the Cloudflare Access JWT on /v1/admin/*.
+    "asyncpg>=0.30",
+    "argon2-cffi>=23.1",
+    "pyjwt[crypto]>=2.9",
     # Phase D uses Apple Vision for OCR. It is installed in Phase A so the
     # step 0 `import Vision` gate runs against the real venv.
     "pyobjc-framework-Vision>=10.3; sys_platform == 'darwin'",

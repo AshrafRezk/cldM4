@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 DEFAULT_ARTIFACT_DIR = os.path.expanduser("~/Cloudiator/artifacts")
+DEFAULT_QUEUE_DB = os.path.expanduser("~/Cloudiator/queue.db")
 
 
 def _str(name: str, default: str) -> str:
@@ -49,6 +50,9 @@ class Settings:
     host: str = field(default_factory=lambda: _str("HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: _int("PORT", 8080))
     web_concurrency: str | None = field(default_factory=lambda: _opt("WEB_CONCURRENCY"))
+    public_base_url: str = field(
+        default_factory=lambda: _str("PUBLIC_BASE_URL", "http://127.0.0.1:8080")
+    )
 
     ollama_host: str = field(default_factory=lambda: _str("OLLAMA_HOST", "http://127.0.0.1:11434"))
     ollama_max_loaded_models: str | None = field(
@@ -91,8 +95,47 @@ class Settings:
     artifact_dir: str = field(default_factory=lambda: _str("ARTIFACT_DIR", DEFAULT_ARTIFACT_DIR))
     min_free_disk_gb: float = field(default_factory=lambda: _float("MIN_FREE_DISK_GB", 10.0))
     hard_free_disk_gb: float = field(default_factory=lambda: _float("HARD_FREE_DISK_GB", 5.0))
+    queue_db: str = field(default_factory=lambda: _str("QUEUE_DB", DEFAULT_QUEUE_DB))
 
     health_rpm: int = field(default_factory=lambda: _int("HEALTH_RPM", 120))
+
+    # PLAN.md §11. The Mini holds one process for weeks against a Neon compute
+    # that auto-suspends after ~5 idle minutes, so the pool is tiny and every
+    # socket is treated as possibly dead.
+    database_url: str | None = field(default_factory=lambda: _opt("DATABASE_URL"))
+    db_pool_min: int = field(default_factory=lambda: _int("DB_POOL_MIN", 0))
+    db_pool_max: int = field(default_factory=lambda: _int("DB_POOL_MAX", 2))
+    db_connect_timeout_seconds: float = field(
+        default_factory=lambda: _float("DB_CONNECT_TIMEOUT_SECONDS", 3.0)
+    )
+    db_statement_timeout_seconds: float = field(
+        default_factory=lambda: _float("DB_STATEMENT_TIMEOUT_SECONDS", 5.0)
+    )
+    db_pool_recycle_seconds: float = field(
+        default_factory=lambda: _float("DB_POOL_RECYCLE_SECONDS", 300.0)
+    )
+
+    # Revocation lag equals this value: a flushed cache is the only way to make
+    # a revoke immediate (PLAN.md §11).
+    key_cache_ttl_seconds: float = field(
+        default_factory=lambda: _float("KEY_CACHE_TTL_SECONDS", 60.0)
+    )
+
+    usage_flush_interval_seconds: float = field(
+        default_factory=lambda: _float("USAGE_FLUSH_INTERVAL_SECONDS", 10.0)
+    )
+    usage_flush_batch: int = field(default_factory=lambda: _int("USAGE_FLUSH_BATCH", 500))
+    usage_outbox_max_rows: int = field(
+        default_factory=lambda: _int("USAGE_OUTBOX_MAX_ROWS", 100_000)
+    )
+
+    # /v1/admin/* is Cloudflare Access plus JWT validation. ADMIN_TOKEN is a
+    # loopback-only break-glass for when Access itself is broken (PLAN.md §12).
+    cf_access_team_domain: str | None = field(
+        default_factory=lambda: _opt("CF_ACCESS_TEAM_DOMAIN")
+    )
+    cf_access_aud: str | None = field(default_factory=lambda: _opt("CF_ACCESS_AUD"))
+    admin_token: str | None = field(default_factory=lambda: _opt("ADMIN_TOKEN"))
 
 
 @lru_cache(maxsize=1)

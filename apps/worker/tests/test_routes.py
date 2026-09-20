@@ -3,6 +3,9 @@
 Exercised through ASGI without the lifespan: the boot gates refuse to run
 anywhere but arm64 macOS, and they are proven on the Mini by
 scripts/smoke-phase-a.sh rather than mocked out here.
+
+Every route but /v1/health needs a key from Phase B onwards, so the client here
+carries one that is already in the cache. Auth itself is tested in test_auth.py.
 """
 
 from __future__ import annotations
@@ -14,9 +17,12 @@ from app import main
 
 
 @pytest.fixture()
-def client():
+def client(cached_key):
+    _, headers = cached_key
     transport = httpx.ASGITransport(app=main.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8080")
+    return httpx.AsyncClient(
+        transport=transport, base_url="http://127.0.0.1:8080", headers=headers
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -120,9 +126,12 @@ async def test_chat_defaults_to_the_configured_model(client):
     assert response.json()["model"] == "qwen3.5:9b"
 
 
-async def test_a_model_that_is_not_on_disk_is_a_404(client):
-    async with client:
-        response = await client.post(
+async def test_a_scoped_model_that_is_not_on_disk_is_a_404(install_key, make_client):
+    """In scope but absent is a 404. Out of scope is a 403 (test_auth.py)."""
+    _, headers = install_key(models=["qwen3.5:9b", "gpt-oss:20b"])
+
+    async with make_client(headers) as scoped_client:
+        response = await scoped_client.post(
             "/v1/chat/completions",
             json={"model": "gpt-oss:20b", "messages": [{"role": "user", "content": "hi"}]},
         )
