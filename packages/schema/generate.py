@@ -1,9 +1,17 @@
-"""Merge OpenAPI fragments by key scope. No Ollama, no Neon, no FastAPI."""
+"""Merge OpenAPI fragments by key scope. No Ollama, no Neon, no FastAPI.
+
+`target="salesforce"` emits the restricted OpenAPI **3.0.3** subset the External
+Services importer accepts (PLAN.md §10). The importer is conservative: several
+constructs that are perfectly legal 3.1 are either rejected or silently mangled
+into an Apex class nobody can call. `_assert_salesforce_safe` fails the build
+rather than shipping a document that imports and then misbehaves.
+"""
 
 from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -11,7 +19,8 @@ FRAGMENTS_DIR = Path(__file__).resolve().parent / "fragments"
 SCOPES_PATH = Path(__file__).resolve().parent / "scopes.json"
 
 FORBIDDEN_COMPOSITION = ("oneOf", "anyOf", "allOf", "not")
-APEX_OPERATION_ID = __import__("re").compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+APEX_OPERATION_ID = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+SALESFORCE_MEDIA_TYPE = "application/json"
 
 
 def load_scopes() -> dict[str, Any]:
@@ -25,7 +34,9 @@ def _load_fragments() -> list[dict[str, Any]]:
     return [json.loads(path.read_text()) for path in files]
 
 
-def _scope_allows(fragment: Mapping[str, Any], scopes: set[str]) -> bool:
+def _scope_allows(fragment: Mapping[str, Any], scopes: set[str], *, salesforce: bool) -> bool:
+    if salesforce and fragment.get("x-cloudiator-salesforce") is False:
+        return False
     if fragment.get("x-cloudiator-always"):
         return True
     needed = fragment.get("x-cloudiator-scope") or []
@@ -73,6 +84,33 @@ def _operation_ids(doc: Mapping[str, Any]) -> list[str]:
     return ids
 
 
+def _walk_schemas(node: Any, path: str = "") -> Iterable[tuple[str, Mapping[str, Any]]]:
+    if isinstance(node, dict):
+        if "type" in node or "$ref" in node or "properties" in node:
+            yield path, node
+        for key, value in node.items():
+            yield from _walk_schemas(value, f"{path}.{key}" if path else key)
+    elif isinstance(node, list):
+        for index, item in enumerate(node):
+            yield from _walk_schemas(item, f"{path}[{index}]")
+
+
+def _media_types(doc: Mapping[str, Any]) -> list[str]:
+    found: list[str] = []
+    for path_item in (doc.get("paths") or {}).values():
+        if not isinstance(path_item, dict):
+            continue
+        for operation in path_item.values():
+            if not isinstance(operation, dict):
+                continue
+            bodies = [operation.get("requestBody") or {}]
+            bodies += list((operation.get("responses") or {}).values())
+            for body in bodies:
+                if isinstance(body, dict):
+                    found.extend((body.get("content") or {}).keys())
+    return found
+
+
 def _assert_salesforce_safe(doc: Mapping[str, Any]) -> None:
     bad = composition_keys(doc)
     if bad:
@@ -83,6 +121,26 @@ def _assert_salesforce_safe(doc: Mapping[str, Any]) -> None:
     for oid in ids:
         if not APEX_OPERATION_ID.match(oid):
             raise ValueError(f"operationId is not Apex-safe: {oid!r}")
+    for media_type in _media_types(doc):
+        if media_type != SALESFORCE_MEDIA_TYPE:
+            raise ValueError(
+                f"Salesforce OAS is {SALESFORCE_MEDIA_TYPE} only, found {media_type!r}"
+            )
+    for where, schema in _walk_schemas(doc.get("components", {}).get("schemas", {})):
+        if "additionalProperties" in schema:
+            raise ValueError(f"free-form additionalProperties at {where}")
+        if schema.get("format") == "binary":
+            raise ValueError(f"format: binary is not importable, at {where}")
+        if "$ref" in schema:
+            ref = schema["$ref"]
+            if not ref.startswith("#/"):
+                raise ValueError(f"external $ref at {where}: {ref}")
+            continue
+        if schema.get("type") == "object" and not schema.get("properties"):
+            # An untyped object arrives in Apex as an opaque Map nobody can use.
+            raise ValueError(f"object schema without properties at {where}")
+        if schema.get("type") == "array" and not schema.get("items"):
+            raise ValueError(f"array schema without items at {where}")
 
 
 def build_openapi(
@@ -98,13 +156,13 @@ def build_openapi(
     External Services will import (PLAN.md §10).
     """
     scope_set = set(scopes)
+    is_salesforce = (target or "").lower() == "salesforce"
     merged: dict[str, Any] = {"paths": {}, "components": {"schemas": {}}}
     for fragment in _load_fragments():
-        if not _scope_allows(fragment, scope_set):
+        if not _scope_allows(fragment, scope_set, salesforce=is_salesforce):
             continue
         _merge_dict(merged, fragment)
 
-    is_salesforce = (target or "").lower() == "salesforce"
     doc: dict[str, Any] = {
         "openapi": "3.0.3" if is_salesforce else "3.1.0",
         "info": {

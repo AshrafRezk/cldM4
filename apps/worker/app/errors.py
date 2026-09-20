@@ -50,6 +50,27 @@ def not_supported(message: str, *, param: str | None = None, status_code: int = 
     return CloudiatorError(status_code, "not_supported", message, param=param)
 
 
+def invalid_api_key(message: str) -> CloudiatorError:
+    return CloudiatorError(
+        401, "invalid_api_key", message, error_type="invalid_request_error", param="Authorization"
+    )
+
+
+def scope_denied(message: str, *, param: str | None = None) -> CloudiatorError:
+    return CloudiatorError(403, "scope_denied", message, param=param)
+
+
+def rate_limited(message: str, *, retry_after: int) -> CloudiatorError:
+    """Per-key rpm bucket (PLAN.md §10). Always with Retry-After."""
+    return CloudiatorError(
+        429,
+        "insufficient_quota",
+        message,
+        error_type="rate_limit_error",
+        retry_after=retry_after,
+    )
+
+
 def context_length_exceeded(message: str) -> CloudiatorError:
     return CloudiatorError(400, "context_length_exceeded", message, param="messages")
 

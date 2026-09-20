@@ -59,6 +59,32 @@ class OpenApiFilterTests(unittest.TestCase):
         doc = build_openapi(["chat"])
         self.assertEqual(doc["paths"]["/v1/health"]["get"]["security"], [])
 
+    def test_the_salesforce_target_drops_fragments_marked_unsafe(self) -> None:
+        """Its response is a free-form document; the importer mangles it."""
+        scopes = load_scopes()["presets"]["salesforce_engineer"]["capabilities"]
+
+        self.assertIn("/v1/openapi.json", build_openapi(scopes)["paths"])
+        self.assertNotIn("/v1/openapi.json", build_openapi(scopes, target="salesforce")["paths"])
+
+    def test_the_salesforce_target_rejects_a_free_form_object(self) -> None:
+        import generate
+
+        original = generate._load_fragments
+        generate._load_fragments = lambda: [
+            {
+                "x-cloudiator-scope": ["chat"],
+                "paths": {},
+                "components": {"schemas": {"Loose": {"type": "object"}}},
+            }
+        ]
+        try:
+            with self.assertRaises(ValueError):
+                generate.build_openapi(["chat"], target="salesforce")
+            # The same fragment is fine for a generic 3.1 client.
+            generate.build_openapi(["chat"])
+        finally:
+            generate._load_fragments = original
+
 
 if __name__ == "__main__":
     unittest.main()

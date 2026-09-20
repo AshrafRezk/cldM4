@@ -238,7 +238,13 @@ sudo newsyslog -nvv        # dry run: confirm it parses and picks up the files
 Fill in `docs/operator-checklist.md` §§1–2 first. The Cloudflare zone must show **Active**.
 
 ```bash
-cloudflared tunnel login
+cloudflared tunnel login          # browser; picks the zone. Do this by hand.
+scripts/install-tunnel.sh         # creates the tunnel, renders the config, routes DNS, bootstraps the agent
+```
+
+`scripts/install-tunnel.sh` renders `infra/cloudflared/config.yml` and refuses to write an ingress that mentions `11434` or any origin other than `127.0.0.1:8080`. Override the defaults with `TUNNEL_HOSTNAME`, `TUNNEL_PROTOCOL=http2` (Wi-Fi-only installs), or `TUNNEL_NAME`. The manual equivalent is below, and it is what the script does.
+
+```bash
 cloudflared tunnel create cloudiator-mini
 ```
 
@@ -261,7 +267,8 @@ ingress:
 ```bash
 cloudflared tunnel route dns cloudiator-mini api.YOURDOMAIN
 cloudflared tunnel run cloudiator-mini        # run interactively ONCE (Local Network prompt, section 4)
-# then install as a service or a LaunchAgent using the same bootstrap pattern as section 6
+# then install as a service or a LaunchAgent using the same bootstrap pattern as section 6:
+# infra/launchd/com.cloudiator.cloudflared.plist, which scripts/install-tunnel.sh renders for you
 ```
 
 **Named tunnel only.** Quick `cloudflared tunnel --url http://localhost:8080` is not production: random hostname, streaming issues.

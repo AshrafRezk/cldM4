@@ -1,5 +1,6 @@
 {
   "x-cloudiator-always": true,
+  "x-cloudiator-salesforce": false,
   "paths": {
     "/v1/openapi.json": {
       "get": {

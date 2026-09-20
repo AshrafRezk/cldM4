@@ -10,6 +10,8 @@ Secrets (Neon pooled URL, Zone ID, Access AUDs, team domain) live in the passwor
 
 **Mini (already on GitHub):** Phase A OpenAI shim, RAM scheduler, `gemma4:e4b-it-qat` + `nomic-embed-text`. Loopback worker on `127.0.0.1:8080`.
 
+**Phase B code (on GitHub, not yet proven on this Mini):** key auth with argon2id and the 60s cache, the Neon client, the usage outbox, per-key OpenAPI including the Salesforce 3.0.3 variant, Access-verified `/v1/admin/*`, and the tunnel installer. What is left is the Mini-side run order below and the human proofs at the end of it.
+
 ## This laptop, once
 
 ```bash
@@ -26,11 +28,36 @@ Before the agent:
 
 - `git pull`
 - Confirm loopback still works: `curl -s http://127.0.0.1:8080/v1/health`
-- Put password-manager values in `~/Cloudiator/.env` (`chmod 600`, **outside** git): pooled `DATABASE_URL` (`-pooler`), `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` = **api** app AUD, `CF_ACCESS_TEAM_DOMAIN`, `NOMINATIM_USER_AGENT=Cloudiator/0.1 (ashrafrmattar@gmail.com)`
+- Put password-manager values in `~/Cloudiator/.env` (`chmod 600`, **outside** git): pooled `DATABASE_URL` (`-pooler`), `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` = **api** app AUD, `CF_ACCESS_TEAM_DOMAIN`, `ADMIN_TOKEN`, `NOMINATIM_USER_AGENT=Cloudiator/0.1 (ashrafrmattar@gmail.com)`
 - Schema is already applied in Neon. Do not recreate tables unless the agent finds them missing.
 - Tunnel name: `cloudiator-mini` → `http://127.0.0.1:8080` only. Never `11434`.
 
 Prove HTTPS from a **phone on cellular**.
+
+### Phase B run order on the Mini
+
+The code for Phase B is on `main`; these are the steps that touch this machine and the Cloudflare account.
+
+```bash
+cd apps/worker && uv sync --extra dev && cd -     # asyncpg, argon2-cffi, pyjwt
+scripts/apply-neon-schema.sh                      # verifies first; applies only what is missing
+launchctl kickstart -k gui/$UID/ai.cloudiator.worker
+
+cd apps/worker && .venv/bin/python -m app.dbtool mint-key \
+  --tenant cloudiator --name 'Phase B smoke' --preset salesforce_engineer && cd -
+# the plaintext key is printed once; put it in the password manager
+
+cloudflared tunnel login                          # browser, by hand, zone must be Active
+cloudflared tunnel run cloudiator-mini            # ONCE interactively: Local Network prompt, then Ctrl-C
+scripts/install-tunnel.sh                         # config + DNS + LaunchAgent
+
+export SMOKE_API_KEY=sk-cld-...
+scripts/smoke-phase-b.sh
+```
+
+Then the three things no script can do for you: repeat the HTTPS checks from a **phone on cellular**, import `GET /v1/openapi.json?target=salesforce` into External Services in a dev org, and run the Neon-down drill (block the Neon host, confirm chat still returns 200 on a cached key, `db` goes `degraded`, `outbox_depth` grows, then unblock and watch it drain).
+
+Tick `docs/operator-checklist.md` §2 (tunnel UUID, DNS, WAF skip verified) and §3 (retention scheduled) as you go.
 
 ### Copy-paste into the Mini Agent chat
 

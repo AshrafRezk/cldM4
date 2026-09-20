@@ -61,7 +61,19 @@ The Mini holds one process for weeks; Neon computes auto-suspend when idle and d
 | `DB_STATEMENT_TIMEOUT_SECONDS` | `5` | a slow query must not eat the request budget |
 | `DB_POOL_RECYCLE_SECONDS` | `300` | shorter than Neon's idle-suspend window |
 
-Use the **pooled** Neon endpoint (`-pooler` in the hostname). Neon is never on the critical path of a chat: auth falls back to the key cache, usage falls back to the outbox.
+Use the **pooled** Neon endpoint (`-pooler` in the hostname). Neon is never on the critical path of a chat: auth falls back to the key cache, usage falls back to the outbox. The worker logs a warning at boot if the host has no `-pooler` in it, and `scripts/apply-neon-schema.sh` fails on it.
+
+## Mini worker — usage outbox
+
+Written locally on the request path, drained to Neon in the background (`PLAN.md` §11).
+
+| Name | Default | Purpose |
+| --- | --- | --- |
+| `USAGE_FLUSH_INTERVAL_SECONDS` | `10` | how often the background task drains the outbox |
+| `USAGE_FLUSH_BATCH` | `500` | rows per Neon insert |
+| `USAGE_OUTBOX_MAX_ROWS` | `100000` | above this the oldest rows are dropped and the drop is logged |
+
+The outbox lives in `QUEUE_DB`, so it survives a worker restart. Its depth is `outbox_depth` in `/v1/health`; a depth that only grows means Neon has been unreachable for a while.
 
 ## Mini worker — storage
 
@@ -81,12 +93,14 @@ Use the **pooled** Neon endpoint (`-pooler` in the hostname). Neon is never on t
 | Name | Notes |
 | --- | --- |
 | `ARTIFACT_SIGNING_SECRET` | 32+ random bytes. Rotating it invalidates every outstanding signed URL |
-| `ADMIN_TOKEN` | **loopback-only break-glass.** Accepted only for requests arriving on `127.0.0.1` without traversing the tunnel |
+| `ADMIN_TOKEN` | **loopback-only break-glass**, sent as `X-Admin-Token`. Accepted only for requests arriving on `127.0.0.1` without traversing the tunnel |
 | `CF_ACCESS_TEAM_DOMAIN` | `yourteam.cloudflareaccess.com` — JWKS source for Access JWT validation |
-| `CF_ACCESS_AUD` | the Access application's AUD tag; `/v1/admin/*` validates against it |
+| `CF_ACCESS_AUD` | the Access application's AUD tag (the **api** app); `/v1/admin/*` validates against it |
 | `LOG_PROMPTS_DEFAULT` | `false`. Per-key `log_prompts` may not override this upward for Salesforce presets |
 
 Public `/v1/admin/*` is Cloudflare Access + JWT validation, not a bearer token. A token in a header or query string leaks into logs and browser history.
+
+"Loopback" needs the header check as well as the address: cloudflared connects to `127.0.0.1`, so a tunnelled request also arrives from a loopback address. The worker accepts `X-Admin-Token` only when none of Cloudflare's hop headers (`Cf-Connecting-Ip`, `Cf-Ray`, `X-Forwarded-For`, `Cf-Ipcountry`) are present.
 
 ## Mini worker — external services
 

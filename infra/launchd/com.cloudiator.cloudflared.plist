@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. scripts/install-tunnel.sh substitutes __HOME__ and __CLOUDFLARED__
+  and writes the result to ~/Library/LaunchAgents/com.cloudiator.cloudflared.plist.
+
+  A plist with placeholder paths loads "successfully" and then fails to exec,
+  which looks exactly like a working install. The installer refuses to write a
+  file that still contains one.
+
+  Named tunnel only: a quick tunnel gives you a random hostname and breaks
+  streaming (PLAN.md §13). The config file is the only source of the ingress
+  rules, so the arguments here never name a port.
+
+  XML comments cannot contain a double hyphen, so flags are spelled out in prose.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.cloudiator.cloudflared</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__CLOUDFLARED__</string>
+    <string>--config</string>
+    <string>__HOME__/.cloudflared/config.yml</string>
+    <string>tunnel</string>
+    <string>run</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>__HOME__/Cloudiator/logs/cloudflared.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Cloudiator/logs/cloudflared.err</string>
+  <key>ProcessType</key><string>Interactive</string>
+</dict>
+</plist>
