@@ -60,6 +60,17 @@ assert_model_allowed() {
   esac
 }
 
+# Octal permissions of a file. BSD stat and GNU stat disagree about -f, and GNU
+# `stat -f` succeeds with filesystem information rather than failing, so a
+# `||` fallback silently prints the wrong thing.
+file_mode() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    stat -f '%Lp' "$1" 2>/dev/null
+  else
+    stat -c '%a' "$1" 2>/dev/null
+  fi
+}
+
 load_env_file() {
   if [ -f "$1" ]; then
     set -a

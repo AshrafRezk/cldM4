@@ -2,9 +2,10 @@
 # __HOSTNAME__, and __PROTOCOL__ and writes the result to ~/.cloudflared/config.yml.
 #
 # There is exactly one `service:` line pointing at a port, and that port is 8080.
-# If 11434 ever appears here, the Ollama API is on the public internet with no
+# If the Ollama port ever appears here, that API is on the public internet with no
 # authentication at all: rotate every sk-cld- key and assume the models were used
-# by strangers (PLAN.md §13).
+# by strangers (PLAN.md §13). The installer and the Phase B smoke both assert that
+# the rendered file does not contain it anywhere, comments included.
 
 tunnel: __TUNNEL_UUID__
 credentials-file: __HOME__/.cloudflared/__TUNNEL_UUID__.json

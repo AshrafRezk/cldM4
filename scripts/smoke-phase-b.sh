@@ -55,7 +55,7 @@ section "Secrets stay out of git"
 
 if [ -f "$HOME/Cloudiator/.env" ]; then
   pass "$HOME/Cloudiator/.env exists"
-  PERMS="$(stat -f '%Lp' "$HOME/Cloudiator/.env" 2>/dev/null || stat -c '%a' "$HOME/Cloudiator/.env" 2>/dev/null)"
+  PERMS="$(file_mode "$HOME/Cloudiator/.env")"
   [ "$PERMS" = "600" ] && pass ".env is chmod 600" || fail ".env is $PERMS: chmod 600 ~/Cloudiator/.env"
   case "$HOME/Cloudiator/.env" in
     "$ROOT"/*) fail ".env is inside the git working tree" ;;
@@ -117,6 +117,7 @@ check_status() {
   local status code
   status="$(curl -s -o /tmp/cloudiator-smoke.json -w '%{http_code}' --max-time 120 "$url" "$@" 2>/dev/null)"
   code="$(json_field error.code < /tmp/cloudiator-smoke.json)"
+  [ "$code" = "None" ] && code=""
   if [ "$status" = "$expect_status" ] && { [ -z "$expect_code" ] || [ "$code" = "$expect_code" ]; }; then
     pass "$label -> $status ${code:-ok}"
   else

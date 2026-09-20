@@ -38,7 +38,7 @@ case "$DATABASE_URL" in
 esac
 
 if [ -f "$HOME/Cloudiator/.env" ]; then
-  PERMS="$(stat -f '%Lp' "$HOME/Cloudiator/.env" 2>/dev/null || stat -c '%a' "$HOME/Cloudiator/.env" 2>/dev/null)"
+  PERMS="$(file_mode "$HOME/Cloudiator/.env")"
   [ "$PERMS" = "600" ] && pass ".env is chmod 600" || fail ".env is $PERMS, expected 600: chmod 600 ~/Cloudiator/.env"
 fi
 

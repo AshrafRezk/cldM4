@@ -49,6 +49,12 @@ CLOUDFLARED="$(command -v cloudflared 2>/dev/null)"
 [ -n "$CLOUDFLARED" ] || die "cloudflared is not installed: brew install cloudflared"
 pass "cloudflared at $CLOUDFLARED"
 
+# Only used to read `cloudflared tunnel list --output json`. The worker venv is
+# there after mac-setup; the system interpreter is enough if it is not.
+PY="$ROOT/apps/worker/.venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3 2>/dev/null)"
+[ -n "$PY" ] || die "no python3 to read the tunnel list with"
+
 [ -f "$HOME/.cloudflared/cert.pem" ] \
   && pass "cloudflared is logged in" \
   || die "run 'cloudflared tunnel login' first (it needs a browser and the zone must be Active)"
@@ -68,31 +74,25 @@ esac
 # --------------------------------------------------------------------------
 section "Named tunnel"
 
-UUID="$("$CLOUDFLARED" tunnel list --output json 2>/dev/null \
-  | "$ROOT/apps/worker/.venv/bin/python" -c '
+tunnel_uuid() {
+  "$CLOUDFLARED" tunnel list --output json 2>/dev/null | "$PY" -c '
 import json, sys
-name = sys.argv[1]
 try:
     tunnels = json.load(sys.stdin)
 except Exception:
     sys.exit(0)
 for tunnel in tunnels:
-    if tunnel.get("name") == name and not tunnel.get("deleted_at"):
-        print(tunnel.get("id", ""))
-        break
-' "$TUNNEL_NAME")"
-
-if [ -z "$UUID" ]; then
-  info "creating tunnel $TUNNEL_NAME"
-  "$CLOUDFLARED" tunnel create "$TUNNEL_NAME" || die "could not create the tunnel"
-  UUID="$("$CLOUDFLARED" tunnel list --output json 2>/dev/null \
-    | "$ROOT/apps/worker/.venv/bin/python" -c '
-import json, sys
-for tunnel in json.load(sys.stdin):
     if tunnel.get("name") == sys.argv[1] and not tunnel.get("deleted_at"):
         print(tunnel.get("id", ""))
         break
-' "$TUNNEL_NAME")"
+' "$TUNNEL_NAME"
+}
+
+UUID="$(tunnel_uuid)"
+if [ -z "$UUID" ]; then
+  info "creating tunnel $TUNNEL_NAME"
+  "$CLOUDFLARED" tunnel create "$TUNNEL_NAME" || die "could not create the tunnel"
+  UUID="$(tunnel_uuid)"
 fi
 
 [ -n "$UUID" ] || die "could not determine the tunnel UUID"
