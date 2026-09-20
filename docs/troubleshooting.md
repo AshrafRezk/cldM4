@@ -48,6 +48,24 @@ Real fix: `PLAN.md` §8, exclusive slot contract — `async with metal_lock`, ki
 
 Key lacks the capability. Check dashboard checkboxes against the route (`tools.charts`, `image_generation`, etc.). Note that scope is re-checked on **every** tool call inside a chat loop, so a model that invents a tool name gets a 403 tool result mid-conversation — that is correct behaviour, not a bug.
 
+A model name the key is not scoped for is also a `403`, deliberately, rather than a `404`: the error must not tell a tenant which models are on the disk. A model the key *may* use but that is not installed is the `404 model_not_found`.
+
+## 403 on `/v1/admin/*` even though Cloudflare Access let me through
+
+The worker validates the Access JWT itself — Access in front of an origin only means something if the origin refuses requests that did not come through it. Check, in this order:
+
+- `CF_ACCESS_AUD` is the AUD of the **api** application (`api.<domain>/v1/admin*`), not the dashboard one
+- `CF_ACCESS_TEAM_DOMAIN` matches the team domain exactly, so the JWKS at `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` resolves
+- the worker log says why. It logs the reason and tells the caller nothing
+
+`ADMIN_TOKEN` is refused on anything that arrived through the tunnel, even though cloudflared connects from `127.0.0.1`: the Cloudflare hop headers give it away. Over SSH on the Mini it works.
+
+## 503 mini_offline on a key that worked five minutes ago
+
+Neon is unreachable **and** that key is not in the 60s cache. The worker will not answer `401` when it cannot check a key — that would send an integrator hunting for a bug in their own code during your outage.
+
+Keys already in use keep working. Check `db` in `/v1/health`, then `/v1/health/deep` for the actual Neon error.
+
 ## 429 metal_busy / Retry-After
 
 One Metal slot. Salesforce should switch to `POST /v1/jobs` rather than retry storms. The per-key `rpm` bucket and the Cloudflare rate-limit rule can also fire.

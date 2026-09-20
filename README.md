@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phase A (the worker) is in `apps/worker`; the rest of the plan is still plan.
+**This repository is the production plan and the product.** Phases A and B (the worker, key auth, Neon, and the tunnel) are in `apps/worker`, `packages/schema`, `infra/`, and `scripts/`; the rest of the plan is still plan.
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -32,6 +32,24 @@ scripts/smoke-phase-a.sh                # the definition of done
 
 Roll back with `scripts/install-launchagents.sh --uninstall`, `git checkout -- apps/worker scripts`, and `rm -rf apps/worker/.venv`. Models stay on disk.
 
+### Phase B on the Mini, in order
+
+Needs [docs/operator-checklist.md](docs/operator-checklist.md) §§1–5 filled in, and the pooled `DATABASE_URL`, `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN` in `~/Cloudiator/.env` (`chmod 600`, outside git).
+
+```bash
+scripts/apply-neon-schema.sh            # verifies first; applies only what is missing
+cd apps/worker && .venv/bin/python -m app.dbtool mint-key \
+  --tenant cloudiator --name 'Phase B smoke' --preset salesforce_engineer   # shown once
+cd - && cloudflared tunnel login        # human, browser, zone must be Active
+scripts/install-tunnel.sh               # named tunnel -> 127.0.0.1:8080 only
+export SMOKE_API_KEY=sk-cld-...
+scripts/smoke-phase-b.sh                # the definition of done
+```
+
+Then do the three things a script cannot: repeat the HTTPS checks from a **phone on cellular**, import `?target=salesforce` OpenAPI into External Services in a dev org, and run the Neon-down drill.
+
+Roll back with `scripts/install-tunnel.sh --uninstall` (and `cloudflared tunnel delete cloudiator-mini` plus the DNS record if you want the tunnel gone), `.venv/bin/python -m app.dbtool revoke-key <public_id>` for any key you minted, and `git checkout -- apps/worker scripts`. The Phase A loopback worker keeps working untouched.
+
 ## If you are not on the Mini
 
 Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. Implementation that needs Metal, Apple Vision, and 24GB RAM belongs on the Mini.
@@ -55,9 +73,11 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Known failures and fixes |
 | [docs/licenses.md](docs/licenses.md) | Model and library licenses |
 | [.env.example](.env.example) | Mini worker env template (copy, do not commit secrets) |
-| [apps/worker/](apps/worker/) | Phase A: FastAPI worker, RAM scheduler, guards, tests |
-| [scripts/](scripts/) | Gates, host setup, LaunchAgent install, Phase A smoke |
-| [infra/launchd/](infra/launchd/) | LaunchAgent and wrapper templates |
+| [apps/worker/](apps/worker/) | Phases A–B: FastAPI worker, RAM scheduler, key auth, usage outbox, tests |
+| [packages/schema/](packages/schema/) | OpenAPI fragments, scope enums, the per-key document generator |
+| [scripts/](scripts/) | Gates, host setup, LaunchAgents, Neon schema, tunnel, phase smokes |
+| [infra/launchd/](infra/launchd/) | LaunchAgent templates (worker and cloudflared) |
+| [infra/cloudflared/](infra/cloudflared/) | Tunnel config template: one origin, `127.0.0.1:8080` |
 
 ## Locked v1 decisions
 
