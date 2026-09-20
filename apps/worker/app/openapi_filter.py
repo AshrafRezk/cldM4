@@ -1,10 +1,9 @@
 """Per-key OpenAPI documents (PLAN.md §10).
 
 The generator lives in `packages/schema` because the dashboard and the CLI need
-it too, and because it must stay importable without FastAPI, Ollama, or Neon.
-The worker loads that module by path rather than copying the merge logic: two
-implementations of "which operations does this key see" is how a key ends up
-with a contract it cannot call.
+it too. `generate.py` is what the worker loads by path; `generate.mjs` is the
+Netlify twin. Keep them in lockstep — two merge implementations is how a key
+ends up with a contract it cannot call.
 """
 
 from __future__ import annotations

@@ -9,9 +9,23 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
+from urllib.parse import urlparse
 
 DEFAULT_ARTIFACT_DIR = os.path.expanduser("~/Cloudiator/artifacts")
 DEFAULT_QUEUE_DB = os.path.expanduser("~/Cloudiator/queue.db")
+
+
+def _dashboard_origin() -> str:
+    override = _opt("DASHBOARD_ORIGIN")
+    if override:
+        return override.rstrip("/")
+    public = _str("PUBLIC_BASE_URL", "http://127.0.0.1:8080")
+    parsed = urlparse(public)
+    host = parsed.netloc
+    if not host.startswith("api."):
+        return ""
+    scheme = parsed.scheme or "https"
+    return f"{scheme}://app.{host[4:]}"
 
 
 def _str(name: str, default: str) -> str:
@@ -53,6 +67,9 @@ class Settings:
     public_base_url: str = field(
         default_factory=lambda: _str("PUBLIC_BASE_URL", "http://127.0.0.1:8080")
     )
+    # Browser playground on app.<domain> (Phase C). Derived from PUBLIC_BASE_URL
+    # (api.X → app.X) unless DASHBOARD_ORIGIN is set. Apex callouts do not use CORS.
+    dashboard_origin: str = field(default_factory=lambda: _dashboard_origin())
 
     ollama_host: str = field(default_factory=lambda: _str("OLLAMA_HOST", "http://127.0.0.1:11434"))
     ollama_max_loaded_models: str | None = field(

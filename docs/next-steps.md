@@ -1,74 +1,64 @@
-# Next steps — Phase C from the MacBook (2026-09-20)
+# Next steps — stop recorded 2026-09-20 ~22:09 UTC
 
-**Phase A and B are proven.** Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions.
+Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not put secrets in this file.
 
-Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
+**Last thing actually done:** dashboard playground chat from `https://app.cloudiator.org` → `https://api.cloudiator.org` returned Arabic (Salesforce sentence). Mini OPTIONS preflight is **204** with `access-control-allow-origin: https://app.cloudiator.org`. The operator then **revoked many keys** and stopped. The leftover Phase C checks below were **not** done.
 
-## Done
+Do not start Phase D until those leftover checks are green, or until the operator explicitly skips them.
 
-**API:** `https://api.cloudiator.org` → named tunnel `cloudiator-mini` (`e88624cb-3f03-4578-a38b-a7e3e090c873`) → `http://127.0.0.1:8080`. Gemma 4 E4B QAT + `nomic-embed-text`. Chat from the Air returned JSON 200. A garbage key is a FastAPI JSON 401, not Cloudflare HTML. `:11434` times out on the WAN. Salesforce OAS is OpenAPI `3.0.3` with zero composition keywords. External Services import and the Neon-down drill are postponed (Phase F / later).
+## Where the code is
 
-**Mini `.env`:** `NOMINATIM_USER_AGENT` is quoted. `DEFAULT_MODEL=gemma4:e4b-it-qat`.
+- Branch: `cursor/cloud-agent-1789940810344-piopm` (PR https://github.com/AshrafRezk/cldM4/pull/9). There is **no** `cursor/phase-c-netlify-dashboard` on GitHub.
+- Mini (`~/cldM4`) is on that branch, worker restarted after checkout. **Not** back on `main`.
+- Dashboard is live on Netlify Drop at `https://app.cloudiator.org` (site `cloudiator`). Last deploy from Netlify Drop / CLI `--no-build`; the Netlify UI has **no Trigger deploy** until the site is Git-linked.
 
-**This branch (PR #8):** KEY=VALUE `.env` loader (do not `source` the file), `dbtool` reads `~/Cloudiator/.env`, embedder keep-alive via `/api/embed`, tunnel list JSON `null` is survivable, `--local` smoke skips the tunnel.
+## Proven
 
-## This MacBook, once
+- Cloudflare Access is on `app.cloudiator.org` (operator logged in as `ashrafrmattar@gmail.com`). Not re-checked in incognito.
+- Pooled Neon `DATABASE_URL` is in Netlify site env (server-side). Dashboard mint/list/revoke works.
+- Tenant `cloudiator` visible in the UI.
+- CORS on the Mini worker: `OPTIONS /v1/chat/completions` from origin `https://app.cloudiator.org` → 204.
+- One playground chat succeeded (Arabic, Salesforce prompt) with a Salesforce-engineer key, then that key and several others were revoked.
 
-Merge [PR #8](https://github.com/AshrafRezk/cldM4/pull/8) on GitHub, then:
+## Keys (2026-09-20)
 
-```bash
-cd /path/to/cldM4
-git checkout main
-git pull origin main
-```
+All of these dashboard rows showed **revoked** after the playground proof. `public_id` only (never store the secret here):
 
-If #8 is still open and you want to start C anyway:
+| Name | public_id | Notes |
+| --- | --- | --- |
+| Salesforce org | `3id2agzqwmg7` | Playground success, then revoked (also appeared in a screenshot) |
+| Salesforce org | `fcq3567r7dih` | revoked |
+| Salesforce org | `rzo7uuany4qu` | revoked |
+| Salesforce org | `qdej5o4oerhw` | revoked |
+| Salesforce org | `nhdbs2bmbcdh` | revoked (earlier screenshot leak) |
+| Phase B smoke | `97ktd26abuzf` | revoked |
+| Phase B smoke | `o4ig8h9ncxhn` | revoked |
+| Phase B smoke | `fk5r7c2naido` | revoked |
 
-```bash
-git fetch origin cursor/safe-env-source-5f2a
-git checkout cursor/safe-env-source-5f2a
-```
+Worker key cache can take **up to 60s** to honour revoke. Mint a **new** key before the next playground or `curl` test. Do not paste full `sk-cld-…` secrets into chat or screenshots.
 
-Do **not** run `ollama pull`, LaunchAgents, or `scripts/mac-setup.sh` on the Air.
+## Not done (Phase C leftover)
 
-## Phase C — Netlify dashboard (new chat, do this next)
+The operator did **not** do these after the playground reply:
 
-Cursor **Pro Plus**. Agent mode. **Auto off.** Privacy Mode on. Model: **Claude Sonnet 5**. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md` `@docs/env.md`.
+- [ ] Refresh the **usage** chart and confirm a `usage_daily` row for the playground chat.
+- [ ] Download **both** OpenAPI files (normal + Salesforce External Services).
+- [ ] Confirm the on-screen Apex snippet contains `setTimeout(120000)` and `"stream": false`.
+- [ ] Incognito window on `https://app.cloudiator.org` challenged by **Cloudflare Access**, not a password form.
+- [ ] Disable Netlify’s `*.netlify.app` default domain (`cloudiator.netlify.app` is not behind Access).
+- [ ] Merge PR #9 and `git checkout main && git pull` on the Mini.
+- [ ] Rotate `ADMIN_SESSION_SECRET` if a CLI log printed it; copy the current value into the password manager.
 
-Netlify site env (server functions only, never the browser bundle):
+## When you pick this up
 
-- pooled `DATABASE_URL` (`-pooler` in the host)
-- `PUBLIC_API_URL=https://api.cloudiator.org`
-- `ADMIN_SESSION_SECRET` (random, password manager)
+1. Mint a new Salesforce-engineer key (old ones above are dead). Copy it once.
+2. Finish the leftover checks, or skip them in writing and start Phase D anyway.
+3. Merge PR #9 when ready so the Mini is not stuck on the cloud-agent branch.
 
-Cloudflare Access is already on `app.cloudiator.org`. No login form. No shared admin password. No Netlify Identity.
-
-### Copy-paste into the MacBook Agent chat
-
-```
-You are implementing Cloudiator from this repo. Read PLAN.md, docs/cursor-settings.md, docs/next-steps.md, and the docs/ files. Do not skip RAM rules. Do not use Docker for Ollama. Do not put inference in Netlify. Work only on the current phase. Commit when the phase definition of done is met if I ask you to commit.
-
-Phase A and B are green. Domain is cloudiator.org. API is https://api.cloudiator.org through named tunnel cloudiator-mini. Neon project cloudiator already has the schema. Dashboard hostname is app.cloudiator.org. Cloudflare Access is already on app.cloudiator.org. Do not scaffold apps/gateway/. Do not expose 11434. Do not run Ollama or LaunchAgents on this laptop.
-
-Phase C only.
-
-1. apps/dashboard Vite React. NO login form, NO shared admin password, NO Netlify Identity. Authentication is Cloudflare Access on app.cloudiator.org, configured outside the app. The app reads the Cf-Access-Authenticated-User-Email header in its server functions and trusts nothing else.
-2. Create tenant, mint key, checkboxes for scopes from PLAN.md section 9 presets.
-3. Show the key once. Next to the revoke button, state plainly that revocation takes up to 60 seconds to propagate (worker key cache).
-4. Usage chart from Neon, reading the usage_daily rollup rather than raw events.
-5. Download OpenAPI JSON for that key, with a separate "Salesforce (External Services)" button that hits ?target=salesforce.
-6. Copy-paste Salesforce Named Credential + Apex snippet from docs/salesforce.md. The snippet must contain req.setTimeout(120000) and "stream": false.
-7. A small browser chat playground that calls https://api.cloudiator.org/v1/chat/completions from the client with the minted key. No inference in Netlify functions, ever. DATABASE_URL is server-side only.
-8. Netlify deploy. Custom domain app.cloudiator.org.
-9. Tests: a build-output check that greps dist/ for neon.tech and fails if found.
-```
-
-**Prove it:** incognito on `app.cloudiator.org` is challenged by Cloudflare Access, not a password form. Mint a key, chat from the playground, see a usage row. `npm run build && grep -r neon.tech dist/` finds nothing.
-
-## Later
+## Later (not now)
 
 | When | What |
 | --- | --- |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage). |
-| Phase D | Tools, OCR, maps — Mini, Opus 5. |
-| Phase F | External Services import of `/tmp/cloudiator-oas.json` (already valid 3.0.3). |
+| Phase D | **New chat on the Mini**, Opus 5, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md`. Paste the Phase D block only (tools, OCR, maps). |
+| Phase F | External Services import of Salesforce OAS. |
