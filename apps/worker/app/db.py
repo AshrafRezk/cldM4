@@ -75,6 +75,19 @@ INSERT INTO usage_events (
 
 EXPECTED_TABLES = ("tenants", "api_keys", "usage_events", "usage_daily", "jobs")
 
+# asyncpg's InterfaceError does not inherit from PostgresError, and "connection is
+# closed" — the idle-suspend case this module exists for — arrives as one. Letting
+# it escape would turn a Neon suspend into a 500 instead of a cache fallback.
+CONNECTION_ERRORS = (
+    asyncpg.PostgresError,
+    asyncpg.InterfaceError,
+    asyncpg.InternalClientError,
+    OSError,
+    asyncio.TimeoutError,
+)
+# Neon answered and refused the statement: the row is wrong, not the connection.
+REJECTION_ERRORS = (asyncpg.DataError, asyncpg.IntegrityConstraintViolationError)
+
 
 class DatabaseUnavailable(RuntimeError):
     """Neon could not answer. Fall back to the key cache or the outbox."""
@@ -206,7 +219,7 @@ class Neon:
             con = await pool.acquire(timeout=self.settings.db_connect_timeout_seconds)
             try:
                 await con.fetchval("SELECT 1", timeout=PING_TIMEOUT_SECONDS)
-            except (asyncpg.PostgresError, OSError, asyncio.TimeoutError) as exc:
+            except CONNECTION_ERRORS as exc:
                 last = exc
                 with suppress(Exception):
                     con.terminate()
@@ -245,11 +258,11 @@ class Neon:
         except DatabaseUnavailable as exc:
             self._record_failure(exc)
             raise
-        except (asyncpg.DataError, asyncpg.IntegrityConstraintViolationError) as exc:
+        except REJECTION_ERRORS as exc:
             # The connection is fine; this statement is not. Neon is not degraded.
             self._record_success()
             raise DatabaseRejected(f"{type(exc).__name__}: {exc}") from exc
-        except (asyncpg.PostgresError, OSError, asyncio.TimeoutError) as exc:
+        except CONNECTION_ERRORS as exc:
             self._record_failure(exc)
             raise DatabaseUnavailable(f"{type(exc).__name__}: {exc}") from exc
         self._record_success()

@@ -58,6 +58,7 @@ log = logging.getLogger("cloudiator.worker")
 
 USAGE_EVENTS_LIMIT = 100
 USAGE_ROLLUP_DAYS = 30
+JANITOR_SECONDS = 60.0
 
 # Endpoint families that will never exist in v1. A 404 with an OpenAI-shaped
 # body makes SDKs surface a readable error instead of an HTML page (PLAN.md §10).
@@ -131,15 +132,24 @@ async def lifespan(app: FastAPI):
     )
     _warn_about_phase_b_configuration()
     prewarm_encoder()
-    outbox.open()
+    try:
+        outbox.open()
+    except Exception as exc:  # noqa: BLE001
+        # Losing usage metrics is not a reason to stop serving inference; losing
+        # them silently is. Health carries the reason (PLAN.md §11).
+        scheduler.mark_degraded(
+            "usage_outbox", f"cannot open {settings.queue_db}: {exc}. Usage is not being recorded"
+        )
     await scheduler.poll_once()
     scheduler.start()
     outbox.start()
     warm = asyncio.create_task(_warm_models(), name="warm-models")
+    janitor = asyncio.create_task(_janitor(), name="cache-janitor")
     try:
         yield
     finally:
         warm.cancel()
+        janitor.cancel()
         await scheduler.stop()
         await outbox.stop()
         outbox.close()
@@ -166,6 +176,23 @@ def _warn_about_phase_b_configuration() -> None:
             "CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD are not set: /v1/admin/* accepts nothing "
             "but the loopback break-glass token until they are (PLAN.md §12)"
         )
+
+
+async def _janitor() -> None:
+    """Drop expired key-cache entries and idle rate buckets.
+
+    Both are keyed on caller-supplied ids, so without this a key-guessing flood
+    leaves its footprint resident until each entry is next touched.
+    """
+    while True:
+        await asyncio.sleep(JANITOR_SECONDS)
+        try:
+            key_cache.purge_expired()
+            rate_limiter.purge_idle()
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - the janitor outlives its failures
+            log.exception("cache janitor pass failed")
 
 
 async def _warm_models() -> None:

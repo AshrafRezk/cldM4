@@ -70,6 +70,9 @@ HASHER = PasswordHasher(
 # the cache entry without limit.
 MAX_VERIFIED_DIGESTS = 8
 MAX_REJECTED_DIGESTS = 64
+# And bounded across public_ids: a key-guessing flood would otherwise leave a
+# negative entry per guess resident until its TTL, on a box with no RAM to spare.
+MAX_CACHE_ENTRIES = 4096
 RATE_BUCKET_IDLE_SECONDS = 600.0
 
 
@@ -142,6 +145,8 @@ class KeyRecord:
     max_tokens: int
     max_context: int
     rpm: int
+    # Carried from Neon but not enforced yet: enforcing it needs the usage_daily
+    # rollup, which the dashboard phase builds. Do not read it as a live limit.
     daily_token_budget: int | None
     allowed_origins: tuple[str, ...]
     salesforce_org_id: str | None
@@ -248,7 +253,24 @@ class KeyCache:
         if verified_secret is not None:
             entry.verified.add(self.digest(verified_secret))
         self._entries[public_id] = entry
+        if len(self._entries) > MAX_CACHE_ENTRIES:
+            self._evict(now)
         return entry
+
+    def _evict(self, now: float) -> None:
+        """Keep the cache bounded during a key-guessing flood.
+
+        Negative entries go first: rebuilding one costs a single indexed SELECT,
+        while dropping a verified entry costs a 64 MiB argon2id verification.
+        """
+        self.purge_expired(now=now)
+        if len(self._entries) <= MAX_CACHE_ENTRIES:
+            return
+        candidates = sorted(
+            self._entries.items(), key=lambda item: (item[1].record is not None, item[1].expires_at)
+        )
+        for public_id, _ in candidates[: len(self._entries) - MAX_CACHE_ENTRIES]:
+            self._entries.pop(public_id, None)
 
     def mark_verified(self, entry: _Entry, secret: str) -> None:
         if len(entry.verified) >= MAX_VERIFIED_DIGESTS:
@@ -307,6 +329,8 @@ class RateLimiter:
         self._buckets: dict[str, tuple[float, float]] = {}
 
     def check(self, key_id: str, rpm: int, *, now: float | None = None) -> None:
+        # rpm 0 or less is "no per-key limit". Stopping a key is revocation, not a
+        # rate limit of zero.
         if rpm <= 0:
             return
         now = time.monotonic() if now is None else now

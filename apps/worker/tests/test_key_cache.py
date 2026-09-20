@@ -162,6 +162,22 @@ def test_two_caches_produce_different_digests():
     assert KeyCache(60.0).digest(secret) != KeyCache(60.0).digest(secret)
 
 
+def test_the_cache_stays_bounded_under_a_key_guessing_flood():
+    """And a verified key survives it: re-verifying costs 64 MiB of argon2id."""
+    from app.auth import MAX_CACHE_ENTRIES
+
+    cache = KeyCache(60.0)
+    real = KeyRecord.from_row(key_row(public_id="realkey"))
+    cache.put("realkey", real, verified_secret="s", now=0.0)
+
+    for index in range(MAX_CACHE_ENTRIES * 2):
+        cache.put(f"guess-{index}", None, now=0.0)
+
+    assert len(cache._entries) <= MAX_CACHE_ENTRIES
+    entry = cache.get("realkey", now=0.0)
+    assert entry is not None and entry.record is real
+
+
 def test_the_verified_and_rejected_sets_are_bounded():
     cache = KeyCache(60.0)
     entry = cache.put("bounded", KeyRecord.from_row(key_row(public_id="bounded")))

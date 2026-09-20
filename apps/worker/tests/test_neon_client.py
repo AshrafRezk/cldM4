@@ -198,6 +198,29 @@ async def test_a_socket_that_died_while_idle_is_replaced():
     assert neon.state() == STATE_OK
 
 
+async def test_a_closed_connection_is_an_outage_not_a_500():
+    """asyncpg reports "connection is closed" as an InterfaceError, which does not
+    inherit from PostgresError. Uncaught, an idle suspend becomes a 500."""
+
+    async def closed(connection):
+        raise asyncpg.InterfaceError("connection is closed")
+
+    neon, _ = make_neon([FakeConnection()])
+
+    with pytest.raises(DatabaseUnavailable):
+        await neon.run(closed)
+
+    assert neon.state() == STATE_DEGRADED
+
+
+async def test_a_dead_socket_reported_as_an_interface_error_is_replaced():
+    dead = FakeConnection(ping_error=asyncpg.InterfaceError("connection is closed"))
+    neon, _ = make_neon([dead, FakeConnection()])
+
+    assert await neon.run(one) == "ok"
+    assert dead.terminated is True
+
+
 async def test_two_dead_sockets_are_a_database_outage():
     connections = [
         FakeConnection(ping_error=asyncpg.PostgresConnectionError("lost")),

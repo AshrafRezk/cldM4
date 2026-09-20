@@ -175,7 +175,13 @@ class UsageOutbox:
         return self._dropped
 
     def record(self, event: UsageEvent) -> None:
-        """Called from the request path. Swallows everything (PLAN.md §11)."""
+        """Called from the request path. Swallows everything (PLAN.md §11).
+
+        The insert runs inline rather than in a thread so a crash cannot lose a
+        row that a response already reported. It can wait on the flusher's lock,
+        but only for one WAL batch — milliseconds against a chat measured in tens
+        of seconds.
+        """
         if event.route in SKIP_ROUTES:
             return
         # An unauthenticated 401 flood would otherwise fill the outbox with rows
