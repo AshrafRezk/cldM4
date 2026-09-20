@@ -245,7 +245,8 @@ Operator: Ashraf / laptop cloud  Date: 2026-09-20
 
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
-1. **This laptop:** `git push` so GitHub has this commit. Do not commit `.env` or connection strings.
-2. **Mini — Phase A only** (new Cursor chat, Opus, Auto off). Ethernet, `uname -m` → arm64, FileVault policy in §6, then the Phase A prompt in [cursor-phases.md](cursor-phases.md). Loopback chat must work before any tunnel.
-3. **Mini — Phase B remainder:** named tunnel `cloudiator-mini` to `127.0.0.1:8080` only (never 11434), worker key auth, usage outbox. Prove HTTPS from a **phone on cellular**.
-4. **Later:** Netlify dashboard (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
+1. **This laptop:** `git push` (if this commit is not on GitHub yet).
+2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md`. Paste **Phase B only**.
+3. Mini `.env`: pooled `DATABASE_URL`, `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` (api app), `CF_ACCESS_TEAM_DOMAIN`, Nominatim UA. `chmod 600`, outside git.
+4. Named tunnel `cloudiator-mini` → `127.0.0.1:8080` only. Prove from a **phone on cellular**.
+5. **Later:** Netlify (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
