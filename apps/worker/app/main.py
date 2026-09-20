@@ -204,7 +204,8 @@ async def _warm_models() -> None:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
-            log.warning("could not warm %s: %s", label, exc)
+            model = ollama.default_model if label == "hot model" else ollama.embed_model
+            log.warning("could not warm %s (%s): %s", label, model, exc)
 
 
 app = FastAPI(

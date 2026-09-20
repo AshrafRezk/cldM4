@@ -296,6 +296,18 @@ async def test_watchdog_rewarms_the_hot_model_after_an_oom_kill(settings):
     assert "qwen3.5:9b" in models.loaded
 
 
+async def test_watchdog_names_the_tag_when_rewarm_404s(settings):
+    """A nameless 404 in worker.err is how this sat unidentified for half an hour."""
+    models = FakeModels(loaded=["nomic-embed-text"])
+    models.reload_fails = True
+    scheduler = make_scheduler(settings, models)
+
+    await scheduler.watchdog_once(elapsed=REWARM_AFTER_SECONDS)
+
+    assert "hot_model_missing" in scheduler.degraded
+    assert settings.default_model in scheduler.degraded["hot_model_missing"]
+
+
 async def test_watchdog_does_not_interfere_with_exclusive_work(settings):
     models = FakeModels(loaded=["nomic-embed-text"])
     scheduler = make_scheduler(settings, models)

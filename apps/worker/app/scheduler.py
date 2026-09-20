@@ -363,11 +363,18 @@ class Scheduler:
         self._seconds_without_generative += elapsed
         if self._seconds_without_generative < REWARM_AFTER_SECONDS:
             return
-        log.warning("no generative model resident for %.0fs; re-warming the hot model",
-                    self._seconds_without_generative)
+        log.warning(
+            "no generative model resident for %.0fs; re-warming %s",
+            self._seconds_without_generative,
+            self.settings.default_model,
+        )
         try:
             await self.models.reload_hot_model()
             self._seconds_without_generative = 0.0
             self.clear_degraded("hot_model_missing")
-        except Exception:  # noqa: BLE001
-            self.mark_degraded("hot_model_missing", "watchdog could not re-warm the hot model")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("watchdog could not re-warm %s: %s", self.settings.default_model, exc)
+            self.mark_degraded(
+                "hot_model_missing",
+                f"watchdog could not re-warm {self.settings.default_model}: {exc}",
+            )
