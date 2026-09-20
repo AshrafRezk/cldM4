@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Phase B definition of done (docs/cursor-phases.md "Prove it").
 #
-#   export SMOKE_API_KEY=sk-cld-...          # a real key, minted with app.dbtool
-#   scripts/smoke-phase-b.sh                 # loopback + public HTTPS checks
-#   scripts/smoke-phase-b.sh --local         # skip everything that needs the tunnel
+#   export SMOKE_API_KEY=sk-cld-<id>_<secret>  # a real key, minted with app.dbtool
+#   scripts/smoke-phase-b.sh                   # loopback + public HTTPS checks
+#   scripts/smoke-phase-b.sh --local           # loopback only; skip tunnel + public HTTPS
 #
 # It only reads. Non-zero exit means the phase is not done.
 #
@@ -106,6 +106,10 @@ if [ -z "$KEY" ]; then
   info "      --tenant cloudiator --name 'Phase B smoke' --preset salesforce_engineer"
 else
   case "$KEY" in
+    sk-cld-...|sk-cld-'...'|sk-cld-\<id\>*)
+      fail "SMOKE_API_KEY is the placeholder from the docs. Paste the minted key (sk-cld-<id>_<secret>)."
+      KEY=""
+      ;;
     sk-cld-*_*) pass "SMOKE_API_KEY looks like sk-cld-<id>_<secret>" ;;
     *)          fail "SMOKE_API_KEY is not an sk-cld- key" ;;
   esac
@@ -182,6 +186,20 @@ info "Neon-down drill (manual): block the Neon host, chat again with the same ke
 info "  then check health: db becomes degraded, outbox_depth grows, chat keeps returning 200."
 info "  Unblock, wait ~15s, and the depth returns to 0 with rows in usage_events."
 
+# 11434 must never leave loopback, with or without a tunnel.
+OLLAMA_BIND="$(lsof -nP -iTCP:11434 -sTCP:LISTEN 2>/dev/null | awk 'NR>1{print $9}' | sort -u)"
+if [ -n "$OLLAMA_BIND" ] && printf '%s\n' "$OLLAMA_BIND" | grep -qv '^127\.0\.0\.1:\|^\[::1\]:'; then
+  fail "11434 is bound beyond loopback ($OLLAMA_BIND)"
+else
+  pass "11434 is loopback only"
+fi
+
+if [ "$ONLY_LOCAL" = "1" ]; then
+  info "--local: skipping named-tunnel and public HTTPS checks. Run scripts/install-tunnel.sh next."
+  summary "Phase B smoke (local only)"
+  exit $?
+fi
+
 # --------------------------------------------------------------------------
 section "Tunnel configuration"
 
@@ -217,19 +235,6 @@ else
   fail "$TUNNEL_LABEL is not loaded. Run scripts/install-tunnel.sh"
 fi
 rm -f /tmp/cloudiator-tunnel.log
-
-OLLAMA_BIND="$(lsof -nP -iTCP:11434 -sTCP:LISTEN 2>/dev/null | awk 'NR>1{print $9}' | sort -u)"
-if [ -n "$OLLAMA_BIND" ] && printf '%s\n' "$OLLAMA_BIND" | grep -qv '^127\.0\.0\.1:\|^\[::1\]:'; then
-  fail "11434 is bound beyond loopback ($OLLAMA_BIND)"
-else
-  pass "11434 is loopback only"
-fi
-
-if [ "$ONLY_LOCAL" = "1" ]; then
-  info "--local: skipping the public HTTPS checks"
-  summary "Phase B smoke (local only)"
-  exit $?
-fi
 
 # --------------------------------------------------------------------------
 section "Public HTTPS (run this from a phone on cellular too)"
