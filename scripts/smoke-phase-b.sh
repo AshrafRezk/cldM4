@@ -105,7 +105,6 @@ if [ -z "$KEY" ]; then
   info "  cd apps/worker && .venv/bin/python -m app.dbtool mint-key \\"
   info "      --tenant cloudiator --name 'Phase B smoke' --preset salesforce_engineer"
 else
-  KEY_SECRET="${KEY#sk-cld-*_}"
   case "$KEY" in
     *…*|*'...'*)
       fail "SMOKE_API_KEY still has a placeholder ellipsis. Copy the whole minted line, including the secret after the underscore."

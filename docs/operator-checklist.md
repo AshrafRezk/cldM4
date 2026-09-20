@@ -42,10 +42,10 @@ Do **not** proceed to the tunnel until the Cloudflare zone status is **Active**.
 | --- | --- | --- |
 | Account email | stored in password manager | [x] |
 | Zone ID | stored in password manager | [x] |
-| Tunnel name | `cloudiator-mini` | [ ] |
-| Tunnel UUID | ____________________ | [ ] |
-| Credentials file path | `~/.cloudflared/<UUID>.json` | [ ] |
-| DNS: `api` CNAME → `<UUID>.cfargotunnel.com`, **proxied** (orange cloud) | Mini, after Phase A | [ ] |
+| Tunnel name | `cloudiator-mini` | [x] |
+| Tunnel UUID | `e88624cb-3f03-4578-a38b-a7e3e090c873` | [x] |
+| Credentials file path | `~/.cloudflared/e88624cb-3f03-4578-a38b-a7e3e090c873.json` | [x] |
+| DNS: `api` CNAME → `<UUID>.cfargotunnel.com`, **proxied** (orange cloud) | `api.cloudiator.org` → `e88624cb-….cfargotunnel.com` | [x] |
 
 ### 2a. Zone settings that must be changed — Salesforce Apex is not a browser
 
@@ -68,7 +68,7 @@ Security → WAF → Custom rules → **Skip**.
 Skip: **All managed rules**, **Super Bot Fight Mode**, **Rate limiting rules**, **Browser Integrity Check**.
 
 - [x] Rule created and enabled (`skip-sk-cld-salesforce`), placed **above** every other custom rule.
-- [ ] Verified: a `curl` with a valid `Authorization: Bearer sk-cld-...` header returns JSON, from a network that is not the Mini. (Needs the Mini tunnel.)
+- [x] Verified: a `curl` with a valid `Authorization: Bearer sk-cld-...` header returns JSON, from a network that is not the Mini. (Air, 2026-09-20: chat 200, garbage key JSON 401, Salesforce UA health 200.)
 
 ### 2c. Rate limiting
 

@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A and B (the worker, key auth, Neon, and the tunnel) are in `apps/worker`, `packages/schema`, `infra/`, and `scripts/`; the rest of the plan is still plan.
+**This repository is the production plan and the product.** Phases A and B (the worker, key auth, Neon, and the tunnel) are proven on the Mini at `https://api.cloudiator.org`. Phase C is the Netlify dashboard on `app.cloudiator.org` — start from [docs/next-steps.md](docs/next-steps.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -46,7 +46,7 @@ export SMOKE_API_KEY=sk-cld-...
 scripts/smoke-phase-b.sh                # the definition of done
 ```
 
-Then do the three things a script cannot: repeat the HTTPS checks from a **phone on cellular**, import `?target=salesforce` OpenAPI into External Services in a dev org, and run the Neon-down drill.
+Then do the things a script cannot: repeat the HTTPS checks from a network that is not the Mini (done from the Air 2026-09-20), import `?target=salesforce` OpenAPI into External Services when you reach Phase F, and run the Neon-down drill when convenient.
 
 Roll back with `scripts/install-tunnel.sh --uninstall` (and `cloudflared tunnel delete cloudiator-mini` plus the DNS record if you want the tunnel gone), `.venv/bin/python -m app.dbtool revoke-key <public_id>` for any key you minted, and `git checkout -- apps/worker scripts`. The Phase A loopback worker keeps working untouched.
 
