@@ -52,13 +52,15 @@ SQLite outbox runs against a temporary file, never `~/Cloudiator/queue.db`.
 
 ```bash
 cd apps/worker
-set -a && source ~/Cloudiator/.env && set +a
-
 .venv/bin/python -m app.dbtool verify-schema
 .venv/bin/python -m app.dbtool mint-key \
   --tenant cloudiator --name 'Salesforce dev' --preset salesforce_engineer
 .venv/bin/python -m app.dbtool revoke-key <public_id>
 ```
+
+The CLI reads `~/Cloudiator/.env` itself (override with `CLOUDIATOR_ENV_FILE`)
+for anything the shell has not already set, so there is nothing to source first.
+The LaunchAgent wrapper is the only other reader of that file.
 
 The plaintext key is printed **once**; Neon stores an argon2id hash. Revoking
 takes up to the 60s key-cache TTL to bite, or `POST /v1/admin/cache/flush` to
