@@ -81,7 +81,7 @@ Skip: **All managed rules**, **Super Bot Fight Mode**, **Rate limiting rules**, 
 - [x] Access application on `app.cloudiator.org` — policy: allow email `ashrafrmattar@gmail.com`
 - [x] Access application on `api.cloudiator.org/v1/admin*` — same allow email
 - [x] Application **AUD tag** (needed by the worker to verify the JWT): stored in password manager — use the **api** app AUD as `CF_ACCESS_AUD`
-- [ ] Verified: an incognito window on `app.cloudiator.org` is challenged by Access, not by a password form. (Needs Phase C + DNS.)
+- [ ] Verified: an incognito window on `app.cloudiator.org` is challenged by Access, not by a password form. (Logged-in dashboard works; incognito not checked as of 2026-09-20 stop.)
 
 There is **no shared admin password** in v1. The dashboard has no login screen of its own.
 
@@ -109,8 +109,8 @@ There is **no shared admin password** in v1. The dashboard has no login screen o
 | --- | --- | --- |
 | Team / site name | Cloudastick / `cloudiator` | [x] |
 | Site URL | `https://cloudiator.netlify.app` | [x] |
-| Custom domain `app.<domain>` attached | CNAME `app` → `cloudiator.netlify.app` (proxied), then add domain in Netlify | [ ] |
-| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env (password manager) | [ ] |
+| Custom domain `app.<domain>` attached | CNAME `app` → `cloudiator.netlify.app` (proxied); `https://app.cloudiator.org` live 2026-09-20 | [x] |
+| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env (password manager); dashboard mint works | [x] |
 | Env `PUBLIC_API_URL` = `https://api.<domain>` | `https://api.cloudiator.org` | [x] |
 | Env `ADMIN_SESSION_SECRET` set | Netlify site env; copy into the password manager | [x] |
 
@@ -229,7 +229,7 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ## 11. Sign-off before Phase B starts
 
-Laptop cloud (2026-09-20): domain, Neon schema, WAF Skip, Access apps. Phase A is on `main`. Still open: §4 Netlify (Phase C), §5 Nominatim policy read, tunnel + key auth (Mini Phase B).
+Laptop + Mini (2026-09-20 stop): Phase C dashboard playground proven, then many keys revoked. Leftover Phase C checks and the live status are in [next-steps.md](next-steps.md). Do not start Phase D from a stale copy of this section.
 
 - [x] Sections 1–3 public rows filled. Secrets stay in the password manager, not this file.
 - [ ] Section 6 has exactly one option ticked. (Mini)
@@ -245,8 +245,6 @@ Operator: Ashraf / laptop cloud  Date: 2026-09-20
 
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
-1. **This laptop:** `git push` (if this commit is not on GitHub yet).
-2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`. Paste the block in [next-steps.md](next-steps.md) **Copy-paste into the Mini Agent chat**.
-3. Mini `.env`: pooled `DATABASE_URL`, `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` (api app), `CF_ACCESS_TEAM_DOMAIN`, Nominatim UA. `chmod 600`, outside git.
-4. Named tunnel `cloudiator-mini` → `127.0.0.1:8080` only. Prove from a **phone on cellular**.
-5. **Later:** Netlify (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
+1. Read [next-steps.md](next-steps.md) (stop recorded 2026-09-20: playground proven, keys revoked, leftover checks open).
+2. Phases A/B are live. Phase C dashboard playground is proven; leftover C checks are listed in next-steps. Phase D is a **new** Mini chat when those are done or explicitly skipped.
+3. Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker. Do not put inference in Netlify.

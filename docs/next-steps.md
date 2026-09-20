@@ -1,33 +1,64 @@
-# Next steps — after Phase C deploy (2026-09-20)
+# Next steps — stop recorded 2026-09-20 ~22:09 UTC
 
-Phase C code is on this MacBook branch. Inference still stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions.
+Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not put secrets in this file.
 
-Secrets stay in the password manager, not this file.
+**Last thing actually done:** dashboard playground chat from `https://app.cloudiator.org` → `https://api.cloudiator.org` returned Arabic (Salesforce sentence). Mini OPTIONS preflight is **204** with `access-control-allow-origin: https://app.cloudiator.org`. The operator then **revoked many keys** and stopped. The leftover Phase C checks below were **not** done.
 
-## Done on the MacBook
+Do not start Phase D until those leftover checks are green, or until the operator explicitly skips them.
 
-- `apps/dashboard` Vite React, no login form, no Netlify Identity, no shared password.
-- Netlify site `cloudiator`: https://cloudiator.netlify.app
-- `PUBLIC_API_URL` and `ADMIN_SESSION_SECRET` are in the Netlify site env. Copy the secret into the password manager from the Netlify UI (rotate it if a CLI log printed it).
-- `npm test` in `apps/dashboard`: build, `grep -r neon.tech dist/` finds nothing.
+## Where the code is
 
-## You, before the dashboard can mint keys
+- Branch: `cursor/cloud-agent-1789940810344-piopm` (PR https://github.com/AshrafRezk/cldM4/pull/9). There is **no** `cursor/phase-c-netlify-dashboard` on GitHub.
+- Mini (`~/cldM4`) is on that branch, worker restarted after checkout. **Not** back on `main`.
+- Dashboard is live on Netlify Drop at `https://app.cloudiator.org` (site `cloudiator`). Last deploy from Netlify Drop / CLI `--no-build`; the Netlify UI has **no Trigger deploy** until the site is Git-linked.
 
-1. **Netlify site env:** add pooled `DATABASE_URL` (`-pooler` in the host). Server functions only.
-2. **Custom domain:** Cloudflare DNS CNAME `app` → `cloudiator.netlify.app`, **proxied**. Then Netlify → Domain management → Add `app.cloudiator.org`. Access is already on that hostname.
-3. **Disable the `*.netlify.app` default domain** once `app.cloudiator.org` works. Naked `cloudiator.netlify.app` is not behind Access; an attacker can send `Cf-Access-Authenticated-User-Email` themselves.
-4. **Mini:** `git pull` this branch (or `main` after merge) and restart the worker. Phase C adds CORS for `https://app.cloudiator.org` so the playground can call the API from the browser.
+## Proven
 
-## Prove it
+- Cloudflare Access is on `app.cloudiator.org` (operator logged in as `ashrafrmattar@gmail.com`). Not re-checked in incognito.
+- Pooled Neon `DATABASE_URL` is in Netlify site env (server-side). Dashboard mint/list/revoke works.
+- Tenant `cloudiator` visible in the UI.
+- CORS on the Mini worker: `OPTIONS /v1/chat/completions` from origin `https://app.cloudiator.org` → 204.
+- One playground chat succeeded (Arabic, Salesforce prompt) with a Salesforce-engineer key, then that key and several others were revoked.
 
-- Incognito on `https://app.cloudiator.org` is challenged by **Cloudflare Access**, not a password form.
-- Mint a Salesforce-engineer key, copy it once, chat from the playground, refresh usage.
-- The Apex snippet on screen contains `setTimeout(120000)` and `"stream": false`.
+## Keys (2026-09-20)
 
-## Later
+All of these dashboard rows showed **revoked** after the playground proof. `public_id` only (never store the secret here):
+
+| Name | public_id | Notes |
+| --- | --- | --- |
+| Salesforce org | `3id2agzqwmg7` | Playground success, then revoked (also appeared in a screenshot) |
+| Salesforce org | `fcq3567r7dih` | revoked |
+| Salesforce org | `rzo7uuany4qu` | revoked |
+| Salesforce org | `qdej5o4oerhw` | revoked |
+| Salesforce org | `nhdbs2bmbcdh` | revoked (earlier screenshot leak) |
+| Phase B smoke | `97ktd26abuzf` | revoked |
+| Phase B smoke | `o4ig8h9ncxhn` | revoked |
+| Phase B smoke | `fk5r7c2naido` | revoked |
+
+Worker key cache can take **up to 60s** to honour revoke. Mint a **new** key before the next playground or `curl` test. Do not paste full `sk-cld-…` secrets into chat or screenshots.
+
+## Not done (Phase C leftover)
+
+The operator did **not** do these after the playground reply:
+
+- [ ] Refresh the **usage** chart and confirm a `usage_daily` row for the playground chat.
+- [ ] Download **both** OpenAPI files (normal + Salesforce External Services).
+- [ ] Confirm the on-screen Apex snippet contains `setTimeout(120000)` and `"stream": false`.
+- [ ] Incognito window on `https://app.cloudiator.org` challenged by **Cloudflare Access**, not a password form.
+- [ ] Disable Netlify’s `*.netlify.app` default domain (`cloudiator.netlify.app` is not behind Access).
+- [ ] Merge PR #9 and `git checkout main && git pull` on the Mini.
+- [ ] Rotate `ADMIN_SESSION_SECRET` if a CLI log printed it; copy the current value into the password manager.
+
+## When you pick this up
+
+1. Mint a new Salesforce-engineer key (old ones above are dead). Copy it once.
+2. Finish the leftover checks, or skip them in writing and start Phase D anyway.
+3. Merge PR #9 when ready so the Mini is not stuck on the cloud-agent branch.
+
+## Later (not now)
 
 | When | What |
 | --- | --- |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage). |
-| Phase D | Tools, OCR, maps — Mini, Opus 5. |
-| Phase F | External Services import of `/tmp/cloudiator-oas.json` (already valid 3.0.3). |
+| Phase D | **New chat on the Mini**, Opus 5, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md`. Paste the Phase D block only (tools, OCR, maps). |
+| Phase F | External Services import of Salesforce OAS. |
