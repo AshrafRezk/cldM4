@@ -11,7 +11,8 @@ The operator of the Mini is responsible for complying with model and data licens
 | gpt-oss 20B | Apache 2.0 | https://ollama.com/library/gpt-oss |
 | nomic-embed-text | Apache 2.0 | https://ollama.com/library/nomic-embed-text |
 | Llama 3.2 3B | Llama community license | https://ollama.com/library/llama3.2 |
-| Whisper (OpenAI) | MIT | mlx-community weights on Hugging Face |
+| Whisper large-v3-turbo (Phase F, not pulled) | MIT | https://huggingface.co/mlx-community/whisper-large-v3-turbo |
+| Kokoro-82M (candidate speak model, not in v1) | Apache 2.0. English and eight other languages. No Arabic. | https://huggingface.co/hexgrad/Kokoro-82M |
 | Qwen3.5 9B (fallback only) | Check the Ollama/HF model card (often Apache 2.0) | https://ollama.com/library/qwen3.5 |
 
 Do not assume a fine-tune or GGUF requant inherits rights you have not read.
