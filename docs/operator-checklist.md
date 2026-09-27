@@ -241,12 +241,6 @@ Operator: Ashraf / laptop cloud  Date: 2026-09-20
 
 ---
 
-## 12. Next steps (after laptop cloud setup)
+## 12. Next steps
 
-Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
-
-1. **This laptop:** `git push` (if this commit is not on GitHub yet).
-2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`. Paste the block in [next-steps.md](next-steps.md) **Copy-paste into the Mini Agent chat**.
-3. Mini `.env`: pooled `DATABASE_URL`, `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` (api app), `CF_ACCESS_TEAM_DOMAIN`, Nominatim UA. `chmod 600`, outside git.
-4. Named tunnel `cloudiator-mini` → `127.0.0.1:8080` only. Prove from a **phone on cellular**.
-5. **Later:** Netlify (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
+Phases A–E are done. The finish list (swap reboot, usage row, Neon retention, Netlify hostname, Phase F, boot and alerting) is [next-steps.md](next-steps.md). Secrets stay in the password manager. Mini repo: `/Users/ashrafrezk/cldM4`.
