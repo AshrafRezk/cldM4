@@ -47,57 +47,59 @@ The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin
 | `POST /v1/tools/diagram` with `engine: mermaid` | `engine: graphviz`, signed PNG URL |
 | Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. `dot` is `/opt/homebrew/bin/dot`. |
 
-## Next
+## Phase E happy path (Mini, 2026-09-27)
 
-Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://github.com/AshrafRezk/cldM4/pull/12), then [#13](https://github.com/AshrafRezk/cldM4/pull/13), in that order, when `main` should match the Mini.
+`Idempotency-Key: test-2` created job `dcbfbc7dc5af4e7e91967a7e5c057496` (202). It reached `succeeded` with artifact `8034c949723d4c1caca9c7838abfbb06`. `ollama ps` afterward was Gemma 5.4 GB and `nomic-embed-text` 370 MB, one generative model. Swap used went from 1707.88 MB to 1699.88 MB, so this generate did not add swap. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
 
-Phase E warmup is recorded in [operator-checklist.md](operator-checklist.md) section 9. Production generates pass `--low-ram` and `--model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell`. The worker does that itself. 8-bit stays off. `gpt-oss:20b` stays unpulled.
+## Next: crash drill
 
-After the warmup the worker came back `idle_hot_9b` with Gemma (5.4 GB) and `nomic-embed-text` (370 MB). `ok` is false because `degraded` is `swap_in_use` (~1900 MB left over from the 19.08 GB run). Pressure is `normal`, so jobs are allowed. A reboot clears the leftover swap. It is not required before the first job.
+`$KEY` has to be minted in this terminal. The drill starts a second image, kills `mflux-generate` once the job is `running`, waits 60s, then chats. Chat has to answer with no manual model reload. After that, a worker restart must still return that same job.
 
 ```bash
+cd /Users/ashrafrezk/cldM4/apps/worker
+KEY=$(.venv/bin/python -m app.dbtool mint-key --tenant cloudiator --name 'phase-e-crash' \
+  --preset creative \
+  | tee /dev/stderr | awk '/sk-cld-/{print $1; exit}')
 cd /Users/ashrafrezk/cldM4
-git fetch origin cursor/phase-e-flux-jobs-73f3
-git checkout cursor/phase-e-flux-jobs-73f3
-# MFLUX_MODEL_PATH defaults to ~/Cloudiator/models/flux-schnell-4bit.
-# MFLUX_LOW_RAM defaults to true. Add them to ~/Cloudiator/.env if you want them explicit.
+test -n "$KEY" || { echo 'key was not minted'; exit 1; }
+JOB_JSON=$(curl -sS http://127.0.0.1:8080/v1/jobs \
+  -H "Authorization: Bearer $KEY" \
+  -H 'Idempotency-Key: crash-1' -H 'content-type: application/json' \
+  -d '{"kind":"image","prompt":"a red bicycle"}')
+echo "$JOB_JSON"
+CRASH=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  STATUS=$(curl -sf http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+  echo "status $STATUS"
+  test "$STATUS" = "running" && break
+  sleep 2
+done
+pkill -9 -f mflux-generate || echo 'mflux was already gone'
+sleep 60
+curl -sS http://127.0.0.1:8080/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
+  -d '{"model":"gemma4:e4b-it-qat","messages":[{"role":"user","content":"Say hi in one word."}],"max_tokens":16,"stream":false}'
+echo
+ollama ps
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  STATUS=$(curl -sf http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+  echo "after-kill $STATUS"
+  test "$STATUS" = "failed" -o "$STATUS" = "succeeded" && break
+  sleep 5
+done
 launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
   curl -sf http://127.0.0.1:8080/v1/health && break
   sleep 2
 done
 echo
-cd apps/worker
-KEY=$(.venv/bin/python -m app.dbtool mint-key --tenant cloudiator --name 'phase-e' \
-  --preset creative \
-  | tee /dev/stderr | awk '/sk-cld-/{print $1; exit}')
-cd ../..
-JOB_JSON=$(curl -sS -D /tmp/job.hdr -o - http://127.0.0.1:8080/v1/jobs \
-  -H "Authorization: Bearer $KEY" \
-  -H 'Idempotency-Key: test-2' -H 'content-type: application/json' \
-  -d '{"kind":"image","prompt":"a red bicycle"}')
-echo "$JOB_JSON"
-head -n 1 /tmp/job.hdr
-JOB=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-echo "job $JOB"
-curl -sS -D /tmp/job2.hdr -o /tmp/job2.json http://127.0.0.1:8080/v1/jobs \
-  -H "Authorization: Bearer $KEY" \
-  -H 'Idempotency-Key: test-2' -H 'content-type: application/json' \
-  -d '{"kind":"image","prompt":"a red bicycle"}'
-head -n 1 /tmp/job2.hdr
-cat /tmp/job2.json
+curl -sS http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY"
 echo
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
-  curl -sS http://127.0.0.1:8080/v1/jobs/$JOB -H "Authorization: Bearer $KEY"
-  echo
-  curl -sf http://127.0.0.1:8080/v1/jobs/$JOB -H "Authorization: Bearer $KEY" | grep -q '"status":"succeeded"' && break
-  sleep 10
-done
-ollama ps
-sysctl vm.swapusage
 ```
 
-The first Mini job `5cccebb6053642da8f7506373c93f984` was 202, and the replay was 200 with that same id. mflux finished 4/4 and Gemma was reloaded. The job was marked failed because the worker created the output file first; mflux will not overwrite, so it saved `image_1.png` and the worker read the empty file. That is fixed. `Idempotency-Key: test-1` still returns the failed job for 24h. The retry uses `test-2`.
+The chat JSON has to contain a one-word reply. `ollama ps` has to show Gemma. After the restart, `$CRASH` has to still be `failed` (or `succeeded` if the kill missed it), not `queued`. This key cannot see the earlier succeeded job; that row belongs to the key minted in the previous terminal.
 
 ## Remaining
 
@@ -106,5 +108,5 @@ The first Mini job `5cccebb6053642da8f7506373c93f984` was 202, and the replay wa
 | When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Now | Phase E checkout and the job curls above. Do not `pkill` mflux until the first job succeeds | Mini |
+| Now | Crash drill: kill `mflux-generate` mid-job, then chat within 60s, then restart and read the succeeded job | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
