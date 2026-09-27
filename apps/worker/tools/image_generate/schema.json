@@ -1,0 +1,11 @@
+{
+  "name": "flux_generate",
+  "description": "Generate an image with local FLUX schnell. Runs as a job, never inside a sync chat turn.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "prompt": {"type": "string", "description": "What to draw."}
+    },
+    "required": ["prompt"]
+  }
+}

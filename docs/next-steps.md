@@ -1,6 +1,6 @@
-# Next steps — Phase D3 proven (2026-09-27)
+# Next steps — Phase E jobs (2026-09-27)
 
-**Phases A–D3 are proven on the Mini.** Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Phase D3 is [PR #13](https://github.com/AshrafRezk/cldM4/pull/13). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Phase E starts with a human disk check and an offline FLUX warmup. Do not `ollama pull gpt-oss:20b` until that warmup is recorded.
+**Phases A–D3 are proven on the Mini.** Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Phase D3 is [PR #13](https://github.com/AshrafRezk/cldM4/pull/13). Phase E is this branch. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -51,22 +51,53 @@ The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin
 
 Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://github.com/AshrafRezk/cldM4/pull/12), then [#13](https://github.com/AshrafRezk/cldM4/pull/13), in that order, when `main` should match the Mini.
 
-Phase E warmup is recorded in [operator-checklist.md](operator-checklist.md) section 9. Production generates pass `--low-ram` and `--model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell`. 8-bit stays off. `gpt-oss:20b` stays unpulled. The 19.08 GB run swapped; the 8.43 GB `--low-ram` run did not add swap.
+Phase E warmup is recorded in [operator-checklist.md](operator-checklist.md) section 9. Production generates pass `--low-ram` and `--model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell`. The worker does that itself. 8-bit stays off. `gpt-oss:20b` stays unpulled.
 
-Phase E warmup is measured. Production generates use `--low-ram` and the local 4-bit directory. `ollama ps` was empty before the good run. Peak MLX memory was 8.43 GB, `real` was 1:56.11, and swap used moved from 2012.19 MB to 1996.19 MB. `/tmp/test-lowram.png` is 1.2 MB. 8-bit stays off. `gpt-oss:20b` stays unpulled.
-
-The worker was started again at the end of that script, with both models unloaded. Confirm it re-warmed Gemma and the embedder:
+After the warmup the worker came back `idle_hot_9b` with Gemma (5.4 GB) and `nomic-embed-text` (370 MB). `ok` is false because `degraded` is `swap_in_use` (~1900 MB left over from the 19.08 GB run). Pressure is `normal`, so jobs are allowed. A reboot clears the leftover swap. It is not required before the first job.
 
 ```bash
+cd /Users/ashrafrezk/cldM4
+git fetch origin cursor/phase-e-flux-jobs-73f3
+git checkout cursor/phase-e-flux-jobs-73f3
+# MFLUX_MODEL_PATH defaults to ~/Cloudiator/models/flux-schnell-4bit.
+# MFLUX_LOW_RAM defaults to true. Add them to ~/Cloudiator/.env if you want them explicit.
+launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
   curl -sf http://127.0.0.1:8080/v1/health && break
   sleep 2
 done
 echo
+cd apps/worker
+KEY=$(.venv/bin/python -m app.dbtool mint-key --tenant cloudiator --name 'phase-e' \
+  --preset creative \
+  | tee /dev/stderr | awk '/sk-cld-/{print $1; exit}')
+cd ../..
+JOB_JSON=$(curl -sS -D /tmp/job.hdr -o - http://127.0.0.1:8080/v1/jobs \
+  -H "Authorization: Bearer $KEY" \
+  -H 'Idempotency-Key: test-1' -H 'content-type: application/json' \
+  -d '{"kind":"image","prompt":"a red bicycle"}')
+echo "$JOB_JSON"
+head -n 1 /tmp/job.hdr
+JOB=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+echo "job $JOB"
+curl -sS -D /tmp/job2.hdr -o /tmp/job2.json http://127.0.0.1:8080/v1/jobs \
+  -H "Authorization: Bearer $KEY" \
+  -H 'Idempotency-Key: test-1' -H 'content-type: application/json' \
+  -d '{"kind":"image","prompt":"a red bicycle"}'
+head -n 1 /tmp/job2.hdr
+cat /tmp/job2.json
+echo
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
+  curl -sS http://127.0.0.1:8080/v1/jobs/$JOB -H "Authorization: Bearer $KEY"
+  echo
+  curl -sf http://127.0.0.1:8080/v1/jobs/$JOB -H "Authorization: Bearer $KEY" | grep -q '"status":"succeeded"' && break
+  sleep 10
+done
 ollama ps
+sysctl vm.swapusage
 ```
 
-Expect `idle_hot_9b` and both `gemma4:e4b-it-qat` and `nomic-embed-text` in `ollama ps`. Job-queue code comes after that health check. Every generate passes `--low-ram` and `--model` pointed at `~/Cloudiator/models/flux-schnell-4bit`.
+The first POST is 202. The second is 200 with the same id. When the job succeeds, `ollama ps` shows Gemma again and one generative model. Swap used should not climb. The crash drill (`pkill -9 -f mflux` during a second job, then a chat within 60s) comes after this happy path.
 
 ## Remaining
 
@@ -75,5 +106,5 @@ Expect `idle_hot_9b` and both `gemma4:e4b-it-qat` and `nomic-embed-text` in `oll
 | When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Phase E, after the health check above | Exclusive-slot image jobs. Every generate uses `--low-ram` and the local 4-bit path. No `gpt-oss:20b` | Mini |
+| Now | Phase E checkout and the job curls above. Do not `pkill` mflux until the first job succeeds | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
