@@ -203,12 +203,12 @@ The RAM table in `PLAN.md` §4 is an estimate. Replace it with what your machine
 | Gemma cold load time | Phase A | ______ s |
 | TTFT first chat (new prefix) | Phase A curl | ______ s |
 | TTFT second chat (same system+tools prefix) | Phase A curl | ______ s — should be lower |
-| Peak memory during FLUX 4-bit 1024² | `mflux-generate` Peak MLX memory, 2026-09-27, no `--low-ram` | 19.08 GB |
+| Peak memory during FLUX 4-bit 1024² | `--low-ram`, models unloaded, 2026-09-27 | 8.43 GB MLX. The same prompt without `--low-ram` peaked at 19.08 GB |
 | Peak memory during FLUX 8-bit 1024² (only if you enable it) | | not run |
-| FLUX 1024² wall clock | `time` on that same run | 1:58.76 (`real`) |
-| Swap used at peak (**must stay 0**) | `sysctl vm.swapusage` after that run | used = 3059.31M |
+| FLUX 1024² wall clock | `time` on the `--low-ram` run | 1:56.11 (`real`). Without `--low-ram`: 1:58.76 |
+| Swap used at peak (**must stay 0**) | `sysctl vm.swapusage` around the `--low-ram` run | used 2012.19M before, 1996.19M after. The earlier 19.08 GB run had raised used to 3059.31M. This run did not add swap |
 
-The 4-bit 1024² run wrote `/tmp/test.png` (2.3 MB) and then showed 3059 MB of swap. That run is not the production setting. Retry with `--low-ram` before any job code. Do not run 8-bit. Do not pull `gpt-oss:20b`.
+Production FLUX on this Mini is 4-bit schnell at 1024² with `--low-ram` (`--model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell`). That run peaked at 8.43 GB and did not add swap. The run without `--low-ram` peaked at 19.08 GB and left swap in use. Do not run 8-bit. Do not pull `gpt-oss:20b`. Leftover swap from the first run clears on reboot.
 
 ---
 

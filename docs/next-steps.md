@@ -51,32 +51,22 @@ The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin
 
 Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://github.com/AshrafRezk/cldM4/pull/12), then [#13](https://github.com/AshrafRezk/cldM4/pull/13), in that order, when `main` should match the Mini.
 
-Phase E is the following phase. Its first step is a human warmup in Terminal, not a worker change and not an `ollama pull`. Record peak memory and wall clock in [operator-checklist.md](operator-checklist.md) section 9 before any job-queue code. Skip `gpt-oss:20b` unless `df -h /` still shows comfortable headroom after the 4-bit weights are on disk. 4-bit is the default. Do not quantize to 8-bit in the same sitting.
+Phase E warmup is recorded in [operator-checklist.md](operator-checklist.md) section 9. Production generates pass `--low-ram` and `--model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell`. 8-bit stays off. `gpt-oss:20b` stays unpulled. The 19.08 GB run swapped; the 8.43 GB `--low-ram` run did not add swap.
 
-The weights are on disk (9.0 GB) and the first 1024² generate succeeded: `/tmp/test.png` is 2.3 MB, 4 steps, `real` 1:58.76, peak MLX memory 19.08 GB. Swap after that run was `used = 3059.31M`. A 24 GB Mini cannot take that as the production path. The retry adds `--low-ram`, which releases the text encoders and the transformer after use and caps the MLX cache. Print swap before and after. macOS will not return the 3 GB already swapped until a reboot, so the number that matters is whether `used` stays at 3059 MB or climbs. 8-bit stays off. `gpt-oss:20b` stays unpulled.
+Phase E warmup is measured. Production generates use `--low-ram` and the local 4-bit directory. `ollama ps` was empty before the good run. Peak MLX memory was 8.43 GB, `real` was 1:56.11, and swap used moved from 2012.19 MB to 1996.19 MB. `/tmp/test-lowram.png` is 1.2 MB. 8-bit stays off. `gpt-oss:20b` stays unpulled.
+
+The worker was started again at the end of that script, with both models unloaded. Confirm it re-warmed Gemma and the embedder:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
-launchctl bootout "gui/$(id -u)/ai.cloudiator.worker" || true
-ollama stop gemma4:e4b-it-qat || true
-ollama stop nomic-embed-text || true
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  curl -sf http://127.0.0.1:8080/v1/health && break
+  sleep 2
+done
+echo
 ollama ps
-echo '--- swap before ---'
-sysctl vm.swapusage
-time mflux-generate \
-  --model "$HOME/Cloudiator/models/flux-schnell-4bit" \
-  --base-model schnell \
-  --low-ram \
-  --steps 4 --height 1024 --width 1024 \
-  --prompt "a red bicycle" --output /tmp/test-lowram.png
-echo '--- swap after ---'
-sysctl vm.swapusage
-ls -lh /tmp/test-lowram.png
-launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist"
-launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 ```
 
-Paste `ollama ps`, both swap lines, the `Peak MLX memory` line, and the `real` time.
+Expect `idle_hot_9b` and both `gemma4:e4b-it-qat` and `nomic-embed-text` in `ollama ps`. Job-queue code comes after that health check. Every generate passes `--low-ram` and `--model` pointed at `~/Cloudiator/models/flux-schnell-4bit`.
 
 ## Remaining
 
@@ -85,5 +75,5 @@ Paste `ollama ps`, both swap lines, the `Peak MLX memory` line, and the `real` t
 | When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Phase E, after the warmup above is recorded | Exclusive-slot image jobs. `gpt-oss:20b` only if disk still allows | Mini |
+| Phase E, after the health check above | Exclusive-slot image jobs. Every generate uses `--low-ram` and the local 4-bit path. No `gpt-oss:20b` | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
