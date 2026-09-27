@@ -1,6 +1,6 @@
-# Next steps — Phase D3 on the Mini (2026-09-27)
+# Next steps — Phase D3 proven (2026-09-27)
 
-**Phases A–D2 are proven on the Mini.** Phase D3 (image ops, documents, diagrams) is this branch, `cursor/phase-d3-image-docs-diagrams-73f3`. It is not on the Mini until that branch is checked out. Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX).
+**Phases A–D3 are proven on the Mini.** Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Phase D3 is [PR #13](https://github.com/AshrafRezk/cldM4/pull/13). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Phase E starts with a human disk check and an offline FLUX warmup. Do not `ollama pull gpt-oss:20b` until that warmup is recorded.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -37,49 +37,39 @@ The first `kickstart` returned before port 8080 was listening. After the worker 
 
 matplotlib, numpy, scipy, duckdb, and pyarrow are installed in the worker venv with `uv pip`.
 
-## Mini, now (Phase D3)
+## Phase D3 proof (Mini, 2026-09-27)
 
-`salesforce_engineer` already includes `tools.image_ops`, `tools.docs`, `tools.text`, and `tools.time`. Diagrams need `tools.diagrams` (the creative preset, or pass `--capabilities` ). Graphviz (`dot`) must be on the Mini; `scripts/mac-setup.sh` installs it, and `brew install graphviz` is enough if `dot` is missing. Do not run `mac-setup` again just for that.
+The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin/dot`; the LaunchAgent PATH did not. The renderer now checks that path. After `git pull` and `kickstart`, health stayed `idle_hot_9b` with 388.4 GB free.
 
-The first Mini run converted `001D000000IRt53` to `001D000000IRt53IAD`. The diagram call returned `not_supported` because launchd's PATH is `/usr/bin:/bin:/usr/sbin:/sbin`, so the worker could not see `/opt/homebrew/bin/dot` even though Terminal could. The handler now checks that path (and `/usr/local/bin/dot`) itself. Pull and kickstart; do not reinstall the LaunchAgent.
+| Check | Result |
+| --- | --- |
+| `POST /v1/tools/text` `sf_id` `001D000000IRt53` | `001D000000IRt53IAD` |
+| `POST /v1/tools/diagram` with `engine: mermaid` | `engine: graphviz`, signed PNG URL |
+| Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. `dot` is `/opt/homebrew/bin/dot`. |
 
-Wait for `/v1/health` after `kickstart`. The last restart returned before port 8080 was open.
+## Next
 
-```bash
-cd /Users/ashrafrezk/cldM4
-git fetch origin cursor/phase-d3-image-docs-diagrams-73f3
-git checkout cursor/phase-d3-image-docs-diagrams-73f3
-git pull --ff-only
-command -v dot >/dev/null || brew install graphviz
-launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-  curl -sf http://127.0.0.1:8080/v1/health && break
-  sleep 1
-done
-echo
-```
+Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://github.com/AshrafRezk/cldM4/pull/12), then [#13](https://github.com/AshrafRezk/cldM4/pull/13), in that order, when `main` should match the Mini.
 
-Then, with `KEY` set to a `salesforce_engineer` key and `DIAGRAM_KEY` set to a key that has `tools.diagrams`:
+Phase E is the following phase. Its first step is a human warmup in Terminal, not a worker change and not an `ollama pull`. Record peak memory and wall clock in [operator-checklist.md](operator-checklist.md) section 9 before any job-queue code. Skip `gpt-oss:20b` unless `df -h /` still shows comfortable headroom after the 4-bit weights are on disk. 4-bit is the default. Do not quantize to 8-bit in the same sitting.
 
 ```bash
-curl -sS http://127.0.0.1:8080/v1/tools/text -H "Authorization: Bearer $KEY" \
-  -H 'content-type: application/json' \
-  -d '{"action":"sf_id","id":"001D000000IRt53"}'
-
-curl -sS http://127.0.0.1:8080/v1/tools/diagram -H "Authorization: Bearer $DIAGRAM_KEY" \
-  -H 'content-type: application/json' \
-  -d '{"source":"digraph { apples -> pears }","engine":"mermaid"}'
+df -h /
+uv tool install --upgrade mflux
+# pre-quantized 4-bit weights, or:
+# mflux-save --model schnell --quantize 4 --path ~/Cloudiator/models/flux-schnell-4bit
+time mflux-generate --path ~/Cloudiator/models/flux-schnell-4bit \
+  --steps 4 --height 1024 --width 1024 \
+  --prompt "a red bicycle" --output /tmp/test.png
+sysctl vm.swapusage
 ```
-
-Expect `id18` of `001D000000IRt53IAD`, and a diagram `engine` of `graphviz` (mermaid is off) whose `url` opens as a PNG. `ollama ps` stays on the hot model and the embedder.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| Now | The Phase D3 checkout and the two curls above | Mini |
-| When you want `main` to match the Mini | Merge PR #11, then #12, then this branch | GitHub, then Mini |
+| When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Phase E | FLUX jobs, and `gpt-oss:20b` only after a disk check | Mini |
+| Phase E, after the warmup above is recorded | Exclusive-slot image jobs. `gpt-oss:20b` only if disk still allows | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
