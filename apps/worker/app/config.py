@@ -183,6 +183,25 @@ class Settings:
     cf_access_aud: str | None = field(default_factory=lambda: _opt("CF_ACCESS_AUD"))
     admin_token: str | None = field(default_factory=lambda: _opt("ADMIN_TOKEN"))
 
+    # Phase D3. Graphviz is the diagram renderer. mermaid-cli is a Chromium
+    # process and stays off unless this is explicitly true.
+    enable_mermaid: bool = field(
+        default_factory=lambda: _str("ENABLE_MERMAID", "false").lower() in ("1", "true", "yes")
+    )
+
+    # Phase E. Always passed on the mflux command line. A request must never
+    # resolve weights from the network. --low-ram is the measured 24 GB setting:
+    # without it a 1024² generate peaked at 19 GB and used swap.
+    mflux_model_path: str = field(
+        default_factory=lambda: _str(
+            "MFLUX_MODEL_PATH",
+            os.path.expanduser("~/Cloudiator/models/flux-schnell-4bit"),
+        )
+    )
+    mflux_low_ram: bool = field(
+        default_factory=lambda: _str("MFLUX_LOW_RAM", "true").lower() in ("1", "true", "yes")
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

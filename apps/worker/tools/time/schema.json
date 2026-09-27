@@ -1,0 +1,12 @@
+{
+  "name": "holiday_on",
+  "description": "Say whether a date is a public holiday in a country. Do not guess the holiday name.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "country": {"type": "string", "description": "ISO country code, such as US or EG."},
+      "date": {"type": "string", "description": "YYYY-MM-DD."}
+    },
+    "required": ["country", "date"]
+  }
+}

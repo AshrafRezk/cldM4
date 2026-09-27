@@ -1,0 +1,44 @@
+{
+  "x-cloudiator-scope": ["tools.time"],
+  "paths": {
+    "/v1/tools/time": {
+      "post": {
+        "operationId": "toolsTimePost",
+        "summary": "Look up a public holiday",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "country": {"type": "string"},
+                  "date": {"type": "string"}
+                },
+                "required": ["country", "date"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Holiday lookup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "country": {"type": "string"},
+                    "date": {"type": "string"},
+                    "holiday": {"type": "string"},
+                    "is_holiday": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

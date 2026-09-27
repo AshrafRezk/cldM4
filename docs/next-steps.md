@@ -1,6 +1,6 @@
-# Next steps — Phase D proven on the Mini (2026-09-27)
+# Next steps — Phase E proven (2026-09-27)
 
-**Phases A, B, C, and D are done on the Mini.** The worker is on `cursor/phase-d-tools-ocr-maps-73f3`, health is `idle_hot_9b` (`gemma4:e4b-it-qat` + `nomic-embed-text`, swap 0), and playground CORS allows `https://app.cloudiator.org`. Phase D is not on `main` until [PR #11](https://github.com/AshrafRezk/cldM4/pull/11) is merged. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX) yet. The next build phase in [cursor-phases.md](cursor-phases.md) is Phase D2 (charts, stats, DuckDB).
+**Phases A–E are proven on the Mini, and this commit puts D2–E on `main`.** #11 was squash-merged, so #12–#14 landed on their parent branches and not on `main`. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -25,26 +25,55 @@ Secrets stay in the password manager, not this file. Checklist: [operator-checkl
 
 `ocrmac` is installed in the worker venv (`uv pip`, not a `pip` binary). OCR passes a PIL image. `ARTIFACT_SIGNING_SECRET` is in `~/Cloudiator/.env`.
 
-## Now
+## Phase D2 proof (Mini, 2026-09-27)
 
-The two keys minted in that terminal were printed into this chat. Revoke them, then mint the real one from the console and leave the secret in the password manager.
+The first `kickstart` returned before port 8080 was listening. After the worker logged `Application startup complete`, health stayed `idle_hot_9b`.
+
+| Check | Result |
+| --- | --- |
+| `POST /v1/tools/query` fruit CSV, `SUM` by kind | `apples/5`, `pears/4`, `truncated: false` |
+| `POST /v1/tools/chart` | `engine: matplotlib`, signed PNG URL on `https://api.cloudiator.org/artifacts/...` |
+| Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. |
+
+matplotlib, numpy, scipy, duckdb, and pyarrow are installed in the worker venv with `uv pip`.
+
+## Phase D3 proof (Mini, 2026-09-27)
+
+The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin/dot`; the LaunchAgent PATH did not. The renderer now checks that path. After `git pull` and `kickstart`, health stayed `idle_hot_9b` with 388.4 GB free.
+
+| Check | Result |
+| --- | --- |
+| `POST /v1/tools/text` `sf_id` `001D000000IRt53` | `001D000000IRt53IAD` |
+| `POST /v1/tools/diagram` with `engine: mermaid` | `engine: graphviz`, signed PNG URL |
+| Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. `dot` is `/opt/homebrew/bin/dot`. |
+
+## Phase E happy path (Mini, 2026-09-27)
+
+`Idempotency-Key: test-2` created job `dcbfbc7dc5af4e7e91967a7e5c057496` (202). It reached `succeeded` with artifact `8034c949723d4c1caca9c7838abfbb06`. `ollama ps` afterward was Gemma 5.4 GB and `nomic-embed-text` 370 MB, one generative model. Swap used went from 1707.88 MB to 1699.88 MB, so this generate did not add swap. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
+
+## Phase E crash drill (Mini, 2026-09-27)
+
+Job `1bf553e4641a47f29159da6f307e2317` was `running` when `mflux-generate` was killed. After 60 seconds, chat on `gemma4:e4b-it-qat` returned `Hi.` with no manual reload. `ollama ps` showed Gemma 5.4 GB and `nomic-embed-text` 370 MB. The job was `failed`. After `kickstart`, health was `idle_hot_9b` and that same job was still `failed`. Swap used was 1683.88 MB, down from 1699.88 MB before the drill.
+
+Phase E is proven on the Mini. 8-bit stays off. `gpt-oss:20b` stays unpulled. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
+
+## Next
+
+On the Mini, from the repo root (the directory you are already in):
 
 ```bash
-cd /Users/ashrafrezk/cldM4/apps/worker
-.venv/bin/python -m app.dbtool revoke-key ziwnk5ba8uvw
-.venv/bin/python -m app.dbtool revoke-key 5rozejut8fkw
+git checkout main
+git pull origin main
+launchctl kickstart -k gui/$UID/ai.cloudiator.worker
 ```
 
-Mint the replacement at https://app.cloudiator.org/console (preset `salesforce_engineer`). Do not paste the secret back into chat.
+Do that only after this landing commit is on `main`. The worker venv already has the Phase D–E packages from the earlier branch. Phase F is the External Services import. It waits until you ask for it.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| Now | Revoke the two public ids above and mint a replacement in the console | Mini |
-| When you want `main` to match the Mini | Merge PR #11, then `git checkout main && git pull` and `scripts/install-launchagents.sh` | GitHub, then Mini |
+| After this commit is on `main` | Pull `main` and kickstart the worker | Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
-| This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| **Phase D2** | Charts, stats, DuckDB. Next build phase. No new model. | Repo, then Mini |
-| Phase E | FLUX jobs, and `gpt-oss:20b` only after D2/D3 and a disk check | Mini |
-| Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
+| This week | Schedule `infra/neon-retention.sql` (free-tier storage) and disable `cloudiator.netlify.app` | Neon + Netlify |
+| When you ask | Phase F: External Services import of Salesforce OAS 3.0.3 | Salesforce |
