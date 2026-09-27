@@ -13,10 +13,23 @@ import health from "./fragments/health.json" with { type: "json" };
 import jobs from "./fragments/jobs.json" with { type: "json" };
 import models from "./fragments/models.json" with { type: "json" };
 import openapi from "./fragments/openapi.json" with { type: "json" };
+import toolsMaps from "./fragments/tools-maps.json" with { type: "json" };
+import toolsOcr from "./fragments/tools-ocr.json" with { type: "json" };
 import usage from "./fragments/usage.json" with { type: "json" };
 import scopesJson from "./scopes.json" with { type: "json" };
 
-const FRAGMENTS = [chat, common, embeddings, health, jobs, models, openapi, usage];
+const FRAGMENTS = [
+  chat,
+  common,
+  embeddings,
+  health,
+  jobs,
+  models,
+  openapi,
+  toolsMaps,
+  toolsOcr,
+  usage,
+];
 const FORBIDDEN_COMPOSITION = ["oneOf", "anyOf", "allOf", "not"];
 const APEX_OPERATION_ID = /^[A-Za-z][A-Za-z0-9_]*$/;
 const SALESFORCE_MEDIA_TYPE = "application/json";

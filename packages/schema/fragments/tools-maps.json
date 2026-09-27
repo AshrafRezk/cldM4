@@ -1,0 +1,42 @@
+{
+  "x-cloudiator-scope": ["tools.maps"],
+  "paths": {
+    "/v1/tools/geocode": {
+      "post": {
+        "operationId": "toolsGeocodePost",
+        "summary": "Geocode a place name",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "q": {"type": "string"}
+                },
+                "required": ["q"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coordinates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {"type": "number"},
+                    "lon": {"type": "number"},
+                    "display_name": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

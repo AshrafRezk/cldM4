@@ -110,6 +110,35 @@ class Settings:
     vision_max_redirects: int = field(default_factory=lambda: _int("VISION_MAX_REDIRECTS", 2))
 
     artifact_dir: str = field(default_factory=lambda: _str("ARTIFACT_DIR", DEFAULT_ARTIFACT_DIR))
+    artifact_ttl_hours: float = field(default_factory=lambda: _float("ARTIFACT_TTL_HOURS", 24.0))
+    artifact_url_ttl_seconds: int = field(
+        default_factory=lambda: _int("ARTIFACT_URL_TTL_SECONDS", 900)
+    )
+    artifact_signing_secret: str | None = field(
+        default_factory=lambda: _opt("ARTIFACT_SIGNING_SECRET")
+    )
+    geocode_cache_db: str = field(
+        default_factory=lambda: _str(
+            "GEOCODE_CACHE_DB", os.path.expanduser("~/Cloudiator/geocode.db")
+        )
+    )
+    nominatim_url: str = field(
+        default_factory=lambda: _str("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
+    )
+    nominatim_user_agent: str = field(default_factory=lambda: _str("NOMINATIM_USER_AGENT", ""))
+    nominatim_max_rows: int = field(
+        default_factory=lambda: _int("NOMINATIM_MAX_ROWS_PER_REQUEST", 25)
+    )
+    overpass_urls: str = field(
+        default_factory=lambda: _str("OVERPASS_URLS", "https://overpass-api.de/api/interpreter")
+    )
+    osrm_url: str = field(
+        default_factory=lambda: _str("OSRM_URL", "https://router.project-osrm.org")
+    )
+    max_tool_iterations: int = field(default_factory=lambda: _int("MAX_TOOL_ITERATIONS", 8))
+    tool_loop_budget_seconds: float = field(
+        default_factory=lambda: _float("TOOL_LOOP_BUDGET_SECONDS", 75.0)
+    )
     min_free_disk_gb: float = field(default_factory=lambda: _float("MIN_FREE_DISK_GB", 10.0))
     hard_free_disk_gb: float = field(default_factory=lambda: _float("HARD_FREE_DISK_GB", 5.0))
     queue_db: str = field(default_factory=lambda: _str("QUEUE_DB", DEFAULT_QUEUE_DB))

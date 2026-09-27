@@ -3,7 +3,9 @@
 FastAPI worker for the Mac Mini M4 24GB appliance. Runs **only** on the Mini:
 arm64 macOS, Python 3.11, single process, bound to `127.0.0.1:8080`.
 
-See `PLAN.md` §§4, 6, 8, 10, 11, 12 and `docs/cursor-phases.md` Phases A and B.
+See `PLAN.md` §§4, 6, 8–12 and `docs/cursor-phases.md` Phases A–D.
+
+Phase D adds `POST /v1/tools/ocr`, `/v1/tools/geocode`, `/v1/tools/places`, and `/v1/tools/route`. FastAPI runs the tool loop (8 iterations, 75s). OCR uses Apple Vision on the Mini and does not load a model. Geocode caches Nominatim for 30 days and only rate-limits cache misses.
 
 ## Layout
 

@@ -1,0 +1,11 @@
+{
+  "name": "geocode",
+  "description": "Turn a place name into latitude and longitude. Do not invent coordinates.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "q": {"type": "string", "description": "Place or address, one location."}
+    },
+    "required": ["q"]
+  }
+}

@@ -27,6 +27,14 @@ os.environ.update(
         "HARD_FREE_DISK_GB": "0",
         "PUBLIC_BASE_URL": "https://api.cloudiator.test",
         "ARTIFACT_DIR": os.path.join(_TEST_STATE_DIR, "artifacts"),
+        "ARTIFACT_SIGNING_SECRET": "test-signing-secret-at-least-32-bytes",
+        "ARTIFACT_TTL_HOURS": "24",
+        "ARTIFACT_URL_TTL_SECONDS": "900",
+        "GEOCODE_CACHE_DB": os.path.join(_TEST_STATE_DIR, "geocode.db"),
+        "NOMINATIM_USER_AGENT": "Cloudiator/0.1 (test@example.com)",
+        "NOMINATIM_URL": "https://nominatim.test",
+        "OVERPASS_URLS": "https://overpass.test/interpreter",
+        "OSRM_URL": "https://osrm.test",
         # Never the operator's real ~/Cloudiator/queue.db.
         "QUEUE_DB": os.path.join(_TEST_STATE_DIR, "queue.db"),
     }

@@ -1,10 +1,9 @@
-"""Cloudiator worker — Phases A and B.
+"""Cloudiator worker — Phases A–D.
 
-Bound to 127.0.0.1:8080, single process, one Metal slot. The OpenAI-compatible
-surface here is chat, embeddings, and models; every route but `/v1/health` needs
-an `sk-cld-` key. Neon holds the keys and the usage history, and neither is
-allowed on the critical path of a chat: auth falls back to the 60s key cache and
-usage falls back to the SQLite outbox. The tool loop is Phase D.
+Bound to 127.0.0.1:8080, single process, one Metal slot. Chat, embeddings, and
+models are OpenAI-compatible. OCR and maps are library tools: FastAPI runs the
+tool loop, Ollama only proposes calls. Neon is never on the critical path of a
+chat.
 """
 
 from __future__ import annotations
@@ -22,6 +21,8 @@ from fastapi.responses import JSONResponse, Response
 
 from . import __version__
 from .admin import AccessVerifier, AdminGuard
+from .artifacts import ArtifactStore
+from .artifacts import janitor_loop as artifact_janitor_loop
 from .auth import (
     Authenticator,
     KeyCache,
@@ -39,10 +40,13 @@ from .db import DatabaseUnavailable, Neon, pooled_endpoint
 from .errors import CloudiatorError, mini_offline, model_not_found, not_supported
 from .gates import BootRefused, run_boot_gates
 from .logging_setup import configure_logging, scrub
+from .maps import MapsClient
 from .ollama import OllamaClient, normalize_tag
 from .openapi_filter import build_for_key, normalize_target
 from .scheduler import Scheduler
 from .ssrf import prepare_messages_for_ollama, validate_image_inputs
+from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
+from .tool_routes import register_tool_routes
 from .translation import (
     build_options,
     chat_response_to_openai,
@@ -90,6 +94,10 @@ rate_limiter = RateLimiter()
 outbox = UsageOutbox(settings, db)
 access = AccessVerifier(settings)
 admin_guard = AdminGuard(settings, access)
+artifacts = ArtifactStore(settings)
+maps_client = MapsClient(settings)
+tool_registry = load_registry()
+tool_runner = ToolRunner(settings, tool_registry, maps_client)
 
 
 class HealthLimiter:
@@ -146,11 +154,13 @@ async def lifespan(app: FastAPI):
     outbox.start()
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
+    artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")
     try:
         yield
     finally:
         warm.cancel()
         janitor.cancel()
+        artifact_janitor.cancel()
         await scheduler.stop()
         await outbox.stop()
         outbox.close()
@@ -399,35 +409,73 @@ async def chat_completions(
     # 512 tokens in a 4096 context whatever the request asked for.
     num_ctx = effective_context(key, resolve_num_ctx(settings))
     max_tokens = clamp_max_tokens(resolve_max_tokens(body, settings), key)
-    prompt_tokens = estimate_prompt_tokens(prepared, body.get("tools"))
+    tools = _chat_tools(body, key)
+    prompt_tokens = estimate_prompt_tokens(prepared, tools or None)
     enforce_context(prompt_tokens, max_tokens, num_ctx)
 
     options = build_options(body, num_ctx=num_ctx, max_tokens=max_tokens)
     response_format = (body.get("response_format") or {}).get("type")
 
-    async with scheduler.chat_slot():
-        remaining = settings.sync_deadline_seconds - (time.monotonic() - started)
-        if remaining <= 1:
-            raise _deadline_error()
-        try:
-            raw = await asyncio.wait_for(
-                ollama.chat(
-                    model,
-                    prepared,
-                    options=options,
-                    tools=body.get("tools"),
-                    response_format=response_format,
-                ),
-                timeout=remaining,
-            )
-        except asyncio.TimeoutError:
-            raise _deadline_error() from None
+    if tools:
+        payload, iterations = await run_tool_loop(
+            messages=prepared,
+            tools=tools,
+            model=model,
+            options=options,
+            response_format=response_format,
+            key=key,
+            prompt_tokens=prompt_tokens,
+            ollama=ollama,
+            scheduler=scheduler,
+            runner=tool_runner,
+            settings=settings,
+            started=started,
+        )
+    else:
+        async with scheduler.chat_slot():
+            remaining = settings.sync_deadline_seconds - (time.monotonic() - started)
+            if remaining <= 1:
+                raise _deadline_error()
+            try:
+                raw = await asyncio.wait_for(
+                    ollama.chat(
+                        model,
+                        prepared,
+                        options=options,
+                        tools=None,
+                        response_format=response_format,
+                    ),
+                    timeout=remaining,
+                )
+            except asyncio.TimeoutError:
+                raise _deadline_error() from None
+        payload = chat_response_to_openai(raw, model=model, estimated_prompt_tokens=prompt_tokens)
+        iterations = 0
 
-    payload = chat_response_to_openai(raw, model=model, estimated_prompt_tokens=prompt_tokens)
     usage = payload["usage"]
     request.state.usage.prompt_tokens = usage["prompt_tokens"]
     request.state.usage.completion_tokens = usage["completion_tokens"]
-    return JSONResponse(content=payload)
+    response = JSONResponse(content=payload)
+    response.headers["x-cloudiator-tool-iterations"] = str(iterations)
+    return response
+
+
+def _chat_tools(body: dict[str, Any], key: KeyRecord) -> list[dict[str, Any]]:
+    """Client tools if sent, otherwise the scoped defaults. Canonical key order."""
+    from .tool_loop import canonical_tools
+
+    supplied = body.get("tools")
+    if supplied is None:
+        return default_chat_tools(tool_registry, key)
+    if not isinstance(supplied, list) or not supplied:
+        return []
+    schemas = []
+    for tool in supplied:
+        if isinstance(tool, dict) and isinstance(tool.get("function"), dict):
+            schemas.append(tool["function"])
+        elif isinstance(tool, dict):
+            schemas.append(tool)
+    return canonical_tools(schemas)
 
 
 def _deadline_error() -> CloudiatorError:
@@ -608,4 +656,5 @@ def _register_unsupported_paths(application: FastAPI) -> None:
         )
 
 
+register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
 _register_unsupported_paths(app)
