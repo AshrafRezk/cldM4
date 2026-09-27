@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A and B (the worker, key auth, Neon, and the tunnel) are proven on the Mini at `https://api.cloudiator.org`. That is a private chat API, not a client-ready product. The dashboard, tools, jobs, image generation, Salesforce pack, and speech are still ahead. Start from [docs/next-steps.md](docs/next-steps.md).
+**This repository is the production plan and the product.** Phases A and B are on `main` at `https://api.cloudiator.org`. The dashboard is already live at `https://app.cloudiator.org` on [PR #9](https://github.com/AshrafRezk/cldM4/pull/9), which is not merged here. Do not rebuild it. Start from [docs/next-steps.md](docs/next-steps.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 

@@ -3,7 +3,7 @@
 **Product name:** Cloudiator (repo `cldM4`)  
 **Hardware:** Apple Mac Mini M4, 24GB unified memory  
 **Git:** https://github.com/AshrafRezk/cldM4.git  
-**Status (2026-09-27):** Phases A and B are proven on the Mini. Public API: `https://api.cloudiator.org`. What is running, and what still blocks a real client, is [docs/next-steps.md](docs/next-steps.md). Implement the rest on the Mini, one phase at a time.  
+**Status (2026-09-27):** Phases A and B are on `main`. Phase C (dashboard, key minting, usage, playground) is live at `https://app.cloudiator.org` on branch `cursor/cloud-agent-1789940810344-piopm` ([PR #9](https://github.com/AshrafRezk/cldM4/pull/9)), which is **not merged to `main`**. `main` alone looks like the dashboard was never built. Read [docs/next-steps.md](docs/next-steps.md) before starting a phase.  
 **Video:** out of v1.  
 **Speech:** no speak model. No listen endpoint. See §7.
 
@@ -33,26 +33,28 @@ Do **not** implement from a laptop and expect Metal/Vision/Ollama to be producti
 
 ### 0a. Where the appliance actually is
 
-Proven on the Mini, 2026-09-20, and present in this repo:
+`origin/main` is Phase B. The running dashboard is PR #9, and the Mini is checked out on that branch.
 
-- FastAPI on `127.0.0.1:8080`, one process: chat, embeddings, live `/v1/models`, health, metal lock, context guard, vision SSRF, explicit `keep_alive`.
-- `sk-cld-` keys in Neon (argon2id, 60s cache, per-key rpm), usage outbox, per-key OpenAPI including `?target=salesforce` (3.0.3), Cloudflare Access JWT on `/v1/admin*`.
-- Named tunnel `cloudiator-mini` → `https://api.cloudiator.org`. A real key returned chat JSON. A garbage key returned FastAPI JSON 401. Port 11434 is not on the tunnel.
-- Hot models named by the plan: `gemma4:e4b-it-qat` and `nomic-embed-text`. The measured RAM, tok/s, and swap rows in [docs/operator-checklist.md](docs/operator-checklist.md) §8–§9 are still blank.
+Proven:
 
-Not built, so a client cannot be handed this as the product in `§22`:
+- API `https://api.cloudiator.org`: chat, embeddings, models, health, `sk-cld-` keys, usage outbox, per-key OpenAPI.
+- Dashboard `https://app.cloudiator.org`: Cloudflare Access, mint / list / revoke, usage chart from `usage_daily`, OpenAPI download buttons, Apex snippet, browser playground. One playground chat returned Arabic on 2026-09-20. CORS preflight from that origin is 204.
+- Hot models named by the plan: `gemma4:e4b-it-qat` and `nomic-embed-text`. Checklist §8–§9 measurements are still blank.
 
-| Gap | Why a client feels it |
+Not done, so this is not the product in §22:
+
+| Gap | Why it matters |
 | --- | --- |
-| Phase C dashboard | Keys are minted over SSH with `dbtool`. No usage screen, no OpenAPI download, no revoke button. Netlify is blank in the checklist. |
-| Boot policy §6 and alerts §7 | A power cut or a dead worker is silent. The client discovers it. |
-| Neon retention | Free-tier storage fills; key minting starts failing. |
-| Phases D–D3 | No OCR, maps, charts, DuckDB, docs, or image ops. Chat is the only capability. |
-| Phase E jobs and FLUX | Errors already say `POST /v1/jobs`. That route does not exist. Image generation does not exist. |
-| Phase F Salesforce pack | External Services import and the Neon-down drill were postponed. `stream: true` is rejected for every key, including browser keys. |
+| PR #9 not merged | A fresh clone of `main` has no `apps/dashboard`. The Mini must stay on the PR branch until it merges. |
+| Phase C leftovers | Usage row not confirmed, both OpenAPI downloads not confirmed, incognito Access check, `cloudiator.netlify.app` still public. |
+| Boot policy §6 and alerts §7 | A power cut or a dead worker is silent. |
+| Neon retention | Free-tier storage fills; key minting starts failing. The usage chart stays empty until the rollup runs. |
+| Phases D–D3 | No OCR, maps, charts, DuckDB, docs, or image ops. |
+| Phase E jobs and FLUX | Errors already say `POST /v1/jobs`. That route does not exist. |
+| Phase F | External Services import and the Neon-down drill were postponed. |
 | Speech | See §7. Do not sell listening or speaking. |
 
-A first pilot may be **chat only**, one org, with the operator on call, after §6, §7, the retention job, and a written limit: no streaming, no tools, no images, no speech, one generation at a time, `429` when the Metal slot is busy. That pilot is not v1 done.
+Do not start Phase D until the Phase C leftovers in [docs/next-steps.md](docs/next-steps.md) are ticked or explicitly skipped.
 
 ---
 

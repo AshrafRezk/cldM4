@@ -81,7 +81,7 @@ Skip: **All managed rules**, **Super Bot Fight Mode**, **Rate limiting rules**, 
 - [x] Access application on `app.cloudiator.org` — policy: allow email `ashrafrmattar@gmail.com`
 - [x] Access application on `api.cloudiator.org/v1/admin*` — same allow email
 - [x] Application **AUD tag** (needed by the worker to verify the JWT): stored in password manager — use the **api** app AUD as `CF_ACCESS_AUD`
-- [ ] Verified: an incognito window on `app.cloudiator.org` is challenged by Access, not by a password form. (Needs Phase C + DNS.)
+- [ ] Verified: an incognito window on `app.cloudiator.org` is challenged by Access, not by a password form. The site is live; this incognito check was not done on 2026-09-20.
 
 There is **no shared admin password** in v1. The dashboard has no login screen of its own.
 
@@ -107,15 +107,16 @@ There is **no shared admin password** in v1. The dashboard has no login screen o
 
 | Item | Value | Done |
 | --- | --- | --- |
-| Team / site name | ____________________ | [ ] |
-| Site URL | ____________________ | [ ] |
-| Custom domain `app.<domain>` attached | | [ ] |
-| Env `DATABASE_URL` set (server-side only) | | [ ] |
-| Env `PUBLIC_API_URL` = `https://api.<domain>` | | [ ] |
-| Env `ADMIN_SESSION_SECRET` set | | [ ] |
+| Team / site name | Cloudastick / `cloudiator` | [x] |
+| Site URL | `https://cloudiator.netlify.app` (disable this hostname; it is not behind Access) | [x] |
+| Custom domain `app.<domain>` attached | `https://app.cloudiator.org` live 2026-09-20 | [x] |
+| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env | [x] |
+| Env `PUBLIC_API_URL` = `https://api.<domain>` | `https://api.cloudiator.org` | [x] |
+| Env `ADMIN_SESSION_SECRET` set | Netlify site env; copy into the password manager | [x] |
 
-- [ ] Confirmed `DATABASE_URL` does **not** appear in the built client bundle: `npm run build` then grep `dist/` for `neon.tech`.
-- [ ] No Netlify Function calls Ollama or the Mini for inference. Ever.
+- [x] `DATABASE_URL` is not in the client bundle (`apps/dashboard` `npm test` on PR #9 greps `dist/` for `neon.tech`).
+- [x] No Netlify Function calls Ollama. The playground POSTs to `https://api.cloudiator.org` from the browser.
+- [ ] `cloudiator.netlify.app` disabled so the Access email header cannot be spoofed on the naked origin.
 
 ---
 
@@ -229,9 +230,9 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ## 11. Sign-off
 
-Laptop and Mini (2026-09-20): domain, Neon schema, WAF Skip, Access apps, Phase A, Phase B tunnel and key auth. `https://api.cloudiator.org` answers chat.
+Laptop and Mini (2026-09-20): domain, Neon schema, WAF Skip, Access apps, Phase A, Phase B, and the Phase C dashboard on PR #9 (`https://app.cloudiator.org` mints keys and shows usage). That PR is not on `main`.
 
-Still open before a client depends on it: §2a Security Level and Browser Integrity Check, §3 retention job, §4 Netlify (Phase C), §5 Nominatim policy, §6 boot policy, §7 alerting, §8–§9 measured numbers. Detail: [next-steps.md](next-steps.md).
+Still open: §2a Security Level and Browser Integrity Check, §3 retention job, §4 naked `netlify.app` hostname, §5 Nominatim policy, §6 boot policy, §7 alerting, §8–§9 measured numbers, and the Phase C click-through leftovers in [next-steps.md](next-steps.md).
 
 - [x] Sections 1–3 public rows filled. Secrets stay in the password manager, not this file.
 - [ ] Section 6 has exactly one option ticked. (Mini)
@@ -247,7 +248,7 @@ Operator: Ashraf  Date: 2026-09-20 (Phase B). Re-reviewed 2026-09-27: client gat
 
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
-1. **Mini, human:** boot policy (§6), health alert (§7), schedule `infra/neon-retention.sql`, fill §8 and §9. Do not hand a client a key before the alert has fired once on purpose.
-2. **Anywhere but the Mini's Metal:** Phase C dashboard. Prompt is in [next-steps.md](next-steps.md).
-3. Dogfood one chat key. Then Phases D, D2, D3, E, F.
-4. Do not create a Cloudflare Worker. Do not pull a speech model until Phase F, and do not describe Gemma as a voice.
+1. Finish the Phase C leftovers in [next-steps.md](next-steps.md). Do not rebuild the dashboard.
+2. Merge PR #9, then `git pull` on the Mini so it is not stuck on the cloud-agent branch.
+3. **Mini, human:** boot policy (§6), health alert (§7), schedule `infra/neon-retention.sql`, fill §8 and §9.
+4. Then Phase D on the Mini. Do not create a Cloudflare Worker. Do not pull a speech model until Phase F.
