@@ -18,6 +18,20 @@
   autoLaunch = false
 
 # Cloudflare Access is the only login. Do not enable Netlify Identity.
+# Netlify will not delete the *.netlify.app name. Force it onto the hostname
+# that Access protects. These rules must stay above the SPA fallback.
+
+[[redirects]]
+  from = "https://cloudiator.netlify.app/*"
+  to = "https://app.cloudiator.org/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://cloudiator.netlify.app/*"
+  to = "https://app.cloudiator.org/:splat"
+  status = 301
+  force = true
 
 [[redirects]]
   from = "/api/*"
