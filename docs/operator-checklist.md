@@ -108,14 +108,14 @@ There is **no shared admin password** in v1. The dashboard has no login screen o
 | Item | Value | Done |
 | --- | --- | --- |
 | Team / site name | Cloudastick / `cloudiator` | [x] |
-| Site URL | `https://cloudiator.netlify.app` (disable this hostname; it is not behind Access) | [x] |
-| Custom domain `app.<domain>` attached | `https://app.cloudiator.org` live 2026-09-20 | [x] |
-| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env | [x] |
+| Site URL | `https://cloudiator.netlify.app` (still needs disabling; it is not behind Access) | [x] |
+| Custom domain `app.<domain>` attached | `https://app.cloudiator.org` (Cloudflare Access + CNAME to Netlify) | [x] |
+| Env `DATABASE_URL` set (server-side only) | pooled Neon URL in Netlify site env (password manager) | [x] |
 | Env `PUBLIC_API_URL` = `https://api.<domain>` | `https://api.cloudiator.org` | [x] |
 | Env `ADMIN_SESSION_SECRET` set | Netlify site env; copy into the password manager | [x] |
 
-- [x] `DATABASE_URL` is not in the client bundle (`apps/dashboard` `npm test` on PR #9 greps `dist/` for `neon.tech`).
-- [x] No Netlify Function calls Ollama. The playground POSTs to `https://api.cloudiator.org` from the browser.
+- [x] Confirmed `DATABASE_URL` does **not** appear in the built client bundle: `cd apps/dashboard && npm test` (grep `dist/` for `neon.tech` finds nothing).
+- [x] No Netlify Function calls Ollama or the Mini for inference. The playground POSTs to `https://api.cloudiator.org/v1/chat/completions` from the browser.
 - [ ] `cloudiator.netlify.app` disabled so the Access email header cannot be spoofed on the naked origin.
 
 ---
@@ -230,7 +230,7 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ## 11. Sign-off
 
-Laptop and Mini (2026-09-20): domain, Neon schema, WAF Skip, Access apps, Phase A, Phase B, and the Phase C dashboard on PR #9 (`https://app.cloudiator.org` mints keys and shows usage). That PR is not on `main`.
+Laptop and Mini (2026-09-20, re-checked 2026-09-27): domain, Neon schema, WAF Skip, Access apps, Phase A, Phase B, and the Phase C dashboard (`https://app.cloudiator.org` mints keys and shows usage). Phase C is on `main`.
 
 Still open: §2a Security Level and Browser Integrity Check, §3 retention job, §4 naked `netlify.app` hostname, §5 Nominatim policy, §6 boot policy, §7 alerting, §8–§9 measured numbers, and the Phase C click-through leftovers in [next-steps.md](next-steps.md).
 
@@ -249,6 +249,6 @@ Operator: Ashraf  Date: 2026-09-20 (Phase B). Re-reviewed 2026-09-27: client gat
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
 1. Finish the Phase C leftovers in [next-steps.md](next-steps.md). Do not rebuild the dashboard.
-2. Merge PR #9, then `git pull` on the Mini so it is not stuck on the cloud-agent branch.
+2. `git pull` on the Mini and restart the worker so playground CORS from this merge is loaded.
 3. **Mini, human:** boot policy (§6), health alert (§7), schedule `infra/neon-retention.sql`, fill §8 and §9.
 4. Then Phase D on the Mini. Do not create a Cloudflare Worker. Do not pull a speech model until Phase F.
