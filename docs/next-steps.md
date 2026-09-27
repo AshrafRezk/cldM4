@@ -44,12 +44,12 @@ curl -s http://127.0.0.1:8080/v1/tools/geocode -H "Authorization: Bearer $KEY" \
 curl -s -o /dev/null -w 'second %{time_total}s\n' http://127.0.0.1:8080/v1/tools/geocode \
   -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"q":"Cairo, Egypt"}'
 
-# unscoped key
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/v1/tools/ocr \
+# unscoped key. POST: a GET is 405 and never checks the scope.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8080/v1/tools/ocr \
   -H "Authorization: Bearer $NO_OCR_KEY"
 ```
 
-Expect: `diff` prints nothing, the second geocode is under 50ms, the unscoped key prints `403`. Full contract: [cursor-phases.md](cursor-phases.md) Phase D. Do not start a second Phase D implementation. Do not start Phase E.
+Expect: the second geocode is under 50ms, the unscoped key prints `403`, and OCR returns text without adding a model to `ollama ps`. On the Mini, Cairo cached in 5ms and the chat-only key returned 403. OCR itself needs the PIL-image fix in this branch (`ocrmac` rejects a `pathlib.Path`). Full contract: [cursor-phases.md](cursor-phases.md) Phase D. Do not start a second Phase D implementation. Do not start Phase E.
 
 ## Remaining
 

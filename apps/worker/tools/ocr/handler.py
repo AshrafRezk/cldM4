@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import tempfile
-from pathlib import Path
+import io
 from typing import Any
 
 from app.errors import CloudiatorError
@@ -55,6 +54,7 @@ def _backend():
 def _vision(data: bytes) -> str:
     try:
         from ocrmac import ocrmac
+        from PIL import Image
     except ImportError as exc:
         raise CloudiatorError(
             503,
@@ -62,10 +62,12 @@ def _vision(data: bytes) -> str:
             "Apple Vision OCR is only available on the Mini.",
             error_type="server_error",
         ) from exc
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as handle:
-        handle.write(data)
-        handle.flush()
-        lines = ocrmac.OCR(Path(handle.name)).recognize()
+    # ocrmac 1.0 accepts a path string or a PIL.Image. A pathlib.Path raises
+    # "Invalid image format" before Vision runs.
+    with Image.open(io.BytesIO(data)) as image:
+        image.load()
+        frame = image.convert("RGB")
+        lines = ocrmac.OCR(frame).recognize()
     parts = []
     for line in lines or []:
         text = line[0] if isinstance(line, (list, tuple)) else str(line)
