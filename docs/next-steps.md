@@ -1,6 +1,6 @@
-# Next steps — Phase D2 on the Mini (2026-09-27)
+# Next steps — Phase D2 proven on the Mini (2026-09-27)
 
-**Phases A–D are proven on the Mini.** Phase D2 (charts, stats, DuckDB) is this branch, `cursor/phase-d2-charts-stats-duckdb-73f3`. It is not on the Mini until that branch is checked out. Phase D remains [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX).
+**Phases A–D2 are proven on the Mini.** The worker is on `cursor/phase-d2-charts-stats-duckdb-73f3` ([PR #12](https://github.com/AshrafRezk/cldM4/pull/12)), health is `idle_hot_9b` (`gemma4:e4b-it-qat` + `nomic-embed-text`, swap 0). Phase D remains [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX). The next build phase is Phase D3 (image ops, docs, diagrams).
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -25,38 +25,25 @@ Secrets stay in the password manager, not this file. Checklist: [operator-checkl
 
 `ocrmac` is installed in the worker venv (`uv pip`, not a `pip` binary). OCR passes a PIL image. `ARTIFACT_SIGNING_SECRET` is in `~/Cloudiator/.env`.
 
-## Mini, now (Phase D2)
+## Phase D2 proof (Mini, 2026-09-27)
 
-The worker venv is uv, so install with `uv pip`, then restart. `salesforce_engineer` already includes `tools.charts`, `tools.stats`, and `tools.data`. Put a key minted in the console into `KEY`. Do not paste the secret into chat.
+The first `kickstart` returned before port 8080 was listening. After the worker logged `Application startup complete`, health stayed `idle_hot_9b`.
 
-```bash
-cd /Users/ashrafrezk/cldM4
-git fetch origin cursor/phase-d2-charts-stats-duckdb-73f3
-git checkout cursor/phase-d2-charts-stats-duckdb-73f3
-cd apps/worker
-uv pip install 'matplotlib>=3.8' 'numpy>=1.26' 'scipy>=1.11' 'duckdb>=1.1' 'pyarrow>=15'
-cd ../..
-launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
+| Check | Result |
+| --- | --- |
+| `POST /v1/tools/query` fruit CSV, `SUM` by kind | `apples/5`, `pears/4`, `truncated: false` |
+| `POST /v1/tools/chart` | `engine: matplotlib`, signed PNG URL on `https://api.cloudiator.org/artifacts/...` |
+| Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. |
 
-curl -sS http://127.0.0.1:8080/v1/tools/query -H "Authorization: Bearer $KEY" \
-  -H 'content-type: application/json' \
-  -d '{"sql":"SELECT kind, SUM(n) AS total FROM data GROUP BY kind ORDER BY kind","csv":"kind,n\napples,2\napples,3\npears,4\n"}'
-
-curl -sS http://127.0.0.1:8080/v1/tools/chart -H "Authorization: Bearer $KEY" \
-  -H 'content-type: application/json' \
-  -d '{"kind":"bar","title":"Fruit","x":["apples","pears"],"series":[{"name":"total","values":[5,4]}]}'
-```
-
-Expect the query rows `apples/5` and `pears/4`, and a chart JSON `url`. Open that URL: a PNG. `ollama ps` stays on `gemma4:e4b-it-qat` and `nomic-embed-text`.
+matplotlib, numpy, scipy, duckdb, and pyarrow are installed in the worker venv with `uv pip`.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| Now | The Phase D2 checkout and the two curls above | Mini |
-| When you want `main` to match the Mini | Merge PR #11, then this branch | GitHub, then Mini |
+| When you want `main` to match the Mini | Merge PR #11, then PR #12 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Phase D3 | Image ops, docs, diagrams. No FLUX. | Repo, then Mini |
+| **Phase D3** | Image ops, docs, diagrams. No FLUX. | Repo, then Mini |
 | Phase E | FLUX jobs, and `gpt-oss:20b` only after D3 and a disk check | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
