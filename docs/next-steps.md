@@ -28,8 +28,8 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 
 - [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0.
 - [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears.
-- [ ] **3. `infra/neon-retention.sql` is scheduled** (Neon). Raw `usage_events` older than 30 days get deleted.
-- [ ] **4. `cloudiator.netlify.app` is disabled.** Only `https://app.cloudiator.org` serves the dashboard.
+- [ ] **3. `infra/neon-retention.sql` runs nightly from the Mini.** Raw `usage_events` older than 30 days get deleted. Do not use `pg_cron`: this Neon compute scales to zero, and a suspended compute skips the job.
+- [ ] **4. `cloudiator.netlify.app` redirects to `https://app.cloudiator.org`.** Netlify will not delete that hostname. The redirect is in `apps/dashboard/netlify.toml` and applies on the next production deploy.
 - [ ] **5. Phase F** — Salesforce stream downgrade and 1 MB cap in the worker, then a real External Services import and Apex callout.
 - [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert.
 
@@ -62,13 +62,114 @@ Open `https://app.cloudiator.org/console` (Cloudflare Access, no password form).
 
 ## 3. Schedule Neon retention
 
-Free-tier storage fills if raw `usage_events` are kept forever, and then **key minting fails**. The statement is `infra/neon-retention.sql` (same SQL as [schema.md](schema.md)). Run it once in the Neon SQL editor to confirm it succeeds, then schedule it nightly (Neon scheduled job). Tick operator-checklist §3 when the schedule exists.
+Free-tier storage fills if raw `usage_events` are kept forever, and then **key minting fails**. The statement is `infra/neon-retention.sql` (same SQL as [schema.md](schema.md)).
 
-Do not point the worker at this query. `/v1/health` must stay off Neon.
+Run it from the Mini, not from `pg_cron`. The Neon compute scales to zero, and `pg_cron` only fires while that compute is awake — a missed night is dropped, not retried. The Mini is already on. A LaunchAgent at 03:15 local runs the SQL through the worker's Neon client, which wakes the compute, then lets it suspend again.
 
-## 4. Disable the Netlify default hostname
+```bash
+mkdir -p /Users/ashrafrezk/Cloudiator/logs
+cat > /Users/ashrafrezk/Cloudiator/retention.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+. /Users/ashrafrezk/cldM4/scripts/lib/load-env.sh
+load_env_file /Users/ashrafrezk/Cloudiator/.env
+cd /Users/ashrafrezk/cldM4/apps/worker
+exec .venv/bin/python - << 'PY'
+import asyncio
+from pathlib import Path
 
-The site also answers on `https://cloudiator.netlify.app`. Turn that hostname off in Netlify (Domain management) so the only public dashboard is `https://app.cloudiator.org`, which is the hostname behind Cloudflare Access. Confirm an incognito window on `app.cloudiator.org` is an Access challenge, and that `cloudiator.netlify.app` no longer serves the app.
+from app.config import get_settings
+from app.db import Neon
+
+SQL_PATH = Path("/Users/ashrafrezk/cldM4/infra/neon-retention.sql")
+
+def statements(sql: str) -> list[str]:
+    kept = []
+    for line in sql.splitlines():
+        if line.strip().startswith("--"):
+            continue
+        kept.append(line)
+    return [part.strip() for part in "\n".join(kept).split(";") if part.strip()]
+
+async def main() -> None:
+    db = Neon(get_settings())
+    try:
+        for stmt in statements(SQL_PATH.read_text()):
+            await db.execute_script(stmt, timeout_seconds=120)
+
+        async def counts(con):
+            old = await con.fetchval(
+                "SELECT count(*) FROM usage_events WHERE ts < now() - interval '30 days'"
+            )
+            total = await con.fetchval("SELECT count(*) FROM usage_events")
+            days = await con.fetchval("SELECT count(*) FROM usage_daily")
+            return old, total, days
+
+        old, total, days = await db.run(counts, statement_timeout_seconds=30)
+        print(
+            f"retention ok: usage_events={total} older_than_30d={old} usage_daily_rows={days}",
+            flush=True,
+        )
+    finally:
+        await db.close()
+
+asyncio.run(main())
+PY
+EOF
+chmod 700 /Users/ashrafrezk/Cloudiator/retention.sh
+/bin/bash /Users/ashrafrezk/Cloudiator/retention.sh
+
+cat > /Users/ashrafrezk/Library/LaunchAgents/ai.cloudiator.retention.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.cloudiator.retention</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/ashrafrezk/Cloudiator/retention.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/ashrafrezk/Cloudiator/logs/retention.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ashrafrezk/Cloudiator/logs/retention.err</string>
+</dict>
+</plist>
+EOF
+launchctl bootout gui/$UID/ai.cloudiator.retention 2>/dev/null || true
+launchctl bootstrap gui/$UID /Users/ashrafrezk/Library/LaunchAgents/ai.cloudiator.retention.plist
+launchctl enable gui/$UID/ai.cloudiator.retention
+launchctl print gui/$UID/ai.cloudiator.retention | head -12
+```
+
+The first command runs the SQL immediately. Expect a line like `retention ok: usage_events=… older_than_30d=0 usage_daily_rows=…`. `older_than_30d=0` means the delete worked. Today's playground rows stay; only events older than 30 days are removed, and the rollup covers completed days.
+
+`launchctl print` should show `state = not running` and the program path above. That is a calendar job, not a always-on process. It runs at 03:15 while you are logged in. Do not `source` `/Users/ashrafrezk/Cloudiator/.env`. Tick operator-checklist §3 when that print succeeds.
+
+Do not point the worker request path at this query. `/v1/health` must stay off Neon.
+
+## 4. Send the Netlify hostname to Access
+
+Domain management cannot remove `cloudiator.netlify.app`. That page says the project is always reachable there, and Netlify uses the name for deploys. `app.cloudiator.org` is already the primary domain.
+
+The yellow **Pending DNS verification** badge is Cloudflare sitting in front of Netlify. Click it and confirm the record it wants. In the Cloudflare DNS table for `cloudiator.org`, `app` must be a CNAME to `cloudiator.netlify.app` and stay **proxied** (orange cloud). Access only runs on a proxied hostname. Leave the proxy on. If the playground already loads, the badge can stay yellow: Netlify's checker cannot see through Cloudflare, and turning the cloud grey removes Access.
+
+`apps/dashboard/netlify.toml` forces `https://cloudiator.netlify.app/*` to `https://app.cloudiator.org/:splat` with a 301. After that file is on `main` and Netlify finishes the production deploy:
+
+```bash
+/usr/bin/curl -sI https://cloudiator.netlify.app/ | /usr/bin/grep -i -E 'HTTP/|location:'
+```
+
+Expect `301` and `location: https://app.cloudiator.org/`. An incognito window on `https://app.cloudiator.org` is still a Cloudflare Access challenge.
 
 ## 5. Phase F — Salesforce pack
 
