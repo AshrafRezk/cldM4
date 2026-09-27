@@ -53,16 +53,28 @@ Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://
 
 Phase E is the following phase. Its first step is a human warmup in Terminal, not a worker change and not an `ollama pull`. Record peak memory and wall clock in [operator-checklist.md](operator-checklist.md) section 9 before any job-queue code. Skip `gpt-oss:20b` unless `df -h /` still shows comfortable headroom after the 4-bit weights are on disk. 4-bit is the default. Do not quantize to 8-bit in the same sitting.
 
+Run this on the Mini. It downloads the pre-quantized 4-bit weights (~7 GB) into `~/Cloudiator/models`, stops the worker so Gemma is not resident during the generate, then starts the worker again. Leave `-q` and `--model schnell` off this command. Those pull the full-precision repo (~34 GB) and quantize it in memory.
+
 ```bash
 df -h /
+export PATH="$HOME/.local/bin:$PATH"
+launchctl bootout "gui/$(id -u)/ai.cloudiator.worker" || true
+ollama stop gemma4:e4b-it-qat || true
 uv tool install --upgrade mflux
-# pre-quantized 4-bit weights, or:
-# mflux-save --model schnell --quantize 4 --path ~/Cloudiator/models/flux-schnell-4bit
+mkdir -p ~/Cloudiator/models
+uvx --from huggingface_hub hf download dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit \
+  --local-dir ~/Cloudiator/models/flux-schnell-4bit
+du -sh ~/Cloudiator/models/flux-schnell-4bit
 time mflux-generate --path ~/Cloudiator/models/flux-schnell-4bit \
   --steps 4 --height 1024 --width 1024 \
   --prompt "a red bicycle" --output /tmp/test.png
 sysctl vm.swapusage
+ls -lh /tmp/test.png
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist"
+launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 ```
+
+Paste `df`, the `time` real line, `vm.swapusage`, and the size of `/tmp/test.png`. If generate reports that the saved weights are incompatible with this mflux, stop there and paste the error. The fallback is one local `mflux-save --quantize 4`, then deleting the full-precision Hugging Face cache.
 
 ## Remaining
 
