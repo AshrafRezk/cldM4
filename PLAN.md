@@ -3,8 +3,9 @@
 **Product name:** Cloudiator (repo `cldM4`)  
 **Hardware:** Apple Mac Mini M4, 24GB unified memory  
 **Git:** https://github.com/AshrafRezk/cldM4.git  
-**Status:** Plan only. Implement on the Mini, one phase at a time.  
-**Video:** out of v1.
+**Status (2026-09-27):** Phases A and B are proven on the Mini. Public API: `https://api.cloudiator.org`. What is running, and what still blocks a real client, is [docs/next-steps.md](docs/next-steps.md). Implement the rest on the Mini, one phase at a time.  
+**Video:** out of v1.  
+**Speech:** no speak model. No listen endpoint. See §7.
 
 This file is the source of truth. If Cursor on the Mini disagrees with a blog post, **this file wins**.
 
@@ -29,6 +30,29 @@ On the Mac Mini:
 6. Project rule `.cursor/rules/cloudiator.mdc` must stay Always-on.
 
 Do **not** implement from a laptop and expect Metal/Vision/Ollama to be production-tested. You may write TypeScript dashboard code anywhere; **worker + models + LaunchAgents must be verified on the Mini.**
+
+### 0a. Where the appliance actually is
+
+Proven on the Mini, 2026-09-20, and present in this repo:
+
+- FastAPI on `127.0.0.1:8080`, one process: chat, embeddings, live `/v1/models`, health, metal lock, context guard, vision SSRF, explicit `keep_alive`.
+- `sk-cld-` keys in Neon (argon2id, 60s cache, per-key rpm), usage outbox, per-key OpenAPI including `?target=salesforce` (3.0.3), Cloudflare Access JWT on `/v1/admin*`.
+- Named tunnel `cloudiator-mini` → `https://api.cloudiator.org`. A real key returned chat JSON. A garbage key returned FastAPI JSON 401. Port 11434 is not on the tunnel.
+- Hot models named by the plan: `gemma4:e4b-it-qat` and `nomic-embed-text`. The measured RAM, tok/s, and swap rows in [docs/operator-checklist.md](docs/operator-checklist.md) §8–§9 are still blank.
+
+Not built, so a client cannot be handed this as the product in `§22`:
+
+| Gap | Why a client feels it |
+| --- | --- |
+| Phase C dashboard | Keys are minted over SSH with `dbtool`. No usage screen, no OpenAPI download, no revoke button. Netlify is blank in the checklist. |
+| Boot policy §6 and alerts §7 | A power cut or a dead worker is silent. The client discovers it. |
+| Neon retention | Free-tier storage fills; key minting starts failing. |
+| Phases D–D3 | No OCR, maps, charts, DuckDB, docs, or image ops. Chat is the only capability. |
+| Phase E jobs and FLUX | Errors already say `POST /v1/jobs`. That route does not exist. Image generation does not exist. |
+| Phase F Salesforce pack | External Services import and the Neon-down drill were postponed. `stream: true` is rejected for every key, including browser keys. |
+| Speech | See §7. Do not sell listening or speaking. |
+
+A first pilot may be **chat only**, one org, with the operator on call, after §6, §7, the retention job, and a written limit: no streaming, no tools, no images, no speech, one generation at a time, `429` when the Metal slot is busy. That pilot is not v1 done.
 
 ---
 
@@ -499,13 +523,22 @@ Phase E step 0, run **interactively in Terminal**, never from the worker:
 - Quantized: https://huggingface.co/argmaxinc/mlx-FLUX.1-schnell-4bit-quantized
 - Target: 1024×1024, 4 steps, ~10–20s on M4 24GB once weights are local and pre-quantized
 
-Speech (Phase F optional):
+### Listen and speak (do not confuse them)
+
+Gemma 4 E4B **writes text**. It does not produce audio. There is no `/v1/audio/speech` and no text-to-speech weight on the Mini. Kokoro-82M (Apache 2.0, via `mlx-audio`, a few hundred MB) is the speak model that fits this box: English, Japanese, Mandarin, French, Spanish, Italian, Portuguese, and Hindi. It does **not** speak Arabic. Official Qwen3-TTS speaks ten languages well and also omits Arabic; Arabic speech would be a community fine-tune and is not a v1 pull. **v1 has no model that speaks.** Do not promise a voice to a client.
+
+Gemma 4 E2B/E4B/12B can **take audio in** and transcribe or translate it (Google's audio guide; E4B FLEURS word-error is about 0.08, CoVoST BLEU about 35.5). That capability is not wired through the worker. Ollama's E4B audio path has also been unstable: thinking mode eats the answer, and the runner has crashed mid-transcription. Treat Gemma audio as a lab curiosity, not the listener.
+
+The listener, when Phase F is actually built, is **Whisper large-v3-turbo** through `mlx-whisper` (~1.6 GB, MIT, 99 languages including Arabic). It uses the exclusive slot (`exclusive_whisper`): unload Gemma, transcribe, reload Gemma. It is not pulled. `POST /v1/audio/transcriptions` is not implemented. The `speech` key preset in `packages/schema/scopes.json` must not be minted until that route exists.
 
 ```bash
-pip install mlx-whisper   # in worker venv
+# Phase F only, in the worker venv, after the exclusive-slot contract is proven on FLUX
+uv pip install mlx-whisper
 ```
 
 https://huggingface.co/mlx-community/whisper-large-v3-turbo (~1.6 GB)
+
+`tools.audio_ops` (ffmpeg/pydub: trim, convert, loudness) is CPU and is also unbuilt. It is not a model.
 
 Benchmarks for this SKU:
 

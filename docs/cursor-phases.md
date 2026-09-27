@@ -382,7 +382,7 @@ Phase F only.
 3. Apex examples with req.setTimeout(120000) and "stream": false.
 4. Job polling: implement and document ONE of the three patterns in docs/salesforce.md. Each poll is its own transaction. Do not write a loop of 50 callouts inside one Apex execution — that exceeds the 120s cumulative callout budget.
 5. Salesforce keys: force stream=false with the x-cloudiator-stream-downgraded header, max_response_bytes 1MB, artifact ids rather than signed URLs stored on records.
-6. Optional mlx-whisper large-v3-turbo exclusive slot + /v1/audio/transcriptions, using the same exclusive slot contract and try/finally teardown as FLUX.
+6. Optional mlx-whisper large-v3-turbo exclusive slot + /v1/audio/transcriptions, using the same exclusive slot contract and try/finally teardown as FLUX. This is the listener (including Arabic). Gemma audio input is not a substitute. Do not add text-to-speech in this phase: nothing in v1 speaks, and Kokoro (the candidate, Apache 2.0) does not speak Arabic. See PLAN.md §7.
 
 Tests: tests/test_sf_stream_downgrade.py, tests/test_response_size_cap.py.
 ```
