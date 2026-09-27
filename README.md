@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A and B (the worker, key auth, Neon, and the tunnel) are proven on the Mini at `https://api.cloudiator.org`. Phase C is the Netlify dashboard on `app.cloudiator.org` — start from [docs/next-steps.md](docs/next-steps.md).
+**This repository is the production plan and the product.** Phases A–C are live: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. Next is Phase D on the Mini — [docs/next-steps.md](docs/next-steps.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -73,6 +73,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Known failures and fixes |
 | [docs/licenses.md](docs/licenses.md) | Model and library licenses |
 | [.env.example](.env.example) | Mini worker env template (copy, do not commit secrets) |
+| [apps/dashboard/](apps/dashboard/) | Phase C: Netlify Vite React dashboard (no inference, no login form) |
 | [apps/worker/](apps/worker/) | Phases A–B: FastAPI worker, RAM scheduler, key auth, usage outbox, tests |
 | [packages/schema/](packages/schema/) | OpenAPI fragments, scope enums, the per-key document generator |
 | [scripts/](scripts/) | Gates, host setup, LaunchAgents, Neon schema, tunnel, phase smokes |
