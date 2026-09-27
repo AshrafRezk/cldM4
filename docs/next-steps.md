@@ -1,6 +1,6 @@
-# Next steps — Phase E jobs (2026-09-27)
+# Next steps — Phase E proven (2026-09-27)
 
-**Phases A–D3 are proven on the Mini.** Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Phase D3 is [PR #13](https://github.com/AshrafRezk/cldM4/pull/13). Phase E is this branch. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
+**Phases A–E are proven on the Mini.** Phase D is [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Phase D2 is [PR #12](https://github.com/AshrafRezk/cldM4/pull/12). Phase D3 is [PR #13](https://github.com/AshrafRezk/cldM4/pull/13). Phase E is [PR #14](https://github.com/AshrafRezk/cldM4/pull/14). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -51,62 +51,21 @@ The first diagram call returned `not_supported`. Terminal had `/opt/homebrew/bin
 
 `Idempotency-Key: test-2` created job `dcbfbc7dc5af4e7e91967a7e5c057496` (202). It reached `succeeded` with artifact `8034c949723d4c1caca9c7838abfbb06`. `ollama ps` afterward was Gemma 5.4 GB and `nomic-embed-text` 370 MB, one generative model. Swap used went from 1707.88 MB to 1699.88 MB, so this generate did not add swap. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
 
-## Next: crash drill
+## Phase E crash drill (Mini, 2026-09-27)
 
-`$KEY` has to be minted in this terminal. The drill starts a second image, kills `mflux-generate` once the job is `running`, waits 60s, then chats. Chat has to answer with no manual model reload. After that, a worker restart must still return that same job.
+Job `1bf553e4641a47f29159da6f307e2317` was `running` when `mflux-generate` was killed. After 60 seconds, chat on `gemma4:e4b-it-qat` returned `Hi.` with no manual reload. `ollama ps` showed Gemma 5.4 GB and `nomic-embed-text` 370 MB. The job was `failed`. After `kickstart`, health was `idle_hot_9b` and that same job was still `failed`. Swap used was 1683.88 MB, down from 1699.88 MB before the drill.
 
-```bash
-cd /Users/ashrafrezk/cldM4/apps/worker
-KEY=$(.venv/bin/python -m app.dbtool mint-key --tenant cloudiator --name 'phase-e-crash' \
-  --preset creative \
-  | tee /dev/stderr | awk '/sk-cld-/{print $1; exit}')
-cd /Users/ashrafrezk/cldM4
-test -n "$KEY" || { echo 'key was not minted'; exit 1; }
-JOB_JSON=$(curl -sS http://127.0.0.1:8080/v1/jobs \
-  -H "Authorization: Bearer $KEY" \
-  -H 'Idempotency-Key: crash-1' -H 'content-type: application/json' \
-  -d '{"kind":"image","prompt":"a red bicycle"}')
-echo "$JOB_JSON"
-CRASH=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  STATUS=$(curl -sf http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
-  echo "status $STATUS"
-  test "$STATUS" = "running" && break
-  sleep 2
-done
-pkill -9 -f mflux-generate || echo 'mflux was already gone'
-sleep 60
-curl -sS http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
-  -d '{"model":"gemma4:e4b-it-qat","messages":[{"role":"user","content":"Say hi in one word."}],"max_tokens":16,"stream":false}'
-echo
-ollama ps
-for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  STATUS=$(curl -sf http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
-  echo "after-kill $STATUS"
-  test "$STATUS" = "failed" -o "$STATUS" = "succeeded" && break
-  sleep 5
-done
-launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-  curl -sf http://127.0.0.1:8080/v1/health && break
-  sleep 2
-done
-echo
-curl -sS http://127.0.0.1:8080/v1/jobs/$CRASH -H "Authorization: Bearer $KEY"
-echo
-```
+Phase E is proven on the Mini. 8-bit stays off. `gpt-oss:20b` stays unpulled. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
 
-The chat JSON has to contain a one-word reply. `ollama ps` has to show Gemma. After the restart, `$CRASH` has to still be `failed` (or `succeeded` if the kill missed it), not `queued`. This key cannot see the earlier succeeded job; that row belongs to the key minted in the previous terminal.
+## Next
+
+Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://github.com/AshrafRezk/cldM4/pull/12), then [#13](https://github.com/AshrafRezk/cldM4/pull/13), then [#14](https://github.com/AshrafRezk/cldM4/pull/14), in that order, when `main` should match the Mini. Phase F is the External Services import. It waits until those four are merged.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
+| When you want `main` to match the Mini | Merge PR #11, then #12, then #13, then #14 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Now | Crash drill: kill `mflux-generate` mid-job, then chat within 60s, then restart and read that job | Mini |
-| Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
+| After the four PRs are on `main` | Phase F: External Services import of Salesforce OAS 3.0.3 | Salesforce |
