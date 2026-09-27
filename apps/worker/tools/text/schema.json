@@ -1,0 +1,12 @@
+{
+  "name": "fuzzy_match",
+  "description": "Pick the closest string from a list the user supplied. Do not invent choices. Scores come from the library.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {"type": "string"},
+      "choices": {"type": "array", "items": {"type": "string"}}
+    },
+    "required": ["query", "choices"]
+  }
+}

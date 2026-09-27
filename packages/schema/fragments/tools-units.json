@@ -1,0 +1,43 @@
+{
+  "x-cloudiator-scope": ["tools.units"],
+  "paths": {
+    "/v1/tools/units": {
+      "post": {
+        "operationId": "toolsUnitsPost",
+        "summary": "Convert a number between units",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {"type": "number"},
+                  "from": {"type": "string"},
+                  "to": {"type": "string"}
+                },
+                "required": ["value", "from", "to"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Converted value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "value": {"type": "number"},
+                    "unit": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

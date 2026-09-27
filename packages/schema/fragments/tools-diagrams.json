@@ -1,0 +1,43 @@
+{
+  "x-cloudiator-scope": ["tools.diagrams"],
+  "paths": {
+    "/v1/tools/diagram": {
+      "post": {
+        "operationId": "toolsDiagramPost",
+        "summary": "Render a Graphviz diagram",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {"type": "string"},
+                  "engine": {"type": "string"}
+                },
+                "required": ["source"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed PNG URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "url": {"type": "string"},
+                    "engine": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

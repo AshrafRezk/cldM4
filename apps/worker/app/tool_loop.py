@@ -34,6 +34,11 @@ CHAT_TOOL_ORDER = (
     "render_chart",
     "stats_describe",
     "sql_on_table",
+    "extract_document",
+    "image_transform",
+    "fuzzy_match",
+    "convert_units",
+    "render_diagram",
 )
 
 

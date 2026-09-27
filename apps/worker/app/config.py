@@ -183,6 +183,12 @@ class Settings:
     cf_access_aud: str | None = field(default_factory=lambda: _opt("CF_ACCESS_AUD"))
     admin_token: str | None = field(default_factory=lambda: _opt("ADMIN_TOKEN"))
 
+    # Phase D3. Graphviz is the diagram renderer. mermaid-cli is a Chromium
+    # process and stays off unless this is explicitly true.
+    enable_mermaid: bool = field(
+        default_factory=lambda: _str("ENABLE_MERMAID", "false").lower() in ("1", "true", "yes")
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -1,0 +1,46 @@
+{
+  "x-cloudiator-scope": ["tools.docs"],
+  "paths": {
+    "/v1/tools/document": {
+      "post": {
+        "operationId": "toolsDocumentPost",
+        "summary": "Extract text from a PDF, DOCX, or XLSX",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {"type": "string"},
+                  "filename": {"type": "string"},
+                  "file_base64": {"type": "string"},
+                  "text": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extracted preview. Long text also returns an artifact URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {"type": "string"},
+                    "text": {"type": "string"},
+                    "chars": {"type": "integer"},
+                    "truncated": {"type": "boolean"},
+                    "url": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

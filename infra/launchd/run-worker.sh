@@ -19,6 +19,8 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 load_env_file "$ENV_FILE"
 
+# launchd's PATH is /usr/bin:/bin. Homebrew binaries (dot, mmdc) live elsewhere.
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH:-/usr/bin:/bin}"
 export MPLBACKEND=Agg
 # The worker asserts this is 2 and refuses to boot otherwise (PLAN.md §4).
 export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"

@@ -62,6 +62,42 @@ def register_tool_routes(app: FastAPI, *, artifacts, runner, require_key) -> Non
         request.state.usage.tool = "sql_on_table"
         return _tool_json(await runner.execute("sql_on_table", body, key))
 
+    @app.post("/v1/tools/image")
+    async def image(request: Request, key=Depends(require_key("tools.image_ops"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "image_transform"
+        return _tool_json(await runner.execute("image_transform", body, key))
+
+    @app.post("/v1/tools/document")
+    async def document(request: Request, key=Depends(require_key("tools.docs"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "extract_document"
+        return _tool_json(await runner.execute("extract_document", body, key))
+
+    @app.post("/v1/tools/text")
+    async def text(request: Request, key=Depends(require_key("tools.text"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "fuzzy_match"
+        return _tool_json(await runner.execute("fuzzy_match", body, key))
+
+    @app.post("/v1/tools/units")
+    async def units(request: Request, key=Depends(require_key("tools.units"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "convert_units"
+        return _tool_json(await runner.execute("convert_units", body, key))
+
+    @app.post("/v1/tools/time")
+    async def time_tool(request: Request, key=Depends(require_key("tools.time"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "holiday_on"
+        return _tool_json(await runner.execute("holiday_on", body, key))
+
+    @app.post("/v1/tools/diagram")
+    async def diagram(request: Request, key=Depends(require_key("tools.diagrams"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "render_diagram"
+        return _tool_json(await runner.execute("render_diagram", body, key))
+
     @app.post("/v1/artifacts/{artifact_id}/sign")
     async def sign_artifact(
         artifact_id: str, request: Request, key=Depends(require_key())
