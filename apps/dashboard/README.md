@@ -1,6 +1,6 @@
 # Dashboard (Phase C)
 
-Vite + React on Netlify. **No inference.** Chat from the playground goes to `https://api.cloudiator.org` in the browser. Neon is used only from Netlify functions.
+Vite + React on Netlify. **No inference.** The playground calls `https://api.cloudiator.org` from the browser (chat, embeddings, models, usage, OpenAPI, health, or any other `/v1` route). Neon is used only from Netlify functions.
 
 Authentication is **Cloudflare Access** on `app.cloudiator.org`. This app has no login form, no shared admin password, and no Netlify Identity. Server functions read `Cf-Access-Authenticated-User-Email` and trust nothing else.
 

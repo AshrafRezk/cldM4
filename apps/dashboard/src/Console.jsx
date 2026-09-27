@@ -360,6 +360,7 @@ export function Console({ go, path }) {
             apiUrl={me?.apiUrl || "https://api.cloudiator.org"}
             model={me?.defaultModel || "gemma4:e4b-it-qat"}
             initialKey={playgroundKey}
+            keyScopes={selectedKey?.capabilities || []}
           />
         ) : null}
       </main>

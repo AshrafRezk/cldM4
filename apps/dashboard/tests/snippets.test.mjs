@@ -31,9 +31,14 @@ test("minted keys match sk-cld-{public_id}_{secret}", () => {
 
 test("the client playground calls the Mini API, not a Netlify inference function", () => {
   const src = readFileSync(join(here, "../src/Playground.jsx"), "utf8");
-  assert.match(src, /\$\{apiUrl\}\/v1\/chat\/completions/);
+  const catalog = readFileSync(join(here, "../src/playgroundServices.js"), "utf8");
+  assert.match(src, /\$\{apiUrl\}\$\{built\.path\}/);
+  assert.match(catalog, /\/v1\/chat\/completions/);
+  assert.match(catalog, /\/v1\/embeddings/);
   assert.equal(src.includes("ollama"), false);
   assert.equal(src.includes("11434"), false);
+  assert.equal(catalog.includes("ollama"), false);
+  assert.equal(catalog.includes("11434"), false);
 });
 
 test("the built client bundle contains the Apex timeout and stream:false", async () => {
