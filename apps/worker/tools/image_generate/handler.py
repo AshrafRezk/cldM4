@@ -118,9 +118,11 @@ def mflux_command(settings, request: dict[str, Any], dest: str) -> list[str]:
 
 async def generate(arguments: dict[str, Any], *, settings, artifacts, scheduler=None) -> dict[str, Any]:
     request = image_request(arguments)
-    handle = tempfile.NamedTemporaryFile(prefix="flux-", suffix=".png", delete=False)
-    dest = handle.name
-    handle.close()
+    # mflux will not overwrite an existing file. It writes stem_1.png instead
+    # and exits 0. Creating the file first made the worker read an empty PNG
+    # and store the tqdm bar as the job error.
+    work = tempfile.mkdtemp(prefix="flux-")
+    dest = os.path.join(work, "image.png")
     proc: asyncio.subprocess.Process | None = None
     try:
         argv = mflux_command(settings, request, dest)
@@ -134,13 +136,12 @@ async def generate(arguments: dict[str, Any], *, settings, artifacts, scheduler=
             scheduler.subprocesses.register(proc)
         stdout, stderr = await proc.communicate()
         code = proc.returncode or 0
-        png = Path(dest).read_bytes() if os.path.isfile(dest) else b""
+        png = _written_png(dest)
         if code != 0 or not png.startswith(_PNG):
-            detail = (stderr or stdout or b"").decode("utf-8", errors="replace").split("\n", 1)[0][:300]
             raise CloudiatorError(
                 400,
                 "invalid_request_error",
-                detail or "mflux could not write a PNG.",
+                _failure_detail(stdout, stderr),
                 param="prompt",
             )
         artifact_id = artifacts.save(png, ".png")
@@ -148,13 +149,33 @@ async def generate(arguments: dict[str, Any], *, settings, artifacts, scheduler=
     finally:
         if proc is not None and proc.returncode is not None and scheduler is not None:
             scheduler.subprocesses.forget(proc)
-        try:
-            os.unlink(dest)
-        except OSError:
-            pass
+        shutil.rmtree(work, ignore_errors=True)
 
 
 run = generate
+
+
+def _written_png(dest: str) -> bytes:
+    path = Path(dest)
+    candidates = [path, *sorted(path.parent.glob(path.stem + "_*.png"))]
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        data = candidate.read_bytes()
+        if data.startswith(_PNG):
+            return data
+    return b""
+
+
+def _failure_detail(stdout: bytes, stderr: bytes) -> str:
+    text = (stderr + b"\n" + stdout).decode("utf-8", errors="replace").replace("\r", "\n")
+    lines = []
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if not line or "%|" in line or line.startswith("Peak MLX"):
+            continue
+        lines.append(line)
+    return (lines[-1] if lines else "mflux could not write a PNG.")[:300]
 
 
 def _edge(value: Any, name: str) -> int:

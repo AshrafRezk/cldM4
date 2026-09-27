@@ -74,7 +74,7 @@ KEY=$(.venv/bin/python -m app.dbtool mint-key --tenant cloudiator --name 'phase-
 cd ../..
 JOB_JSON=$(curl -sS -D /tmp/job.hdr -o - http://127.0.0.1:8080/v1/jobs \
   -H "Authorization: Bearer $KEY" \
-  -H 'Idempotency-Key: test-1' -H 'content-type: application/json' \
+  -H 'Idempotency-Key: test-2' -H 'content-type: application/json' \
   -d '{"kind":"image","prompt":"a red bicycle"}')
 echo "$JOB_JSON"
 head -n 1 /tmp/job.hdr
@@ -82,7 +82,7 @@ JOB=$(printf '%s' "$JOB_JSON" | python3 -c 'import json,sys; print(json.load(sys
 echo "job $JOB"
 curl -sS -D /tmp/job2.hdr -o /tmp/job2.json http://127.0.0.1:8080/v1/jobs \
   -H "Authorization: Bearer $KEY" \
-  -H 'Idempotency-Key: test-1' -H 'content-type: application/json' \
+  -H 'Idempotency-Key: test-2' -H 'content-type: application/json' \
   -d '{"kind":"image","prompt":"a red bicycle"}'
 head -n 1 /tmp/job2.hdr
 cat /tmp/job2.json
@@ -97,7 +97,7 @@ ollama ps
 sysctl vm.swapusage
 ```
 
-The first POST is 202. The second is 200 with the same id. When the job succeeds, `ollama ps` shows Gemma again and one generative model. Swap used should not climb. The crash drill (`pkill -9 -f mflux` during a second job, then a chat within 60s) comes after this happy path.
+The first Mini job `5cccebb6053642da8f7506373c93f984` was 202, and the replay was 200 with that same id. mflux finished 4/4 and Gemma was reloaded. The job was marked failed because the worker created the output file first; mflux will not overwrite, so it saved `image_1.png` and the worker read the empty file. That is fixed. `Idempotency-Key: test-1` still returns the failed job for 24h. The retry uses `test-2`.
 
 ## Remaining
 

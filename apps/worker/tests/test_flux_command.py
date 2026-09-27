@@ -116,3 +116,33 @@ async def test_the_chat_loop_refuses_flux(settings):
     runner = ToolRunner(settings, load_registry(), maps=None)
     result = await runner.execute("flux_generate", {"prompt": "a red bicycle"}, record)
     assert result["error"] == "not_supported"
+
+
+async def test_generate_reads_the_png_mflux_writes_beside_an_existing_file(tmp_path, monkeypatch):
+    """mflux's save path skips a file that already exists and writes stem_1.png."""
+    from app import main
+
+    model = tmp_path / "flux-schnell-4bit"
+    model.mkdir()
+    binary = tmp_path / "mflux-generate"
+    binary.write_text(
+        "#!/bin/sh\n"
+        "out=\n"
+        "prev=\n"
+        'for arg in "$@"; do\n'
+        '  if [ "$prev" = "--output" ]; then out="$arg"; fi\n'
+        '  prev="$arg"\n'
+        "done\n"
+        'stem="${out%.png}"\n'
+        "printf '\\211PNG\\r\\n\\032\\n' > \"${stem}_1.png\"\n",
+        encoding="utf-8",
+    )
+    binary.chmod(binary.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setattr("tools.image_generate.handler.mflux_binary", lambda: str(binary))
+    result = await generate(
+        {"prompt": "a red bicycle"},
+        settings=_settings(str(model)),
+        artifacts=main.artifacts,
+        scheduler=None,
+    )
+    assert result["url"].startswith("https://api.cloudiator.test/artifacts/")
