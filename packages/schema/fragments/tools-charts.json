@@ -1,0 +1,56 @@
+{
+  "x-cloudiator-scope": ["tools.charts"],
+  "paths": {
+    "/v1/tools/chart": {
+      "post": {
+        "operationId": "toolsChartPost",
+        "summary": "Render a chart PNG from supplied numbers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {"type": "string"},
+                  "title": {"type": "string"},
+                  "x": {"type": "array", "items": {"type": "string"}},
+                  "series": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {"type": "string"},
+                        "values": {"type": "array", "items": {"type": "number"}}
+                      },
+                      "required": ["values"]
+                    }
+                  },
+                  "engine": {"type": "string"}
+                },
+                "required": ["x", "series"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed PNG URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "url": {"type": "string"},
+                    "engine": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

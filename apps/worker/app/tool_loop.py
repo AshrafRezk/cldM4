@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import inspect
 import json
 import logging
 import sys
@@ -26,7 +27,14 @@ from .translation import chat_response_to_openai
 log = logging.getLogger("cloudiator.tools")
 
 TOOLS_ROOT = Path(__file__).resolve().parents[1] / "tools"
-CHAT_TOOL_ORDER = ("ocr_image", "geocode", "places_nearby")
+CHAT_TOOL_ORDER = (
+    "ocr_image",
+    "geocode",
+    "places_nearby",
+    "render_chart",
+    "stats_describe",
+    "sql_on_table",
+)
 
 
 @dataclass(frozen=True)
@@ -111,10 +119,30 @@ def _call_signature(calls: list[dict[str, Any]]) -> str:
 
 
 class ToolRunner:
-    def __init__(self, settings, registry: dict[str, ToolSpec], maps: MapsClient) -> None:
+    def __init__(
+        self,
+        settings,
+        registry: dict[str, ToolSpec],
+        maps: MapsClient,
+        artifacts=None,
+        scheduler=None,
+    ) -> None:
         self.settings = settings
         self.registry = registry
         self.maps = maps
+        self.artifacts = artifacts
+        self.scheduler = scheduler
+
+    def _call_kwargs(self, spec: ToolSpec, extra: dict[str, Any]) -> dict[str, Any]:
+        params = inspect.signature(spec.run).parameters
+        available = {
+            "maps": self.maps,
+            "settings": self.settings,
+            "artifacts": self.artifacts,
+            "scheduler": self.scheduler,
+            **extra,
+        }
+        return {name: value for name, value in available.items() if name in params}
 
     async def execute(self, name: str, arguments: dict[str, Any], key: KeyRecord, **extra: Any) -> dict[str, Any]:
         spec = self.registry.get(name)
@@ -125,16 +153,10 @@ class ToolRunner:
             }
         try:
             require_capability(key, spec.capability)
-            if spec.name == "ocr_image":
-                result = await asyncio.wait_for(
-                    spec.run(arguments, settings=self.settings, **extra),
-                    timeout=spec.timeout_seconds,
-                )
-            else:
-                result = await asyncio.wait_for(
-                    spec.run(arguments, maps=self.maps),
-                    timeout=spec.timeout_seconds,
-                )
+            result = await asyncio.wait_for(
+                spec.run(arguments, **self._call_kwargs(spec, extra)),
+                timeout=spec.timeout_seconds,
+            )
         except asyncio.TimeoutError:
             return {"error": "tool_timeout", "message": f"{name} exceeded {spec.timeout_seconds:.0f}s."}
         except CloudiatorError as exc:

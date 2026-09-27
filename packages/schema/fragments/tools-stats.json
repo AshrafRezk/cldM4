@@ -1,0 +1,62 @@
+{
+  "x-cloudiator-scope": ["tools.stats"],
+  "paths": {
+    "/v1/tools/stats": {
+      "post": {
+        "operationId": "toolsStatsPost",
+        "summary": "Describe, test, or discount numbers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {"type": "string"},
+                  "values": {"type": "array", "items": {"type": "number"}},
+                  "a": {"type": "array", "items": {"type": "number"}},
+                  "b": {"type": "array", "items": {"type": "number"}},
+                  "x": {"type": "array", "items": {"type": "number"}},
+                  "y": {"type": "array", "items": {"type": "number"}},
+                  "n": {"type": "integer"},
+                  "mean": {"type": "number"},
+                  "std": {"type": "number"},
+                  "seed": {"type": "integer"},
+                  "rate": {"type": "number"},
+                  "cashflows": {"type": "array", "items": {"type": "number"}}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {"type": "string"},
+                    "count": {"type": "integer"},
+                    "mean": {"type": "number"},
+                    "std": {"type": "number"},
+                    "min": {"type": "number"},
+                    "p25": {"type": "number"},
+                    "p50": {"type": "number"},
+                    "p75": {"type": "number"},
+                    "max": {"type": "number"},
+                    "statistic": {"type": "number"},
+                    "pvalue": {"type": "number"},
+                    "npv": {"type": "number"},
+                    "rsquared": {"type": "number"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

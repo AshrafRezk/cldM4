@@ -1,0 +1,15 @@
+{
+  "name": "sql_on_table",
+  "description": "Run one SELECT over the CSV or rows the user supplied. Do not invent table values. The preview cells are strings.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "sql": {
+        "type": "string",
+        "description": "One SELECT, WITH, DESCRIBE, or SUMMARIZE. The table name defaults to data."
+      },
+      "csv": {"type": "string", "description": "CSV text with a header row."}
+    },
+    "required": ["sql", "csv"]
+  }
+}

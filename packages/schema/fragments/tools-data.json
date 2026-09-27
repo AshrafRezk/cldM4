@@ -1,0 +1,49 @@
+{
+  "x-cloudiator-scope": ["tools.data"],
+  "paths": {
+    "/v1/tools/query": {
+      "post": {
+        "operationId": "toolsQueryPost",
+        "summary": "Run one SELECT over caller-supplied rows",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sql": {"type": "string"},
+                  "csv": {"type": "string"},
+                  "table": {"type": "string"}
+                },
+                "required": ["sql"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview rows. A larger result also returns a parquet URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "columns": {"type": "array", "items": {"type": "string"}},
+                    "rows": {
+                      "type": "array",
+                      "items": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "row_count": {"type": "integer"},
+                    "truncated": {"type": "boolean"},
+                    "url": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

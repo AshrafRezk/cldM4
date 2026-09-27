@@ -1,0 +1,15 @@
+{
+  "name": "stats_describe",
+  "description": "Summarize a list of numbers: count, mean, std, min, quartiles, max. Do not recompute these yourself.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "values": {
+        "type": "array",
+        "items": {"type": "number"},
+        "description": "The sample to describe."
+      }
+    },
+    "required": ["values"]
+  }
+}

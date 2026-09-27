@@ -1,6 +1,6 @@
-# Next steps — Phase D proven on the Mini (2026-09-27)
+# Next steps — Phase D2 proven on the Mini (2026-09-27)
 
-**Phases A, B, C, and D are done on the Mini.** The worker is on `cursor/phase-d-tools-ocr-maps-73f3`, health is `idle_hot_9b` (`gemma4:e4b-it-qat` + `nomic-embed-text`, swap 0), and playground CORS allows `https://app.cloudiator.org`. Phase D is not on `main` until [PR #11](https://github.com/AshrafRezk/cldM4/pull/11) is merged. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX) yet. The next build phase in [cursor-phases.md](cursor-phases.md) is Phase D2 (charts, stats, DuckDB).
+**Phases A–D2 are proven on the Mini.** The worker is on `cursor/phase-d2-charts-stats-duckdb-73f3` ([PR #12](https://github.com/AshrafRezk/cldM4/pull/12)), health is `idle_hot_9b` (`gemma4:e4b-it-qat` + `nomic-embed-text`, swap 0). Phase D remains [PR #11](https://github.com/AshrafRezk/cldM4/pull/11). Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX). The next build phase is Phase D3 (image ops, docs, diagrams).
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -25,26 +25,25 @@ Secrets stay in the password manager, not this file. Checklist: [operator-checkl
 
 `ocrmac` is installed in the worker venv (`uv pip`, not a `pip` binary). OCR passes a PIL image. `ARTIFACT_SIGNING_SECRET` is in `~/Cloudiator/.env`.
 
-## Now
+## Phase D2 proof (Mini, 2026-09-27)
 
-The two keys minted in that terminal were printed into this chat. Revoke them, then mint the real one from the console and leave the secret in the password manager.
+The first `kickstart` returned before port 8080 was listening. After the worker logged `Application startup complete`, health stayed `idle_hot_9b`.
 
-```bash
-cd /Users/ashrafrezk/cldM4/apps/worker
-.venv/bin/python -m app.dbtool revoke-key ziwnk5ba8uvw
-.venv/bin/python -m app.dbtool revoke-key 5rozejut8fkw
-```
+| Check | Result |
+| --- | --- |
+| `POST /v1/tools/query` fruit CSV, `SUM` by kind | `apples/5`, `pears/4`, `truncated: false` |
+| `POST /v1/tools/chart` | `engine: matplotlib`, signed PNG URL on `https://api.cloudiator.org/artifacts/...` |
+| Loaded models | `gemma4:e4b-it-qat`, `nomic-embed-text`. Swap 0. |
 
-Mint the replacement at https://app.cloudiator.org/console (preset `salesforce_engineer`). Do not paste the secret back into chat.
+matplotlib, numpy, scipy, duckdb, and pyarrow are installed in the worker venv with `uv pip`.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| Now | Revoke the two public ids above and mint a replacement in the console | Mini |
-| When you want `main` to match the Mini | Merge PR #11, then `git checkout main && git pull` and `scripts/install-launchagents.sh` | GitHub, then Mini |
+| When you want `main` to match the Mini | Merge PR #11, then PR #12 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| **Phase D2** | Charts, stats, DuckDB. Next build phase. No new model. | Repo, then Mini |
-| Phase E | FLUX jobs, and `gpt-oss:20b` only after D2/D3 and a disk check | Mini |
+| **Phase D3** | Image ops, docs, diagrams. No FLUX. | Repo, then Mini |
+| Phase E | FLUX jobs, and `gpt-oss:20b` only after D3 and a disk check | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
