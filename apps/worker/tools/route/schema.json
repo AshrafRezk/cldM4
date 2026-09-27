@@ -1,0 +1,14 @@
+{
+  "name": "route",
+  "description": "Driving distance and duration between two coordinates via OSRM. Do not invent the numbers.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "origin_lat": {"type": "number"},
+      "origin_lon": {"type": "number"},
+      "destination_lat": {"type": "number"},
+      "destination_lon": {"type": "number"}
+    },
+    "required": ["origin_lat", "origin_lon", "destination_lat", "destination_lon"]
+  }
+}

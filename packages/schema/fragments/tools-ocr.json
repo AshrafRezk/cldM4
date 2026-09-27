@@ -1,0 +1,40 @@
+{
+  "x-cloudiator-scope": ["tools.ocr"],
+  "paths": {
+    "/v1/tools/ocr": {
+      "post": {
+        "operationId": "toolsOcrPost",
+        "summary": "Read text from an image",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image_url": {"type": "string"}
+                },
+                "required": ["image_url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recognized text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "text": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

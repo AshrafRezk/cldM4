@@ -1,6 +1,6 @@
 # Next steps — Mini pull, then Phase D (2026-09-27)
 
-**Phases A, B, and C are done.** Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions.
+**Phases A, B, and C are done.** Phase D (tool registry, Apple Vision OCR, maps) is the code on branch `cursor/phase-d-tools-ocr-maps-73f3`. It is not on the Mini until that branch is pulled. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -36,8 +36,8 @@ Expect `Access-Control-Allow-Origin: https://app.cloudiator.org`. Do **not** run
 | --- | --- | --- |
 | After this pull | Confirm playground chat from `app.cloudiator.org/console` returns JSON and a `usage_daily` row | Mini + browser |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| **Phase D (next chat)** | Tool registry, OCR (Vision), maps. Mini, Opus 5. Prompt in [cursor-phases.md](cursor-phases.md) | Mini |
+| **Phase D** | Tool registry, OCR (Vision), maps. Code is in `cursor/phase-d-tools-ocr-maps-73f3`. Prove it on the Mini: OCR does not change `ollama ps`, a repeated geocode makes no second Nominatim call, an unscoped key is 403. Vision does not run on Linux. | Mini |
 | Phase E | `gpt-oss:20b` only after Phase D is green | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
 
-Phase D copy-paste: new Agent chat on the Mini, model **Claude Opus 5**, attach `@PLAN.md` `@docs/cursor-phases.md`, paste the **Phase D only** block from [cursor-phases.md](cursor-phases.md).
+Phase D is already implemented on `cursor/phase-d-tools-ocr-maps-73f3`. On the Mini, pull that branch after the CORS restart above and run the Phase D proof commands in [cursor-phases.md](cursor-phases.md). Do not start a second Phase D implementation.

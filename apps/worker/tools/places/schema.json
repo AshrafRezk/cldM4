@@ -1,0 +1,13 @@
+{
+  "name": "places_nearby",
+  "description": "Find nearby amenities from OpenStreetMap. Do not invent places.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "lat": {"type": "number"},
+      "lon": {"type": "number"},
+      "kind": {"type": "string", "description": "OSM amenity, such as cafe or pharmacy."}
+    },
+    "required": ["lat", "lon", "kind"]
+  }
+}

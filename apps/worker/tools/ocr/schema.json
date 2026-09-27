@@ -1,0 +1,14 @@
+{
+  "name": "ocr_image",
+  "description": "Read text from an image with Apple Vision. Use this instead of guessing text in a photo.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "image_url": {
+        "type": "string",
+        "description": "https URL or data:image URI. http and file URLs are rejected."
+      }
+    },
+    "required": ["image_url"]
+  }
+}
