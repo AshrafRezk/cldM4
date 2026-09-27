@@ -1,0 +1,17 @@
+{
+  "name": "image_transform",
+  "description": "Convert an image, encode or decode a QR code, strip GPS, or list palette colors. Do not invent pixel values. GPS is removed unless strip_gps is false.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "description": "convert, qr_encode, qr_decode, exif, or palette."
+      },
+      "image_base64": {"type": "string"},
+      "text": {"type": "string", "description": "Payload for qr_encode."},
+      "format": {"type": "string", "description": "jpeg, png, or heic."}
+    },
+    "required": ["action"]
+  }
+}

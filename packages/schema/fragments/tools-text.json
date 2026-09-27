@@ -1,0 +1,46 @@
+{
+  "x-cloudiator-scope": ["tools.text"],
+  "paths": {
+    "/v1/tools/text": {
+      "post": {
+        "operationId": "toolsTextPost",
+        "summary": "Fuzzy match, parse a phone number, or expand a Salesforce Id",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {"type": "string"},
+                  "query": {"type": "string"},
+                  "choices": {"type": "array", "items": {"type": "string"}},
+                  "number": {"type": "string"},
+                  "region": {"type": "string"},
+                  "id": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Text tool result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id15": {"type": "string"},
+                    "id18": {"type": "string"},
+                    "e164": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
