@@ -39,6 +39,7 @@ CHAT_TOOL_ORDER = (
     "fuzzy_match",
     "convert_units",
     "render_diagram",
+    "web_research",
 )
 
 
@@ -129,12 +130,14 @@ class ToolRunner:
         maps: MapsClient,
         artifacts=None,
         scheduler=None,
+        research=None,
     ) -> None:
         self.settings = settings
         self.registry = registry
         self.maps = maps
         self.artifacts = artifacts
         self.scheduler = scheduler
+        self.research = research
 
     def _call_kwargs(self, spec: ToolSpec, extra: dict[str, Any]) -> dict[str, Any]:
         params = inspect.signature(spec.run).parameters
@@ -143,6 +146,7 @@ class ToolRunner:
             "settings": self.settings,
             "artifacts": self.artifacts,
             "scheduler": self.scheduler,
+            "research": self.research,
             **extra,
         }
         return {name: value for name, value in available.items() if name in params}

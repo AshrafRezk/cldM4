@@ -20,6 +20,7 @@ import toolsDocs from "./fragments/tools-docs.json" with { type: "json" };
 import toolsImage from "./fragments/tools-image.json" with { type: "json" };
 import toolsMaps from "./fragments/tools-maps.json" with { type: "json" };
 import toolsOcr from "./fragments/tools-ocr.json" with { type: "json" };
+import toolsResearch from "./fragments/tools-research.json" with { type: "json" };
 import toolsStats from "./fragments/tools-stats.json" with { type: "json" };
 import toolsText from "./fragments/tools-text.json" with { type: "json" };
 import toolsTime from "./fragments/tools-time.json" with { type: "json" };
@@ -42,6 +43,7 @@ const FRAGMENTS = [
   toolsImage,
   toolsMaps,
   toolsOcr,
+  toolsResearch,
   toolsStats,
   toolsText,
   toolsTime,

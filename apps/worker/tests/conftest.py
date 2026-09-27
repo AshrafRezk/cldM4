@@ -31,6 +31,8 @@ os.environ.update(
         "ARTIFACT_TTL_HOURS": "24",
         "ARTIFACT_URL_TTL_SECONDS": "900",
         "GEOCODE_CACHE_DB": os.path.join(_TEST_STATE_DIR, "geocode.db"),
+        "RESEARCH_CACHE_DB": os.path.join(_TEST_STATE_DIR, "research.db"),
+        "RESEARCH_USER_AGENT": "Cloudiator/1.0 (research; +https://cloudiator.test)",
         "NOMINATIM_USER_AGENT": "Cloudiator/0.1 (test@example.com)",
         "NOMINATIM_URL": "https://nominatim.test",
         "OVERPASS_URLS": "https://overpass.test/interpreter",
@@ -63,6 +65,7 @@ DEFAULT_CAPABILITIES = (
     "tools.text",
     "tools.time",
     "tools.image_ops",
+    "tools.research",
 )
 
 

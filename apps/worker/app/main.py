@@ -42,6 +42,14 @@ from .errors import CloudiatorError, mini_offline, model_not_found, not_supporte
 from .gates import BootRefused, run_boot_gates
 from .logging_setup import configure_logging, scrub
 from .maps import MapsClient
+from .research import (
+    ResearchClient,
+    cite_answer,
+    inject_research_notes,
+    last_user_text,
+    parse_research_option,
+    research_requested,
+)
 from .ollama import OllamaClient, normalize_tag
 from .openapi_filter import build_for_key, normalize_target
 from .scheduler import Scheduler
@@ -98,9 +106,15 @@ access = AccessVerifier(settings)
 admin_guard = AdminGuard(settings, access)
 artifacts = ArtifactStore(settings)
 maps_client = MapsClient(settings)
+research_client = ResearchClient(settings)
 tool_registry = load_registry()
 tool_runner = ToolRunner(
-    settings, tool_registry, maps_client, artifacts=artifacts, scheduler=scheduler
+    settings,
+    tool_registry,
+    maps_client,
+    artifacts=artifacts,
+    scheduler=scheduler,
+    research=research_client,
 )
 jobs = JobRunner(settings, scheduler, artifacts)
 
@@ -426,6 +440,16 @@ async def chat_completions(
     prompt_tokens = estimate_prompt_tokens(prepared, tools or None)
     enforce_context(prompt_tokens, max_tokens, num_ctx)
 
+    research_bundle = await _attach_research(body, prepared, key)
+    if research_bundle is not None:
+        # The sources are already in the prompt. A tool loop would spend the
+        # budget calling web_research again instead of writing the cited answer.
+        tools = []
+        prepared = inject_research_notes(prepared, research_bundle)
+        prompt_tokens = estimate_prompt_tokens(prepared, None)
+        enforce_context(prompt_tokens, max_tokens, num_ctx)
+        request.state.usage.tool = "web_research"
+
     options = build_options(body, num_ctx=num_ctx, max_tokens=max_tokens)
     response_format = (body.get("response_format") or {}).get("type")
 
@@ -468,9 +492,28 @@ async def chat_completions(
     usage = payload["usage"]
     request.state.usage.prompt_tokens = usage["prompt_tokens"]
     request.state.usage.completion_tokens = usage["completion_tokens"]
+    if research_bundle is not None:
+        message = payload["choices"][0]["message"]
+        message["content"] = cite_answer(message.get("content") or "", research_bundle.get("references") or [])
+        message.pop("tool_calls", None)
+        payload["research"] = research_bundle
     response = JSONResponse(content=payload)
     response.headers["x-cloudiator-tool-iterations"] = str(iterations)
+    if research_bundle is not None:
+        response.headers["x-cloudiator-research"] = "1"
     return response
+
+
+async def _attach_research(body: dict[str, Any], messages: list[dict[str, Any]], key: KeyRecord):
+    """Look up free public sources before the model runs, when the caller asked."""
+    if not research_requested(body):
+        return None
+    require_capability(key, "tools.research")
+    spec = parse_research_option(body)
+    if spec is None:
+        return None
+    query = spec.query if spec.query is not None else last_user_text(messages)
+    return await research_client.lookup(query, spec.sources, truncate=spec.query is None)
 
 
 def _chat_tools(body: dict[str, Any], key: KeyRecord) -> list[dict[str, Any]]:

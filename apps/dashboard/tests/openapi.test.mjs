@@ -30,7 +30,7 @@ test("JS generator matches Python generate.py for the Salesforce preset", () => 
     [
       join(schemaDir, "generate.py"),
       "--scopes",
-      "chat,embeddings,tools.ocr,tools.maps,tools.charts,tools.stats,tools.data,tools.docs,tools.text,tools.time,tools.image_ops",
+      "chat,embeddings,tools.ocr,tools.maps,tools.research,tools.charts,tools.stats,tools.data,tools.docs,tools.text,tools.time,tools.image_ops",
       "--target",
       "salesforce",
       "--base-url",
@@ -44,6 +44,7 @@ test("JS generator matches Python generate.py for the Salesforce preset", () => 
       "embeddings",
       "tools.ocr",
       "tools.maps",
+      "tools.research",
       "tools.charts",
       "tools.stats",
       "tools.data",

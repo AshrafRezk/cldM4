@@ -135,6 +135,22 @@ class Settings:
     osrm_url: str = field(
         default_factory=lambda: _str("OSRM_URL", "https://router.project-osrm.org")
     )
+    research_cache_db: str = field(
+        default_factory=lambda: _str(
+            "RESEARCH_CACHE_DB", os.path.expanduser("~/Cloudiator/research.db")
+        )
+    )
+    research_user_agent: str = field(
+        default_factory=lambda: _str(
+            "RESEARCH_USER_AGENT", "Cloudiator/1.0 (research; +https://cloudiator.org)"
+        )
+    )
+    research_timeout_seconds: float = field(
+        default_factory=lambda: _float("RESEARCH_TIMEOUT_SECONDS", 8.0)
+    )
+    research_cache_ttl_seconds: int = field(
+        default_factory=lambda: _int("RESEARCH_CACHE_TTL_SECONDS", 3600)
+    )
     max_tool_iterations: int = field(default_factory=lambda: _int("MAX_TOOL_ITERATIONS", 8))
     tool_loop_budget_seconds: float = field(
         default_factory=lambda: _float("TOOL_LOOP_BUDGET_SECONDS", 75.0)
