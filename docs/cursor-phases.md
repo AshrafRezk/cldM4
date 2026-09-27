@@ -326,7 +326,7 @@ STEP 0 — offline warmup, run by the human in Terminal, NOT by the worker (PLAN
   df -h /                       # need the headroom before you start
   uv tool install --upgrade mflux
   obtain pre-quantized 4-bit weights, or mflux-save --model schnell --quantize 4 --path ~/Cloudiator/models/flux-schnell-4bit
-  time mflux-generate --path ~/Cloudiator/models/flux-schnell-4bit --steps 4 --height 1024 --width 1024 --prompt "a red bicycle" --output /tmp/test.png
+  time mflux-generate --model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell --steps 4 --height 1024 --width 1024 --prompt "a red bicycle" --output /tmp/test.png
   record peak memory and wall clock in docs/operator-checklist.md section 9
   reclaim the full-precision HF cache if you took the quantize-locally path
 Do not write code that can trigger a weight download during an HTTP request. 4-bit is the default; 8-bit only after measuring with zero swap.

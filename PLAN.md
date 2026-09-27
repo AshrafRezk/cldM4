@@ -487,8 +487,8 @@ Phase E step 0, run **interactively in Terminal**, never from the worker:
 4. Point `MFLUX_MODEL_PATH` at the saved local model and always pass it. A worker run must never resolve weights from the network.
 5. Generate once by hand and time it:
    ```bash
-   time mflux-generate --path ~/Cloudiator/models/flux-schnell-4bit --steps 4 \
-     --height 1024 --width 1024 --prompt "a red bicycle" --output /tmp/test.png
+   time mflux-generate --model ~/Cloudiator/models/flux-schnell-4bit --base-model schnell \
+     --steps 4 --height 1024 --width 1024 --prompt "a red bicycle" --output /tmp/test.png
    ```
 6. Watch Activity Monitor during that run and record the peak in `docs/operator-checklist.md` §9.
 
