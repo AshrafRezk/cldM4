@@ -1,6 +1,6 @@
-# Next steps — Phase D on the Mini (2026-09-27)
+# Next steps — Phase D proven on the Mini (2026-09-27)
 
-**Phases A, B, and C are done.** The Mini is on `main` (`d9d4162`), the worker LaunchAgent is running, and the playground CORS preflight returns `Access-Control-Allow-Origin: https://app.cloudiator.org`. Phase D (tool registry, Apple Vision OCR, maps) is the code on branch `cursor/phase-d-tools-ocr-maps-73f3`. It is not on the Mini until that branch is checked out. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions.
+**Phases A, B, C, and D are done on the Mini.** The worker is on `cursor/phase-d-tools-ocr-maps-73f3`, health is `idle_hot_9b` (`gemma4:e4b-it-qat` + `nomic-embed-text`, swap 0), and playground CORS allows `https://app.cloudiator.org`. Phase D is not on `main` until [PR #11](https://github.com/AshrafRezk/cldM4/pull/11) is merged. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not start Phase E (`gpt-oss:20b` or FLUX) yet. The next build phase in [cursor-phases.md](cursor-phases.md) is Phase D2 (charts, stats, DuckDB).
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -12,51 +12,39 @@ Secrets stay in the password manager, not this file. Checklist: [operator-checkl
 
 **Dashboard (Phase C, live):** `https://app.cloudiator.org` on Netlify, Cloudflare Access only (no login form, no shared password). Landing at `/` (Agentforce-native product page + logo). Operator console at `/console` (tenants, scoped keys shown once, usage_daily, Salesforce OAS + Apex `setTimeout(120000)` / `"stream": false`, browser playground → Mini). `DATABASE_URL` is server-side only; `cd apps/dashboard && npm test` finds no `neon.tech` in `dist/`.
 
-## Mini, now (Phase D)
+## Phase D proof (Mini, 2026-09-27)
 
-`main` does not contain the tool routes. Check out the Phase D branch, install the two packages the existing venv does not have yet (`python-multipart` for the OCR upload, `ocrmac` for Apple Vision), then restart. Do **not** run `ollama pull`, `scripts/mac-setup.sh`, or Docker.
+| Check | Result |
+| --- | --- |
+| OCR `POST /v1/tools/ocr` on a large-font PNG | `{"text":"INVOICE 42"}` HTTP 200. No extra model loaded (`idle_hot_9b`). |
+| Geocode `Cairo, Egypt` | `30.0443879, 31.2357257`. Second call `0.005s` (SQLite cache). |
+| Chat-only key, `POST /v1/tools/ocr` | 403 |
+| Signed artifact URL | 200 |
+| Tampered signature | 404 |
+| Path traversal | 404 |
 
-```bash
-cd /Users/ashrafrezk/cldM4
-git fetch origin cursor/phase-d-tools-ocr-maps-73f3
-git checkout cursor/phase-d-tools-ocr-maps-73f3
-# uv venvs have no pip binary. Install into the worker venv with uv.
-cd apps/worker && uv pip install 'python-multipart>=0.0.9' 'ocrmac>=1.0' && cd ../..
-# ARTIFACT_SIGNING_SECRET must be set in ~/Cloudiator/.env (32+ random bytes).
-# Generate once if the line is missing; do not commit it:
-#   printf 'ARTIFACT_SIGNING_SECRET=%s\n' "$(openssl rand -hex 32)" >> ~/Cloudiator/.env
-scripts/install-launchagents.sh
-curl -s http://127.0.0.1:8080/v1/health
-```
+`ocrmac` is installed in the worker venv (`uv pip`, not a `pip` binary). OCR passes a PIL image. `ARTIFACT_SIGNING_SECRET` is in `~/Cloudiator/.env`.
 
-Mint a key in https://app.cloudiator.org/console (preset `salesforce_engineer` already includes `tools.ocr` and `tools.maps`). Put it in `KEY`. For the 403 check, mint a second key with only `chat` and put it in `NO_OCR_KEY`.
+## Now
+
+The two keys minted in that terminal were printed into this chat. Revoke them, then mint the real one from the console and leave the secret in the password manager.
 
 ```bash
-# OCR loads no extra weights. Use any small PNG.
-ollama ps > /tmp/before.txt
-curl -s -F file=@screenshot.png http://127.0.0.1:8080/v1/tools/ocr \
-  -H "Authorization: Bearer $KEY" | jq .text
-ollama ps > /tmp/after.txt && diff /tmp/before.txt /tmp/after.txt
-
-# Cache: second Cairo lookup is <50ms and makes no new Nominatim call.
-curl -s http://127.0.0.1:8080/v1/tools/geocode -H "Authorization: Bearer $KEY" \
-  -H 'content-type: application/json' -d '{"q":"Cairo, Egypt"}' | jq
-curl -s -o /dev/null -w 'second %{time_total}s\n' http://127.0.0.1:8080/v1/tools/geocode \
-  -H "Authorization: Bearer $KEY" -H 'content-type: application/json' -d '{"q":"Cairo, Egypt"}'
-
-# unscoped key. POST: a GET is 405 and never checks the scope.
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8080/v1/tools/ocr \
-  -H "Authorization: Bearer $NO_OCR_KEY"
+cd /Users/ashrafrezk/cldM4/apps/worker
+.venv/bin/python -m app.dbtool revoke-key ziwnk5ba8uvw
+.venv/bin/python -m app.dbtool revoke-key 5rozejut8fkw
 ```
 
-Expect: the second geocode is under 50ms, the unscoped key prints `403`, and OCR returns text without adding a model to `ollama ps`. On the Mini, Cairo cached in 5ms and the chat-only key returned 403. OCR itself needs the PIL-image fix in this branch (`ocrmac` rejects a `pathlib.Path`). Full contract: [cursor-phases.md](cursor-phases.md) Phase D. Do not start a second Phase D implementation. Do not start Phase E.
+Mint the replacement at https://app.cloudiator.org/console (preset `salesforce_engineer`). Do not paste the secret back into chat.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| Now | The Phase D checkout and proof block above | Mini |
+| Now | Revoke the two public ids above and mint a replacement in the console | Mini |
+| When you want `main` to match the Mini | Merge PR #11, then `git checkout main && git pull` and `scripts/install-launchagents.sh` | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Phase E | `gpt-oss:20b` only after Phase D is green | Mini |
+| **Phase D2** | Charts, stats, DuckDB. Next build phase. No new model. | Repo, then Mini |
+| Phase E | FLUX jobs, and `gpt-oss:20b` only after D2/D3 and a disk check | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
