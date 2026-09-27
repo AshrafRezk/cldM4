@@ -97,7 +97,9 @@ admin_guard = AdminGuard(settings, access)
 artifacts = ArtifactStore(settings)
 maps_client = MapsClient(settings)
 tool_registry = load_registry()
-tool_runner = ToolRunner(settings, tool_registry, maps_client)
+tool_runner = ToolRunner(
+    settings, tool_registry, maps_client, artifacts=artifacts, scheduler=scheduler
+)
 
 
 class HealthLimiter:

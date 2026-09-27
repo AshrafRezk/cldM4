@@ -3,9 +3,11 @@
 FastAPI worker for the Mac Mini M4 24GB appliance. Runs **only** on the Mini:
 arm64 macOS, Python 3.11, single process, bound to `127.0.0.1:8080`.
 
-See `PLAN.md` §§4, 6, 8–12 and `docs/cursor-phases.md` Phases A–D.
+See `PLAN.md` §§4, 6, 8–12 and `docs/cursor-phases.md` Phases A–D2.
 
 Phase D adds `POST /v1/tools/ocr`, `/v1/tools/geocode`, `/v1/tools/places`, and `/v1/tools/route`. FastAPI runs the tool loop (8 iterations, 75s). OCR uses Apple Vision on the Mini and does not load a model. Geocode caches Nominatim for 30 days and only rate-limits cache misses.
+
+Phase D2 adds `POST /v1/tools/chart`, `/v1/tools/stats`, and `/v1/tools/query`. Charts default to matplotlib (`MPLBACKEND=Agg`). Plotly is optional and a missing kaleido falls back to matplotlib. DuckDB is a fresh in-memory connection per request with external access and the local filesystem disabled before user SQL runs.
 
 ## Layout
 

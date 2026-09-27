@@ -116,3 +116,7 @@ def disk_full(free_gb: float, floor_gb: float) -> CloudiatorError:
 
 def upload_too_large(limit_bytes: int) -> CloudiatorError:
     return CloudiatorError(413, "upload_too_large", f"Upload exceeds {limit_bytes} bytes.")
+
+
+def sql_not_allowed(message: str) -> CloudiatorError:
+    return CloudiatorError(400, "sql_not_allowed", message, param="sql")

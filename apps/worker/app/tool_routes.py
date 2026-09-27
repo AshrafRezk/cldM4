@@ -44,6 +44,24 @@ def register_tool_routes(app: FastAPI, *, artifacts, runner, require_key) -> Non
         result = await runner.execute("route", body, key)
         return _tool_json(result)
 
+    @app.post("/v1/tools/chart")
+    async def chart(request: Request, key=Depends(require_key("tools.charts"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "render_chart"
+        return _tool_json(await runner.execute("render_chart", body, key))
+
+    @app.post("/v1/tools/stats")
+    async def stats(request: Request, key=Depends(require_key("tools.stats"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "stats_describe"
+        return _tool_json(await runner.execute("stats_describe", body, key))
+
+    @app.post("/v1/tools/query")
+    async def query(request: Request, key=Depends(require_key("tools.data"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "sql_on_table"
+        return _tool_json(await runner.execute("sql_on_table", body, key))
+
     @app.post("/v1/artifacts/{artifact_id}/sign")
     async def sign_artifact(
         artifact_id: str, request: Request, key=Depends(require_key())
@@ -74,9 +92,11 @@ def _tool_json(result: dict[str, Any]) -> JSONResponse:
         raise CloudiatorError(403, "scope_denied", result.get("message") or "Scope denied.")
     if result.get("error"):
         code = result["error"]
-        status = 429 if code == "insufficient_quota" else 400
+        status = 400
         if code == "not_found":
             status = 404
+        if code in {"insufficient_quota", "metal_busy", "disk_full"}:
+            status = 429
         raise CloudiatorError(status, code, result.get("message") or "Tool failed.")
     return JSONResponse(content=result)
 

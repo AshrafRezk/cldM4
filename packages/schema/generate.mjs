@@ -13,8 +13,11 @@ import health from "./fragments/health.json" with { type: "json" };
 import jobs from "./fragments/jobs.json" with { type: "json" };
 import models from "./fragments/models.json" with { type: "json" };
 import openapi from "./fragments/openapi.json" with { type: "json" };
+import toolsCharts from "./fragments/tools-charts.json" with { type: "json" };
+import toolsData from "./fragments/tools-data.json" with { type: "json" };
 import toolsMaps from "./fragments/tools-maps.json" with { type: "json" };
 import toolsOcr from "./fragments/tools-ocr.json" with { type: "json" };
+import toolsStats from "./fragments/tools-stats.json" with { type: "json" };
 import usage from "./fragments/usage.json" with { type: "json" };
 import scopesJson from "./scopes.json" with { type: "json" };
 
@@ -26,8 +29,11 @@ const FRAGMENTS = [
   jobs,
   models,
   openapi,
+  toolsCharts,
+  toolsData,
   toolsMaps,
   toolsOcr,
+  toolsStats,
   usage,
 ];
 const FORBIDDEN_COMPOSITION = ["oneOf", "anyOf", "allOf", "not"];
