@@ -12,6 +12,7 @@ from app.errors import CloudiatorError
 from app.research import (
     ALLOWED_HOSTS,
     assert_allowed,
+    cite_answer,
     parse_duckduckgo,
     parse_google_news,
     parse_open_library,
@@ -174,6 +175,39 @@ def test_allowlist_rejects_link_local_and_plaintext_http():
         assert_allowed("https://evil.example/search")
 
 
+def test_an_uncited_draft_gains_intext_markers_and_a_reference_list():
+    refs = [
+        {
+            "n": 1,
+            "title": "Cairo",
+            "url": "https://openlibrary.org/works/OL1W",
+            "snippet": "Max Rodenbeck wrote about the city.",
+            "source": "openlibrary",
+        }
+    ]
+    text = cite_answer("Cairo is warm.\n\nReferences\n[1] made up", refs)
+    answer, _, bibliography = text.partition("\n\nReferences\n")
+    assert answer == "Cairo is warm [1]."
+    assert "made up" not in text
+    assert "[1] Cairo. openlibrary. https://openlibrary.org/works/OL1W" in bibliography
+
+
+def test_a_model_citation_is_kept_and_unknown_markers_are_removed():
+    refs = [
+        {
+            "n": 1,
+            "title": "Cairo",
+            "url": "https://openlibrary.org/works/OL1W",
+            "snippet": "A city.",
+            "source": "openlibrary",
+        }
+    ]
+    text = cite_answer("Rodenbeck describes the city [1] and not this [9].", refs)
+    assert "describes the city [1]" in text
+    assert "[9]" not in text
+    assert text.count("References") == 1
+
+
 def test_parsers_keep_titles_and_drop_markup():
     assert parse_duckduckgo(DDG)[0]["title"] == "Ada Lovelace"
     assert parse_reddit_atom(REDDIT_ATOM)[0]["snippet"].startswith("r/Python")
@@ -232,9 +266,11 @@ async def test_chat_research_returns_inputs_and_shows_them_to_the_model(
     make_client, cached_key, recorded, fake_ollama, monkeypatch
 ):
     seen: list[dict] = []
+    tool_calls: list = []
 
     async def chat(model, messages, *, options, tools=None, response_format=None):
         seen.extend(messages)
+        tool_calls.append(tools)
         return {
             "model": model,
             "message": {"role": "assistant", "content": "Cairo is warm."},
@@ -257,10 +293,16 @@ async def test_chat_research_returns_inputs_and_shows_them_to_the_model(
         )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["choices"][0]["message"]["content"] == "Cairo is warm."
+    answer = body["choices"][0]["message"]["content"]
+    assert answer.startswith("Cairo is warm [1].")
+    assert "\n\nReferences\n[1] Cairo. openlibrary." in answer
+    assert body["research"]["references"][0]["n"] == 1
+    assert body["research"]["references"][0]["url"] == "https://openlibrary.org/works/OL1W"
     assert body["research"]["books"][0]["title"] == "Cairo"
     assert response.headers["x-cloudiator-research"] == "1"
-    assert any("Research inputs" in (message.get("content") or "") for message in seen)
+    assert tool_calls == [None]
+    assert any("[1]" in (message.get("content") or "") for message in seen)
+    assert any("Do not write a bibliography" in (message.get("content") or "") for message in seen)
     assert all(urlsplit(url).hostname == "openlibrary.org" for url in recorded)
 
 

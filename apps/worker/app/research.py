@@ -46,7 +46,8 @@ ALLOWED_HOSTS = frozenset(
 )
 MAX_QUERY_CHARS = 240
 MAX_BODY_BYTES = 200_000
-MAX_NOTE_CHARS = 1_800
+MAX_NOTE_CHARS = 3_500
+MAX_REFERENCES = 12
 MAX_SNIPPET = 280
 REDIRECTS = {301, 302, 303, 307, 308}
 ATOM = {"a": "http://www.w3.org/2005/Atom"}
@@ -478,21 +479,161 @@ def empty_weather() -> dict[str, Any]:
     return {"found": False, "source": "open-meteo", "place": "", "summary": ""}
 
 
-def research_note(bundle: dict[str, Any]) -> str:
-    lines = ["Research inputs for the next user message. Use them. Do not invent citations or sources."]
+def number_references(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    """Stable [1], [2], … order: web, reddit, news, books, then weather."""
+    refs: list[dict[str, Any]] = []
     for key in ("web", "reddit", "news", "books"):
-        for hit in (bundle.get(key) or [])[:3]:
+        for hit in bundle.get(key) or []:
             if not isinstance(hit, dict):
                 continue
-            title = hit.get("title") or ""
-            snippet = hit.get("snippet") or ""
-            url = hit.get("url") or ""
-            lines.append(f"{key}: {title} — {snippet} {url}".strip())
+            title = str(hit.get("title") or "").strip()
+            snippet = str(hit.get("snippet") or "").strip()
+            if not title and not snippet:
+                continue
+            refs.append(
+                {
+                    "n": len(refs) + 1,
+                    "title": title or snippet[:80],
+                    "url": str(hit.get("url") or ""),
+                    "snippet": snippet,
+                    "source": str(hit.get("source") or key),
+                }
+            )
+            if len(refs) >= MAX_REFERENCES:
+                return refs
     weather = bundle.get("weather") or {}
-    if isinstance(weather, dict) and weather.get("found"):
-        lines.append(
-            f"weather: {weather.get('place')} {weather.get('temperature_c')}°C, {weather.get('summary')}"
+    if isinstance(weather, dict) and weather.get("found") and len(refs) < MAX_REFERENCES:
+        place = str(weather.get("place") or "Weather")
+        summary = str(weather.get("summary") or "")
+        temperature = weather.get("temperature_c")
+        reading = f"{temperature}°C, {summary}".strip(", ") if temperature is not None else summary
+        refs.append(
+            {
+                "n": len(refs) + 1,
+                "title": place,
+                "url": "https://open-meteo.com/",
+                "snippet": f"{place}: {reading}".strip(),
+                "source": "open-meteo",
+            }
         )
+    return refs
+
+
+def with_references(bundle: dict[str, Any]) -> dict[str, Any]:
+    """Copy the bundle and attach numbered references. Does not mutate the cache entry."""
+    out = dict(bundle)
+    out["references"] = number_references(bundle)
+    return out
+
+
+def bibliography(references: list[dict[str, Any]]) -> str:
+    lines = ["References"]
+    for ref in references:
+        url = f" {ref['url']}" if ref.get("url") else ""
+        lines.append(f"[{ref['n']}] {ref['title']}. {ref['source']}.{url}".rstrip())
+    return "\n".join(lines)
+
+
+_CITE = re.compile(r"\[(\d+)\]")
+_BIB = re.compile(r"\n+(?:References|المراجع)\s*\n.*\Z", re.IGNORECASE | re.DOTALL)
+_SENTENCE = re.compile(r"[^.!?؟]+[.!?؟]+|[^.!?؟]+$")
+_WORD = re.compile(r"[^\W\d_]{3,}", re.UNICODE)
+
+
+def cite_answer(content: str, references: list[dict[str, Any]]) -> str:
+    """Turn the model draft into a cited answer.
+
+    The model writes the prose. This pass keeps that wording, makes sure each
+    sentence that needed a source carries [n], and replaces any bibliography
+    the model invented with the numbered sources we actually fetched.
+    """
+    text = _strip_bibliography((content or "").strip())
+    if not references:
+        return text or "No public sources came back for this prompt."
+    valid = {int(ref["n"]) for ref in references}
+    used = {int(n) for n in _CITE.findall(text) if int(n) in valid}
+    if used:
+        text = _drop_unknown_markers(text, valid)
+    else:
+        text = _cite_sentences(text, references)
+    text = text.strip()
+    if not text:
+        text = _cite_sentences("", references)
+    return f"{text}\n\n{bibliography(references)}"
+
+
+def _strip_bibliography(text: str) -> str:
+    text = _BIB.sub("", text).strip()
+    if re.match(r"(?is)^(references|المراجع)\s*\n", text):
+        return ""
+    return text
+
+
+def _drop_unknown_markers(text: str, valid: set[int]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        return match.group(0) if int(match.group(1)) in valid else ""
+
+    cleaned = _CITE.sub(replace, text)
+    return re.sub(r"[ \t]{2,}", " ", cleaned).strip()
+
+
+def _cite_sentences(text: str, references: list[dict[str, Any]]) -> str:
+    sentences = [part.strip() for part in _SENTENCE.findall(text) if part.strip()]
+    if not sentences:
+        return " ".join(_snippet_sentence(ref) for ref in references if _snippet_sentence(ref))
+    cursor = 0
+    cited: list[str] = []
+    for sentence in sentences:
+        if _CITE.search(sentence):
+            cited.append(sentence if sentence[-1:] in ".!?؟" else f"{sentence}.")
+            continue
+        number = _best_ref(sentence, references)
+        if number is None:
+            number = int(references[cursor % len(references)]["n"])
+            cursor += 1
+        body = sentence.rstrip()
+        if body[-1:] in ".!?؟":
+            body = body[:-1].rstrip()
+        cited.append(f"{body} [{number}].")
+    return " ".join(cited)
+
+
+def _snippet_sentence(ref: dict[str, Any]) -> str:
+    bit = str(ref.get("snippet") or ref.get("title") or "").strip().rstrip(".!?؟")
+    if not bit:
+        return ""
+    return f"{bit} [{ref['n']}]."
+
+
+def _best_ref(sentence: str, references: list[dict[str, Any]]) -> int | None:
+    words = set(_WORD.findall(sentence.casefold()))
+    if not words:
+        return None
+    best_n: int | None = None
+    best_score = 0
+    for ref in references:
+        hay = set(_WORD.findall(f"{ref.get('title') or ''} {ref.get('snippet') or ''}".casefold()))
+        score = len(words & hay)
+        if score > best_score:
+            best_score = score
+            best_n = int(ref["n"])
+    return best_n if best_score else None
+
+
+def research_note(bundle: dict[str, Any]) -> str:
+    refs = bundle.get("references") or number_references(bundle)
+    lines = [
+        "Digest the numbered sources for the user's next message. Write a short answer in "
+        "the user's language, in prose, the way a careful person would after reading the pages. "
+        "End every sentence that uses a source with its number in brackets, such as [1] or [1][2]. "
+        "Use only these sources. Do not invent facts, numbers, or links. Do not write a bibliography."
+    ]
+    for ref in refs:
+        lines.append(f"[{ref['n']}] {ref.get('source')}: {ref.get('title')}")
+        if ref.get("snippet"):
+            lines.append(str(ref["snippet"]))
+        if ref.get("url"):
+            lines.append(str(ref["url"]))
     text = "\n".join(lines)
     if len(text) <= MAX_NOTE_CHARS:
         return text
@@ -643,7 +784,7 @@ class ResearchClient:
         key = _cache_key(text, chosen)
         cached = self.cache.get(key)
         if cached is not None:
-            return cached
+            return with_references(cached)
         pieces = await asyncio.gather(*(self._run_source(name, text) for name in chosen))
         bundle: dict[str, Any] = {"query": text, "notes": []}
         for name, (payload, note) in zip(chosen, pieces, strict=True):
@@ -658,7 +799,7 @@ class ResearchClient:
             len(bundle["notes"]),
             self.outbound,
         )
-        return bundle
+        return with_references(bundle)
 
     async def _run_source(self, name: str, query: str) -> tuple[Any, dict[str, str] | None]:
         try:

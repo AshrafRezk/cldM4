@@ -1,32 +1,15 @@
 import { useEffect, useState } from "react";
 import { haptic } from "./haptic.js";
 
-const RESEARCH_KEYS = ["web", "reddit", "news", "books"];
+function referenceList(bundle) {
+  if (Array.isArray(bundle?.references) && bundle.references.length) return bundle.references;
+  return [];
+}
 
-function researchLines(bundle) {
-  if (!bundle) return [];
-  const lines = [];
-  for (const key of RESEARCH_KEYS) {
-    for (const hit of bundle[key] || []) {
-      lines.push({
-        source: hit.source || key,
-        title: hit.title || hit.snippet || key,
-        snippet: hit.snippet || "",
-        url: hit.url || "",
-      });
-    }
-  }
-  const weather = bundle.weather;
-  if (weather?.found) {
-    const temp = weather.temperature_c == null ? "" : `${weather.temperature_c}°C `;
-    lines.push({
-      source: "weather",
-      title: weather.place || "Weather",
-      snippet: `${temp}${weather.summary || ""}`.trim(),
-      url: "",
-    });
-  }
-  return lines;
+function answerBody(text) {
+  const marker = "\n\nReferences\n";
+  const at = text.indexOf(marker);
+  return at === -1 ? text : text.slice(0, at);
 }
 
 export function Playground({ apiUrl, model, initialKey }) {
@@ -118,8 +101,8 @@ export function Playground({ apiUrl, model, initialKey }) {
           Research
         </label>
         <p className="muted">
-          When Research is on, the Mini looks up the prompt on Wikipedia, DuckDuckGo, Reddit, Google News,
-          Open-Meteo, and Open Library, then returns those inputs with the answer. The key needs{" "}
+          When Research is on, the Mini reads Wikipedia, DuckDuckGo, Reddit, Google News, Open-Meteo, and Open
+          Library, then writes the answer with [1] citations and a reference list. The key needs{" "}
           <code>tools.research</code>.
         </p>
         <button type="submit" className="btn btn-primary" disabled={busy || !key.trim()}>
@@ -127,20 +110,26 @@ export function Playground({ apiUrl, model, initialKey }) {
         </button>
       </form>
       {error ? <p className="error">{error}</p> : null}
-      {inputs ? (
+      {reply ? (
+        <div className="reply" dir="auto">
+          {answerBody(reply)}
+        </div>
+      ) : null}
+      {inputs && referenceList(inputs).length ? (
         <div className="research-hits">
-          <p className="muted">Inputs for &quot;{inputs.query}&quot;</p>
-          {researchLines(inputs).map((hit) => (
-            <article key={`${hit.source}-${hit.title}-${hit.url}`} className="research-hit">
-              <div className="src">{hit.source}</div>
-              {hit.url ? (
-                <a href={hit.url} target="_blank" rel="noreferrer">
-                  {hit.title}
+          <p className="muted">References</p>
+          {referenceList(inputs).map((ref) => (
+            <article key={`${ref.n}-${ref.url}`} className="research-hit">
+              <div className="src">
+                [{ref.n}] {ref.source}
+              </div>
+              {ref.url ? (
+                <a href={ref.url} target="_blank" rel="noreferrer">
+                  {ref.title}
                 </a>
               ) : (
-                <strong>{hit.title}</strong>
+                <strong>{ref.title}</strong>
               )}
-              {hit.snippet ? <p>{hit.snippet}</p> : null}
             </article>
           ))}
           {(inputs.notes || []).map((note) => (
@@ -148,14 +137,6 @@ export function Playground({ apiUrl, model, initialKey }) {
               {note.source}: {note.message}
             </p>
           ))}
-          {researchLines(inputs).length === 0 && !(inputs.notes || []).length ? (
-            <p className="muted">No public hits for this prompt.</p>
-          ) : null}
-        </div>
-      ) : null}
-      {reply ? (
-        <div className="reply" dir="auto">
-          {reply}
         </div>
       ) : null}
     </section>

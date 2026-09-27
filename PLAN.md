@@ -648,7 +648,7 @@ Use `opencv-python-headless` only.
 
 ### Research (`tools.research`)
 
-`research: true` on `POST /v1/chat/completions` (alias `Research`) looks up the latest user message before the model runs and returns the same bundle on the completion. `POST /v1/tools/research` is the same lookup. Sources, all keyless and allowlisted: DuckDuckGo instant answers and Wikipedia (`web`), Reddit's public search feed, Google News RSS and Hacker News (`news`), Open-Meteo (`weather`), Open Library (`books`). Google Custom Search is not used. The prompt is a search string, never a URL. Cache hits skip the network. One failed source does not drop the others.
+`research: true` on `POST /v1/chat/completions` (alias `Research`) looks up the latest user message, asks the hot model to digest those sources in the user's language, and returns that answer with in-text `[n]` citations plus a References list. The tool loop is skipped for that call so the completion is the digest. `POST /v1/tools/research` is the same lookup. Sources, all keyless and allowlisted: DuckDuckGo instant answers and Wikipedia (`web`), Reddit's public search feed, Google News RSS and Hacker News (`news`), Open-Meteo (`weather`), Open Library (`books`). Google Custom Search is not used. The prompt is a search string, never a URL. Cache hits skip the network. One failed source does not drop the others.
 
 Production volume: self-host Nominatim or a paid geocoder. Public Nominatim will ban you.
 

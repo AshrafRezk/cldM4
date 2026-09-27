@@ -60,6 +60,16 @@
           "source": {"type": "string"}
         }
       },
+      "ResearchReference": {
+        "type": "object",
+        "properties": {
+          "n": {"type": "integer"},
+          "title": {"type": "string"},
+          "url": {"type": "string"},
+          "snippet": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      },
       "ResearchNote": {
         "type": "object",
         "properties": {
@@ -104,6 +114,10 @@
           "notes": {
             "type": "array",
             "items": {"$ref": "#/components/schemas/ResearchNote"}
+          },
+          "references": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchReference"}
           }
         }
       }
