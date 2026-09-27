@@ -6,6 +6,7 @@ import pytest
 
 from app import main
 from app.procgroup import run_group
+from tools.diagram.handler import graphviz_dot
 from tools.diagram.handler import run as diagram_run
 
 
@@ -43,6 +44,15 @@ async def test_a_direct_graphviz_render_does_not_call_mmdc(monkeypatch):
     )
     assert result["engine"] == "graphviz"
     assert called == []
+
+
+def test_graphviz_is_found_outside_the_launchd_path(tmp_path, monkeypatch):
+    binary = tmp_path / "dot"
+    binary.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary.chmod(0o755)
+    monkeypatch.setattr("tools.diagram.handler.shutil.which", lambda _name: None)
+    monkeypatch.setattr("tools.diagram.handler._DOT_CANDIDATES", (str(binary),))
+    assert graphviz_dot() == str(binary)
 
 
 async def test_timeout_kills_the_process_group():

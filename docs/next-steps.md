@@ -41,18 +41,16 @@ matplotlib, numpy, scipy, duckdb, and pyarrow are installed in the worker venv w
 
 `salesforce_engineer` already includes `tools.image_ops`, `tools.docs`, `tools.text`, and `tools.time`. Diagrams need `tools.diagrams` (the creative preset, or pass `--capabilities` ). Graphviz (`dot`) must be on the Mini; `scripts/mac-setup.sh` installs it, and `brew install graphviz` is enough if `dot` is missing. Do not run `mac-setup` again just for that.
 
+The first Mini run converted `001D000000IRt53` to `001D000000IRt53IAD`. The diagram call returned `not_supported` because launchd's PATH is `/usr/bin:/bin:/usr/sbin:/sbin`, so the worker could not see `/opt/homebrew/bin/dot` even though Terminal could. The handler now checks that path (and `/usr/local/bin/dot`) itself. Pull and kickstart; do not reinstall the LaunchAgent.
+
 Wait for `/v1/health` after `kickstart`. The last restart returned before port 8080 was open.
 
 ```bash
 cd /Users/ashrafrezk/cldM4
 git fetch origin cursor/phase-d3-image-docs-diagrams-73f3
 git checkout cursor/phase-d3-image-docs-diagrams-73f3
-cd apps/worker
-uv pip install 'pillow-heif>=0.18' 'opencv-python-headless>=4.10' 'qrcode>=7.4' \
-  'pypdf>=4.3' 'python-docx>=1.1' 'openpyxl>=3.1' 'fpdf2>=2.7' 'rapidfuzz>=3.9' \
-  'phonenumbers>=8.13' 'pint>=0.24' 'holidays>=0.57'
+git pull --ff-only
 command -v dot >/dev/null || brew install graphviz
-cd ../..
 launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   curl -sf http://127.0.0.1:8080/v1/health && break

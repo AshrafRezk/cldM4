@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,9 @@ GPU = False
 _MAX_SOURCE = 64_000
 _BLOCKED = ("shapefile", "image=", "`")
 _CHROMIUM_ARGS = ["--no-sandbox", "--single-process", "--disable-dev-shm-usage"]
+# launchd does not inherit the login PATH, so Homebrew's dot is invisible to
+# `shutil.which` inside the worker even when Terminal can run it.
+_DOT_CANDIDATES = ("/opt/homebrew/bin/dot", "/usr/local/bin/dot")
 
 
 async def run(arguments: dict[str, Any], *, settings, artifacts, scheduler=None) -> dict[str, Any]:
@@ -51,9 +56,29 @@ def _source(value: Any) -> str:
     return value
 
 
+def graphviz_dot() -> str:
+    found = shutil.which("dot")
+    if found:
+        return found
+    for candidate in _DOT_CANDIDATES:
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    raise FileNotFoundError("dot")
+
+
 async def _graphviz(source: str) -> bytes:
     try:
-        stdout, stderr, code = await run_group(["dot", "-Tpng"], timeout=30, stdin=source.encode())
+        dot = graphviz_dot()
+    except FileNotFoundError as exc:
+        raise CloudiatorError(
+            503,
+            "not_supported",
+            "Graphviz (dot) is not installed on the Mini. brew install graphviz, "
+            "then restart the worker. LaunchAgent jobs do not see a Terminal PATH.",
+            error_type="server_error",
+        ) from exc
+    try:
+        stdout, stderr, code = await run_group([dot, "-Tpng"], timeout=30, stdin=source.encode())
     except FileNotFoundError as exc:
         raise CloudiatorError(
             503,
