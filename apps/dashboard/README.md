@@ -4,6 +4,8 @@ Vite + React on Netlify. **No inference.** Chat from the playground goes to `htt
 
 Authentication is **Cloudflare Access** on `app.cloudiator.org`. This app has no login form, no shared admin password, and no Netlify Identity. Server functions read `Cf-Access-Authenticated-User-Email` and trust nothing else.
 
+How to mint a key, use the playground, and call every live tool: [docs/using-console.md](../../docs/using-console.md).
+
 ## Local
 
 Do not run Ollama, LaunchAgents, or `scripts/mac-setup.sh` on this laptop.

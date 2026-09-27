@@ -56,6 +56,8 @@ SQLite outbox runs against a temporary file, never `~/Cloudiator/queue.db`.
 
 ## Keys
 
+Browser minting, the playground, and one curl per live tool: `docs/using-console.md`.
+
 ```bash
 cd apps/worker
 .venv/bin/python -m app.dbtool verify-schema

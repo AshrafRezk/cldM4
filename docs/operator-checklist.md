@@ -243,4 +243,4 @@ Operator: Ashraf / laptop cloud  Date: 2026-09-20
 
 ## 12. Next steps
 
-Phases A–E are done. The finish list (swap reboot, usage row, Neon retention, Netlify hostname, Phase F, boot and alerting) is [next-steps.md](next-steps.md). Secrets stay in the password manager. Mini repo: `/Users/ashrafrezk/cldM4`.
+Phases A–E are done. How to mint a key, use the playground, and call every live tool is [using-console.md](using-console.md). The finish list (swap reboot, usage row, Neon retention, Netlify hostname, Phase F, boot and alerting) is [next-steps.md](next-steps.md). Secrets stay in the password manager. Mini repo: `/Users/ashrafrezk/cldM4`.
