@@ -108,5 +108,5 @@ The chat JSON has to contain a one-word reply. `ollama ps` has to show Gemma. Af
 | When you want `main` to match the Mini | Merge PR #11, then #12, then #13 | GitHub, then Mini |
 | After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
 | This week | Schedule `infra/neon-retention.sql` (free-tier storage) | Neon |
-| Now | Crash drill: kill `mflux-generate` mid-job, then chat within 60s, then restart and read the succeeded job | Mini |
+| Now | Crash drill: kill `mflux-generate` mid-job, then chat within 60s, then restart and read that job | Mini |
 | Phase F | External Services import of Salesforce OAS 3.0.3 | Salesforce |
