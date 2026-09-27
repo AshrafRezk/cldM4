@@ -227,26 +227,27 @@ The permission-set row is not optional. Without it the callout returns 401 even 
 
 ---
 
-## 11. Sign-off before Phase B starts
+## 11. Sign-off
 
-Laptop cloud (2026-09-20): domain, Neon schema, WAF Skip, Access apps. Phase A is on `main`. Still open: §4 Netlify (Phase C), §5 Nominatim policy read, tunnel + key auth (Mini Phase B).
+Laptop and Mini (2026-09-20, re-checked 2026-09-27): domain, Neon schema, WAF Skip, Access apps, and Phases A–E. `main` matches the Mini. After the D2–E pull, health was `idle_hot_9b` with Gemma and `nomic-embed-text` loaded. `ok` was false only because leftover swap was still in use.
+
+Still open: §2a Security Level and Browser Integrity Check, §3 retention job, §4 naked `netlify.app` hostname, §5 Nominatim policy, §6 boot policy, §7 alerting, and the click-through leftovers in [next-steps.md](next-steps.md).
 
 - [x] Sections 1–3 public rows filled. Secrets stay in the password manager, not this file.
 - [ ] Section 6 has exactly one option ticked. (Mini)
-- [ ] `~/Cloudiator/.env` exists, is `chmod 600`, and is **not** inside the git working tree. (Mini)
-- [ ] `git status` is clean of secrets; `.env` is ignored.
+- [x] `~/Cloudiator/.env` exists, is `chmod 600`, and is **not** inside the git working tree. (Mini, Phase B)
+- [x] `git status` is clean of secrets; `.env` is ignored.
 - [x] You can state, out loud, what happens to Salesforce traffic if you enable Bot Fight Mode. (HTML interstitial; Apex cannot parse it.)
 
-Operator: Ashraf / laptop cloud  Date: 2026-09-20
+Operator: Ashraf  Date: 2026-09-20 (Phase B). Re-reviewed 2026-09-27: Phases D–E are on `main`. Boot policy is still open.
 
 ---
 
-## 12. Next steps (after laptop cloud setup)
+## 12. Next steps
 
 Full copy: [next-steps.md](next-steps.md). Secrets stay in the password manager.
 
-1. **This laptop:** `git push` (if this commit is not on GitHub yet).
-2. **Mini:** `git pull`. Phase A is already on `main`. New Cursor chat, Opus, Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`. Paste the block in [next-steps.md](next-steps.md) **Copy-paste into the Mini Agent chat**.
-3. Mini `.env`: pooled `DATABASE_URL`, `PUBLIC_BASE_URL=https://api.cloudiator.org`, `CF_ACCESS_AUD` (api app), `CF_ACCESS_TEAM_DOMAIN`, Nominatim UA. `chmod 600`, outside git.
-4. Named tunnel `cloudiator-mini` → `127.0.0.1:8080` only. Prove from a **phone on cellular**.
-5. **Later:** Netlify (Phase C). Schedule `infra/neon-retention.sql`. Do not create a Cloudflare Worker.
+1. Finish the leftovers in [next-steps.md](next-steps.md). Do not rebuild the dashboard. Do not pull `gpt-oss:20b`.
+2. Tick exactly one boot policy in §6 before treating a restart as unattended.
+3. Schedule `infra/neon-retention.sql` and disable `cloudiator.netlify.app`.
+4. Phase F when you ask for it. New Agent chat, Claude Sonnet 5, paste only the Phase F block from [cursor-phases.md](cursor-phases.md).

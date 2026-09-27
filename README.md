@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A–C are live: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. Next is Phase D on the Mini — [docs/next-steps.md](docs/next-steps.md).
+**This repository is the production plan and the product.** Phases A–E are on `main` and running on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. Next is [docs/next-steps.md](docs/next-steps.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -61,7 +61,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
 | [docs/hardware-and-network.md](docs/hardware-and-network.md) | **Day 0.** Physical Mini, Ethernet, CGNAT, no port forwards, accounts, prove-internet commands |
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
-| [docs/next-steps.md](docs/next-steps.md) | **Current.** Phase C from the MacBook. Do not put secrets here |
+| [docs/next-steps.md](docs/next-steps.md) | **Current.** What is proven, what is left, and what a reboot does |
 | [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |
 | [docs/plan-review-prompt.md](docs/plan-review-prompt.md) | Opus 5 prompt to re-audit the plan (already run once; keep for later) |
