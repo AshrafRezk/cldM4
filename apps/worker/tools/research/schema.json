@@ -1,0 +1,16 @@
+{
+  "name": "web_research",
+  "description": "Look up a question on free public sources: web (DuckDuckGo and Wikipedia), Reddit, Google News, Open-Meteo weather, and Open Library books. Use this when the user needs current information, news, weather, or books. Do not invent sources.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "q": {"type": "string", "description": "Search text. A question or place name, not a URL."},
+      "sources": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Optional subset: web, reddit, news, weather, books. Omit to search all of them."
+      }
+    },
+    "required": ["q"]
+  }
+}

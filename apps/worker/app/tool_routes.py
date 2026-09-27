@@ -92,6 +92,12 @@ def register_tool_routes(app: FastAPI, *, artifacts, runner, require_key) -> Non
         request.state.usage.tool = "holiday_on"
         return _tool_json(await runner.execute("holiday_on", body, key))
 
+    @app.post("/v1/tools/research")
+    async def research(request: Request, key=Depends(require_key("tools.research"))) -> JSONResponse:
+        body = await _json(request)
+        request.state.usage.tool = "web_research"
+        return _tool_json(await runner.execute("web_research", body, key))
+
     @app.post("/v1/tools/diagram")
     async def diagram(request: Request, key=Depends(require_key("tools.diagrams"))) -> JSONResponse:
         body = await _json(request)

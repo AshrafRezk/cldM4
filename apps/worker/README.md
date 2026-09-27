@@ -11,6 +11,8 @@ Phase D2 adds `POST /v1/tools/chart`, `/v1/tools/stats`, and `/v1/tools/query`. 
 
 Phase D3 adds `POST /v1/tools/image`, `/v1/tools/document`, `/v1/tools/text`, `/v1/tools/units`, `/v1/tools/time`, and `/v1/tools/diagram`. Diagrams use Graphviz. `ENABLE_MERMAID` stays false; a mermaid render is refused onto Graphviz, and a timeout kills the Chromium process group. GPS is stripped from images unless `strip_gps` is false.
 
+`POST /v1/tools/research` and the chat field `research: true` look up the prompt on free public sources (Wikipedia, DuckDuckGo, Reddit, Google News, Open-Meteo, Open Library) and return those inputs with the answer. The key needs `tools.research`. Hosts are allowlisted; the prompt is a search string, never a URL the worker fetches.
+
 ## Layout
 
 | Module | What it owns |

@@ -87,6 +87,7 @@ The outbox lives in `QUEUE_DB`, so it survives a worker restart. Its depth is `o
 | `MIN_FREE_DISK_GB` | `10` | below this, refuse generation jobs and report health `degraded`; hard stop at 5 |
 | `QUEUE_DB` | `/Users/<you>/Cloudiator/queue.db` | jobs **and** the usage outbox |
 | `GEOCODE_CACHE_DB` | `/Users/<you>/Cloudiator/geocode.db` | 30-day TTL; the 1 rps limiter applies to misses only |
+| `RESEARCH_CACHE_DB` | `/Users/<you>/Cloudiator/research.db` | 1-hour TTL for `research: true` lookups; misses only |
 | `MFLUX_MODEL_PATH` | `/Users/<you>/Cloudiator/models/flux-schnell-4bit` | always passed explicitly so a request can never trigger a weight download |
 | `MFLUX_LOW_RAM` | `true` | required on the 24 GB Mini. A 1024² run without it peaked at 19.08 GB and swapped; with it, peak MLX memory was 8.43 GB |
 | `HF_HOME` | `/Users/<you>/.cache/huggingface` | excluded from Time Machine and Spotlight |
@@ -114,6 +115,9 @@ Public `/v1/admin/*` is Cloudflare Access + JWT validation, not a bearer token. 
 | `NOMINATIM_MAX_ROWS_PER_REQUEST` | `25`. Bulk geocoding the public instance is against the usage policy |
 | `OVERPASS_URLS` | comma-separated mirrors for failover |
 | `OSRM_URL` | `https://router.project-osrm.org` |
+| `RESEARCH_USER_AGENT` | `Cloudiator/1.0 (research; +https://cloudiator.org)`. Sent to Wikipedia, Reddit, DuckDuckGo, Google News, Open-Meteo, Open Library, and Hacker News. No API key |
+| `RESEARCH_TIMEOUT_SECONDS` | `8`. Per-source ceiling for one research pass. A slow source becomes a note; the chat still runs |
+| `RESEARCH_CACHE_TTL_SECONDS` | `3600`. Successful lookups only. A source that failed is not cached |
 | `GOOGLE_MAPS_API_KEY` | optional; requires scope `tools.google_places` **and** accepting Google's ToS |
 | `SLACK_WEBHOOK_URL` | optional but strongly recommended — this is how you learn the Mini is down |
 | `HF_TOKEN` | optional; FLUX schnell is Apache 2.0 and does not need one |

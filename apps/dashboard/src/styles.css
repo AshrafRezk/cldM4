@@ -349,6 +349,22 @@ input:focus, select:focus, textarea:focus {
 .stack { display: flex; flex-direction: column; gap: 0.75rem; }
 .stack.padded { margin-top: 0.9rem; border-top: 1px solid var(--line); padding-top: 0.9rem; }
 label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
+label.check { flex-direction: row; align-items: center; gap: 0.55rem; }
+.research-hits { display: grid; gap: 0.5rem; margin-top: 0.9rem; }
+.research-hit {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(5, 8, 12, 0.45);
+}
+.research-hit .src {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.research-hit a { color: inherit; }
+.research-hit p, .research-note { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.85rem; }
 fieldset {
   border: 1px solid var(--line);
   border-radius: 14px;

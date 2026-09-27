@@ -21,7 +21,7 @@ CREATE TABLE api_keys (
   secret_hash     text NOT NULL,                  -- argon2id: t=2, m=65536, p=1, len=32, salt=16
   name            text NOT NULL,
   preset          text,
-  capabilities    jsonb NOT NULL DEFAULT '[]',    -- ["chat","embeddings","tools.ocr",...]
+  capabilities    jsonb NOT NULL DEFAULT '[]',    -- ["chat","embeddings","tools.ocr","tools.research",...]
   models          jsonb NOT NULL DEFAULT '[]',    -- empty = default model only; never lists an unpulled model
   tools           jsonb NOT NULL DEFAULT '[]',    -- chat tool names, max 12
   max_tokens      int NOT NULL DEFAULT 512,

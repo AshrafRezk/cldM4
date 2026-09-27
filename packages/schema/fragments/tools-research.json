@@ -1,0 +1,112 @@
+{
+  "x-cloudiator-scope": ["tools.research"],
+  "paths": {
+    "/v1/tools/research": {
+      "post": {
+        "operationId": "toolsResearchPost",
+        "summary": "Look up a query on free public sources",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "q": {"type": "string"},
+                  "sources": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                },
+                "required": ["q"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Research inputs",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ResearchBundle"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChatRequest": {
+        "properties": {
+          "research": {
+            "type": "boolean",
+            "description": "When true, look up the latest user message on free public sources and return those inputs."
+          }
+        }
+      },
+      "ChatResponse": {
+        "properties": {
+          "research": {"$ref": "#/components/schemas/ResearchBundle"}
+        }
+      },
+      "ResearchHit": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string"},
+          "url": {"type": "string"},
+          "snippet": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      },
+      "ResearchNote": {
+        "type": "object",
+        "properties": {
+          "source": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      },
+      "ResearchWeather": {
+        "type": "object",
+        "properties": {
+          "found": {"type": "boolean"},
+          "source": {"type": "string"},
+          "place": {"type": "string"},
+          "latitude": {"type": "number"},
+          "longitude": {"type": "number"},
+          "temperature_c": {"type": "number"},
+          "wind_kmh": {"type": "number"},
+          "summary": {"type": "string"}
+        }
+      },
+      "ResearchBundle": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "web": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchHit"}
+          },
+          "reddit": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchHit"}
+          },
+          "news": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchHit"}
+          },
+          "books": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchHit"}
+          },
+          "weather": {"$ref": "#/components/schemas/ResearchWeather"},
+          "notes": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ResearchNote"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -84,7 +84,8 @@ FileVault: pick policy A/B/C in operator-checklist §6 **today**, then Automatic
 Salesforce / websites  --HTTPS-->  Cloudflare edge  --Tunnel (outbound from Mini)-->  127.0.0.1:8080 worker
                                                                               \-> 127.0.0.1:11434 Ollama   NEVER public
 Admin browser          --HTTPS-->  app.<domain> (Netlify) --> Neon
-Mini worker            --outbound HTTPS-->  Neon, Nominatim, Overpass, OSRM, Hugging Face, GitHub
+Mini worker            --outbound HTTPS-->  Neon, Nominatim, Overpass, OSRM, Hugging Face, GitHub,
+                                         Wikipedia, DuckDuckGo, Reddit, Google News, Open-Meteo, Open Library
 ```
 
 | Place | Public? | Notes |
@@ -134,7 +135,7 @@ The Mini only needs **outbound** access:
 
 **Inbound WAN:** none. No DMZ. No UPnP for the Mini.
 
-If corporate firewall: allow `*.cloudflare.com`, `*.cftunnel.com` / `*.cfargotunnel.com`, `api.github.com`, `github.com`, `huggingface.co`, `*.neon.tech`, `nominatim.openstreetmap.org`, `overpass-api.de`, `router.project-osrm.org`, `registry.ollama.ai` / `ollama.com`.
+If corporate firewall: allow `*.cloudflare.com`, `*.cftunnel.com` / `*.cfargotunnel.com`, `api.github.com`, `github.com`, `huggingface.co`, `*.neon.tech`, `nominatim.openstreetmap.org`, `overpass-api.de`, `router.project-osrm.org`, `registry.ollama.ai` / `ollama.com`. Research also calls `api.duckduckgo.com`, `en.wikipedia.org`, `www.reddit.com`, `news.google.com`, `hn.algolia.com`, `geocoding-api.open-meteo.com`, `api.open-meteo.com`, and `openlibrary.org`.
 
 ### CGNAT and “I have no public IP”
 

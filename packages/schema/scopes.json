@@ -6,6 +6,7 @@
     "transcriptions",
     "tools.ocr",
     "tools.maps",
+    "tools.research",
     "tools.charts",
     "tools.stats",
     "tools.data",
@@ -27,6 +28,7 @@
         "embeddings",
         "tools.ocr",
         "tools.maps",
+        "tools.research",
         "tools.charts",
         "tools.stats",
         "tools.data",
@@ -60,7 +62,8 @@
         "tools.stats",
         "tools.data",
         "tools.docs",
-        "tools.text"
+        "tools.text",
+        "tools.research"
       ]
     },
     "heavy": {
