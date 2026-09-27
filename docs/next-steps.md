@@ -1,6 +1,6 @@
-# Next steps — Phase E proven (2026-09-27)
+# Next steps — Phases A–E on main (2026-09-27)
 
-**Phases A–E are proven on the Mini, and this commit puts D2–E on `main`.** #11 was squash-merged, so #12–#14 landed on their parent branches and not on `main`. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
+**Phases A–E are proven on the Mini, and `main` matches that tree.** Health after the landing pull: `idle_hot_9b`, `gemma4:e4b-it-qat` and `nomic-embed-text` loaded, pressure normal, `degraded: ["swap_in_use"]` at 1643.88 MB. Inference stays on the Mini. **Do not create a Cloudflare Worker.** Do not put inference in Netlify Functions. Do not pull `gpt-oss:20b`. Do not run FLUX 8-bit.
 
 Secrets stay in the password manager, not this file. Checklist: [operator-checklist.md](operator-checklist.md).
 
@@ -57,23 +57,51 @@ Job `1bf553e4641a47f29159da6f307e2317` was `running` when `mflux-generate` was k
 
 Phase E is proven on the Mini. 8-bit stays off. `gpt-oss:20b` stays unpulled. `ok` stays false until a reboot clears the leftover swap from the 19.08 GB run.
 
-## Next
+## If the Mac restarts
 
-On the Mini, from the repo root (the directory you are already in):
+The dashboard (`app.cloudiator.org`, Netlify) and Neon stay up. Only the Mini's API goes quiet until a GUI session exists.
+
+The worker (`ai.cloudiator.worker`) and the tunnel (`com.cloudiator.cloudflared`) are LaunchAgents with `RunAtLoad` and `KeepAlive`. They start themselves when the appliance user is logged into the GUI. They do not start at the FileVault pre-boot screen. Ollama.app is a GUI app: it starts on login only if it is in System Settings → General → Login Items. After it is up, the worker warms Gemma and `nomic-embed-text` by itself. A reboot clears the leftover swap, so `ok` can become true once those two models are loaded.
+
+| How it stopped | What comes back |
+| --- | --- |
+| Apple menu → Restart, while you are logged in | The disk unlocks for that next boot. You still need the GUI login, unless automatic login is on. Then the two LaunchAgents start. Ollama starts if it is a login item. |
+| Power cut, or a boot that stops at the FileVault password | Nothing starts until a person types the password. "Start up automatically after a power failure" only reaches that screen. |
+| Planned reboot when nobody will be at the keyboard | `sudo fdesetup authrestart` unlocks the disk for exactly the next boot. The GUI login (or automatic login) is still required. |
+
+Checklist §6 is still unticked, and automatic login is not recorded as enabled. Do not treat the Mini as unattended until one boot policy is chosen and a real reboot has been timed. After you log in, poll rather than kickstart:
 
 ```bash
-git checkout main
-git pull origin main
-launchctl kickstart -k gui/$UID/ai.cloudiator.worker
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf http://127.0.0.1:8080/v1/health && echo && break
+  sleep 3
+done
 ```
 
-Do that only after this landing commit is on `main`. The worker venv already has the Phase D–E packages from the earlier branch. Phase F is the External Services import. It waits until you ask for it.
+Expect `idle_hot_9b`. If `loaded` stays empty, open Ollama and add it to Login Items.
+
+## Still open
+
+- [ ] Refresh the usage chart and confirm a `usage_daily` row for a playground chat. The nightly rollup is not scheduled, so a chat from today may not appear until `infra/neon-retention.sql` has run.
+- [ ] Download both OpenAPI files (plain and `?target=salesforce`) from the dashboard.
+- [ ] Confirm the on-screen Apex snippet contains `setTimeout(120000)` and `"stream": false`.
+- [ ] Incognito on `https://app.cloudiator.org` is challenged by Cloudflare Access, not a password form.
+- [ ] Disable `cloudiator.netlify.app`. It is not behind Access, so the email header can be spoofed there.
+- [ ] Copy `ADMIN_SESSION_SECRET` into the password manager if a CLI log printed it.
+- [ ] Tick exactly one boot policy in [operator-checklist.md](operator-checklist.md) §6, and confirm Ollama is a login item.
+- [ ] Schedule `infra/neon-retention.sql`.
+
+## Next code phase
+
+Phase F waits until you ask. New Agent chat on the Mini, model **Claude Sonnet 5**, attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/next-steps.md`, paste only the **Phase F only** block from [cursor-phases.md](cursor-phases.md). That phase is the Salesforce External Services import (OpenAPI 3.0.3, Apex `setTimeout(120000)`, `"stream": false`). Whisper large-v3-turbo is optional inside that phase and is not pulled.
+
+Leave pull requests #3, #4, #7, #9, and #10. They conflict because that work is already on `main`.
 
 ## Remaining
 
 | When | What | Where |
 | --- | --- | --- |
-| After this commit is on `main` | Pull `main` and kickstart the worker | Mini |
-| After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, `infra/neon-retention.sql` is not scheduled yet | Neon |
-| This week | Schedule `infra/neon-retention.sql` (free-tier storage) and disable `cloudiator.netlify.app` | Neon + Netlify |
+| Before relying on a restart | Tick checklist §6 and confirm Ollama is a login item. Then reboot once and time `/v1/health` | Mini |
+| After a playground chat | Confirm a `usage_daily` row. If today's chat is missing, the retention SQL is not scheduled yet | Neon |
+| This week | Schedule `infra/neon-retention.sql` and disable `cloudiator.netlify.app` | Neon + Netlify |
 | When you ask | Phase F: External Services import of Salesforce OAS 3.0.3 | Salesforce |
