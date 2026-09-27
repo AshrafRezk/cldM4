@@ -53,24 +53,30 @@ Merge [PR #11](https://github.com/AshrafRezk/cldM4/pull/11), then [#12](https://
 
 Phase E is the following phase. Its first step is a human warmup in Terminal, not a worker change and not an `ollama pull`. Record peak memory and wall clock in [operator-checklist.md](operator-checklist.md) section 9 before any job-queue code. Skip `gpt-oss:20b` unless `df -h /` still shows comfortable headroom after the 4-bit weights are on disk. 4-bit is the default. Do not quantize to 8-bit in the same sitting.
 
-The weights are already on disk: `~/Cloudiator/models/flux-schnell-4bit` is 9.0 GB, `/` has 387 GiB free, and swap is 0. The installed `mflux-generate` takes a local directory with `--model` and `--base-model schnell`. `--path` is not a flag in this build, so `/tmp/test.png` was never written. Run the generate again with Gemma unloaded.
+The weights are on disk (9.0 GB) and the first 1024² generate succeeded: `/tmp/test.png` is 2.3 MB, 4 steps, `real` 1:58.76, peak MLX memory 19.08 GB. Swap after that run was `used = 3059.31M`. A 24 GB Mini cannot take that as the production path. The retry adds `--low-ram`, which releases the text encoders and the transformer after use and caps the MLX cache. Print swap before and after. macOS will not return the 3 GB already swapped until a reboot, so the number that matters is whether `used` stays at 3059 MB or climbs. 8-bit stays off. `gpt-oss:20b` stays unpulled.
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 launchctl bootout "gui/$(id -u)/ai.cloudiator.worker" || true
 ollama stop gemma4:e4b-it-qat || true
+ollama stop nomic-embed-text || true
+ollama ps
+echo '--- swap before ---'
+sysctl vm.swapusage
 time mflux-generate \
   --model "$HOME/Cloudiator/models/flux-schnell-4bit" \
   --base-model schnell \
+  --low-ram \
   --steps 4 --height 1024 --width 1024 \
-  --prompt "a red bicycle" --output /tmp/test.png
+  --prompt "a red bicycle" --output /tmp/test-lowram.png
+echo '--- swap after ---'
 sysctl vm.swapusage
-ls -lh /tmp/test.png
+ls -lh /tmp/test-lowram.png
 launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/ai.cloudiator.worker.plist"
 launchctl kickstart -k "gui/$(id -u)/ai.cloudiator.worker"
 ```
 
-Paste the `real` time, `vm.swapusage`, and `ls` of `/tmp/test.png`. If generate says the saved weights are incompatible with this mflux, stop and paste the error. The fallback is one local `mflux-save --quantize 4`, then deleting the full-precision Hugging Face cache.
+Paste `ollama ps`, both swap lines, the `Peak MLX memory` line, and the `real` time.
 
 ## Remaining
 

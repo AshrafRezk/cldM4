@@ -203,12 +203,12 @@ The RAM table in `PLAN.md` §4 is an estimate. Replace it with what your machine
 | Gemma cold load time | Phase A | ______ s |
 | TTFT first chat (new prefix) | Phase A curl | ______ s |
 | TTFT second chat (same system+tools prefix) | Phase A curl | ______ s — should be lower |
-| Peak memory during FLUX 4-bit 1024² | Activity Monitor during Phase E | ______ GB |
-| Peak memory during FLUX 8-bit 1024² (only if you enable it) | | ______ GB |
-| FLUX 1024² wall clock | Phase E | ______ s |
-| Swap used at peak (**must stay 0**) | `sysctl vm.swapusage` | ______ |
+| Peak memory during FLUX 4-bit 1024² | `mflux-generate` Peak MLX memory, 2026-09-27, no `--low-ram` | 19.08 GB |
+| Peak memory during FLUX 8-bit 1024² (only if you enable it) | | not run |
+| FLUX 1024² wall clock | `time` on that same run | 1:58.76 (`real`) |
+| Swap used at peak (**must stay 0**) | `sysctl vm.swapusage` after that run | used = 3059.31M |
 
-If swap is non-zero at any peak, drop to 4-bit FLUX, drop `num_ctx`, or drop `gpt-oss:20b`. Do not "see how it goes".
+The 4-bit 1024² run wrote `/tmp/test.png` (2.3 MB) and then showed 3059 MB of swap. That run is not the production setting. Retry with `--low-ram` before any job code. Do not run 8-bit. Do not pull `gpt-oss:20b`.
 
 ---
 
