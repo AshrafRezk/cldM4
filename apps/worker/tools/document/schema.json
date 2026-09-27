@@ -1,0 +1,12 @@
+{
+  "name": "extract_document",
+  "description": "Extract text from a PDF, DOCX, or XLSX the user supplied. Do not invent document text. A long file returns a short preview and an artifact URL.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "filename": {"type": "string", "description": "Name ending in pdf, docx, xlsx, or txt."},
+      "file_base64": {"type": "string"}
+    },
+    "required": ["filename", "file_base64"]
+  }
+}

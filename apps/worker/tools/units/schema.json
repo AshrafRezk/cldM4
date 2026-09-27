@@ -1,0 +1,13 @@
+{
+  "name": "convert_units",
+  "description": "Convert a number between units. Do not estimate the factor yourself.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "value": {"type": "number"},
+      "from_unit": {"type": "string", "description": "Source unit, such as kilometer."},
+      "to_unit": {"type": "string", "description": "Target unit, such as meter."}
+    },
+    "required": ["value", "from_unit", "to_unit"]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "render_chart",
+  "description": "Draw a bar, line, or scatter chart from numbers the user or a tool supplied. Do not invent series values. Returns a PNG URL.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "kind": {"type": "string", "description": "bar, line, or scatter."},
+      "title": {"type": "string"},
+      "x": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Category or x labels."
+      },
+      "series": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "values": {"type": "array", "items": {"type": "number"}}
+          },
+          "required": ["values"]
+        }
+      }
+    },
+    "required": ["x", "series"]
+  }
+}

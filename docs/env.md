@@ -88,6 +88,7 @@ The outbox lives in `QUEUE_DB`, so it survives a worker restart. Its depth is `o
 | `QUEUE_DB` | `/Users/<you>/Cloudiator/queue.db` | jobs **and** the usage outbox |
 | `GEOCODE_CACHE_DB` | `/Users/<you>/Cloudiator/geocode.db` | 30-day TTL; the 1 rps limiter applies to misses only |
 | `MFLUX_MODEL_PATH` | `/Users/<you>/Cloudiator/models/flux-schnell-4bit` | always passed explicitly so a request can never trigger a weight download |
+| `MFLUX_LOW_RAM` | `true` | required on the 24 GB Mini. A 1024² run without it peaked at 19.08 GB and swapped; with it, peak MLX memory was 8.43 GB |
 | `HF_HOME` | `/Users/<you>/.cache/huggingface` | excluded from Time Machine and Spotlight |
 
 ## Mini worker — secrets and admin

@@ -17,6 +17,26 @@ dependencies = [
     "argon2-cffi>=23.1",
     "pyjwt[crypto]>=2.9",
     "python-multipart>=0.0.9",
+    # Phase D2. Charts default to matplotlib (Agg). DuckDB is in-memory only.
+    # plotly and kaleido are optional and must never be required to import.
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "duckdb>=1.1",
+    "pyarrow>=15",
+    # Phase D3. Graphviz (`dot`) and mermaid-cli are system binaries, not
+    # Python packages. mermaid stays disabled unless ENABLE_MERMAID=true.
+    "pillow-heif>=0.18",
+    "opencv-python-headless>=4.10",
+    "qrcode>=7.4",
+    "pypdf>=4.3",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "fpdf2>=2.7",
+    "rapidfuzz>=3.9",
+    "phonenumbers>=8.13",
+    "pint>=0.24",
+    "holidays>=0.57",
     # Phase D uses Apple Vision for OCR. pyobjc is the framework binding
     # installed in Phase A; ocrmac is the small wrapper the OCR handler calls.
     "pyobjc-framework-Vision>=10.3; sys_platform == 'darwin'",

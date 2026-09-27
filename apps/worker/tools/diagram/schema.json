@@ -1,0 +1,12 @@
+{
+  "name": "render_diagram",
+  "description": "Render a Graphviz DOT diagram to a PNG. Do not invent nodes the user did not name. Mermaid is not used unless the appliance has it enabled.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "source": {"type": "string", "description": "Graphviz DOT source."},
+      "engine": {"type": "string", "description": "graphviz or mermaid. graphviz is the default."}
+    },
+    "required": ["source"]
+  }
+}

@@ -171,6 +171,15 @@ async def test_invented_tool_is_scope_denied_and_the_loop_continues(settings, ru
     assert payload["choices"][0]["message"]["content"] == "I cannot generate that image."
 
 
-async def test_every_loaded_tool_is_cpu_only():
-    for spec in load_registry().values():
-        assert spec.gpu is False
+def test_sync_chat_tools_are_cpu_only():
+    """FLUX is registered for the job queue. The sync chat loop must not run it."""
+    from app.tool_loop import CHAT_TOOL_ORDER
+
+    registry = load_registry()
+    for name in CHAT_TOOL_ORDER:
+        spec = registry.get(name)
+        if spec is not None:
+            assert spec.gpu is False
+    flux = registry["flux_generate"]
+    assert flux.gpu is True
+    assert flux.name not in CHAT_TOOL_ORDER

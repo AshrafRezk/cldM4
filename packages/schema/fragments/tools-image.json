@@ -1,0 +1,48 @@
+{
+  "x-cloudiator-scope": ["tools.image_ops"],
+  "paths": {
+    "/v1/tools/image": {
+      "post": {
+        "operationId": "toolsImagePost",
+        "summary": "Convert an image, read a QR code, or strip GPS",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {"type": "string"},
+                  "image_base64": {"type": "string"},
+                  "text": {"type": "string"},
+                  "format": {"type": "string"}
+                },
+                "required": ["action"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image result or QR text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "url": {"type": "string"},
+                    "text": {"type": "string"},
+                    "format": {"type": "string"},
+                    "width": {"type": "integer"},
+                    "height": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
