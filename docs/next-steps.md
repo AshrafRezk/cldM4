@@ -8,6 +8,8 @@ Secrets stay in the password manager, not this file. Blanks: [operator-checklist
 
 v1 is finished when every box in [Finish line](#finish-line) is checked. Work top to bottom. Steps 1–4 are operator actions on the Mini, Neon, Netlify, and Cloudflare. Step 5 is the only remaining code phase.
 
+**To use what is already live** — mint a key, send a playground chat, and call every tool Phases A–E shipped — follow [using-console.md](using-console.md).
+
 ## Proven — do not redo
 
 **API:** `https://api.cloudiator.org` → named tunnel `cloudiator-mini` (`e88624cb-3f03-4578-a38b-a7e3e090c873`) → `http://127.0.0.1:8080`. Gemma 4 E4B QAT + `nomic-embed-text`. A garbage key is a FastAPI JSON 401, not Cloudflare HTML. `:11434` times out on the WAN. Salesforce OAS is OpenAPI `3.0.3` with zero composition keywords. Playground CORS allows `https://app.cloudiator.org`.
@@ -58,7 +60,7 @@ Expect `"ok": true`, `"degraded": []`, `swap_used_mb` 0, `state` `idle_hot_9b`, 
 
 ## 2. Playground usage row
 
-Open `https://app.cloudiator.org/console` (Cloudflare Access, no password form). Send one playground chat with a real key. The response is JSON. In Neon, a row for today exists in `usage_daily` for that key. The dashboard usage chart reads the rollup, not raw `usage_events`.
+Open `https://app.cloudiator.org/console` (Cloudflare Access, no password form). Mint a key and send one playground chat, as in [using-console.md](using-console.md). The response is the model's text. On the Usage tab, a row for today exists in `usage_daily` for that key. The chart reads the rollup, not raw `usage_events`. A row can take about 15 seconds to appear.
 
 ## 3. Schedule Neon retention
 

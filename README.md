@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md).
+**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. How to mint a key and use the playground and tools is [docs/using-console.md](docs/using-console.md). What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -61,6 +61,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [PLAN.md](PLAN.md) | Full architecture, models, tools, API, RAM, security, Salesforce, failure modes |
 | [docs/hardware-and-network.md](docs/hardware-and-network.md) | **Day 0.** Physical Mini, Ethernet, CGNAT, no port forwards, accounts, prove-internet commands |
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
+| [docs/using-console.md](docs/using-console.md) | **Use it.** Mint a key, send a playground chat, call every live tool |
 | [docs/next-steps.md](docs/next-steps.md) | **Current.** What remains to finish v1. Do not put secrets here |
 | [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |
@@ -74,7 +75,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/licenses.md](docs/licenses.md) | Model and library licenses |
 | [.env.example](.env.example) | Mini worker env template (copy, do not commit secrets) |
 | [apps/dashboard/](apps/dashboard/) | Phase C: Netlify Vite React dashboard (no inference, no login form) |
-| [apps/worker/](apps/worker/) | Phases A–B: FastAPI worker, RAM scheduler, key auth, usage outbox, tests |
+| [apps/worker/](apps/worker/) | Phases A–E: FastAPI worker, RAM scheduler, key auth, tools, FLUX jobs, tests |
 | [packages/schema/](packages/schema/) | OpenAPI fragments, scope enums, the per-key document generator |
 | [scripts/](scripts/) | Gates, host setup, LaunchAgents, Neon schema, tunnel, phase smokes |
 | [infra/launchd/](infra/launchd/) | LaunchAgent templates (worker and cloudflared) |
