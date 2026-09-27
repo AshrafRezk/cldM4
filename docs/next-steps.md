@@ -29,7 +29,7 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 - [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0.
 - [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears.
 - [ ] **3. `infra/neon-retention.sql` runs nightly from the Mini.** Raw `usage_events` older than 30 days get deleted. Do not use `pg_cron`: this Neon compute scales to zero, and a suspended compute skips the job.
-- [ ] **4. `cloudiator.netlify.app` is disabled.** Only `https://app.cloudiator.org` serves the dashboard.
+- [ ] **4. `cloudiator.netlify.app` redirects to `https://app.cloudiator.org`.** Netlify will not delete that hostname. The redirect is in `apps/dashboard/netlify.toml` and applies on the next production deploy.
 - [ ] **5. Phase F** — Salesforce stream downgrade and 1 MB cap in the worker, then a real External Services import and Apex callout.
 - [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert.
 
@@ -157,9 +157,19 @@ The first command runs the SQL immediately. Expect a line like `retention ok: us
 
 Do not point the worker request path at this query. `/v1/health` must stay off Neon.
 
-## 4. Disable the Netlify default hostname
+## 4. Send the Netlify hostname to Access
 
-The site also answers on `https://cloudiator.netlify.app`. Turn that hostname off in Netlify (Domain management) so the only public dashboard is `https://app.cloudiator.org`, which is the hostname behind Cloudflare Access. Confirm an incognito window on `app.cloudiator.org` is an Access challenge, and that `cloudiator.netlify.app` no longer serves the app.
+Domain management cannot remove `cloudiator.netlify.app`. That page says the project is always reachable there, and Netlify uses the name for deploys. `app.cloudiator.org` is already the primary domain.
+
+The yellow **Pending DNS verification** badge is Cloudflare sitting in front of Netlify. Click it and confirm the record it wants. In the Cloudflare DNS table for `cloudiator.org`, `app` must be a CNAME to `cloudiator.netlify.app` and stay **proxied** (orange cloud). Access only runs on a proxied hostname. Leave the proxy on. If the playground already loads, the badge can stay yellow: Netlify's checker cannot see through Cloudflare, and turning the cloud grey removes Access.
+
+`apps/dashboard/netlify.toml` forces `https://cloudiator.netlify.app/*` to `https://app.cloudiator.org/:splat` with a 301. After that file is on `main` and Netlify finishes the production deploy:
+
+```bash
+/usr/bin/curl -sI https://cloudiator.netlify.app/ | /usr/bin/grep -i -E 'HTTP/|location:'
+```
+
+Expect `301` and `location: https://app.cloudiator.org/`. An incognito window on `https://app.cloudiator.org` is still a Cloudflare Access challenge.
 
 ## 5. Phase F — Salesforce pack
 
