@@ -20,7 +20,8 @@ Secrets stay in the password manager, not this file. Checklist: [operator-checkl
 cd /Users/ashrafrezk/cldM4
 git fetch origin cursor/phase-d-tools-ocr-maps-73f3
 git checkout cursor/phase-d-tools-ocr-maps-73f3
-apps/worker/.venv/bin/pip install 'python-multipart>=0.0.9' ocrmac
+# uv venvs have no pip binary. Install into the worker venv with uv.
+cd apps/worker && uv pip install 'python-multipart>=0.0.9' 'ocrmac>=1.0' && cd ../..
 # ARTIFACT_SIGNING_SECRET must be set in ~/Cloudiator/.env (32+ random bytes).
 # Generate once if the line is missing; do not commit it:
 #   printf 'ARTIFACT_SIGNING_SECRET=%s\n' "$(openssl rand -hex 32)" >> ~/Cloudiator/.env
