@@ -84,8 +84,6 @@ def load_registry() -> dict[str, ToolSpec]:
             run=module.run,
             rest_path=folder.name,
         )
-        if module.GPU:
-            raise RuntimeError(f"{name} is marked gpu; Phase D tools must be gpu false")
     return registry
 
 
@@ -155,6 +153,11 @@ class ToolRunner:
             return {
                 "error": "scope_denied",
                 "message": f"This key cannot call {name}.",
+            }
+        if spec.gpu:
+            return {
+                "error": "not_supported",
+                "message": f"{name} takes the Metal slot. POST /v1/jobs and poll the id.",
             }
         try:
             require_capability(key, spec.capability)

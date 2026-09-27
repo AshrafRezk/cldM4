@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -45,6 +46,7 @@ from .ollama import OllamaClient, normalize_tag
 from .openapi_filter import build_for_key, normalize_target
 from .scheduler import Scheduler
 from .ssrf import prepare_messages_for_ollama, validate_image_inputs
+from .jobs import JobRunner, public_job
 from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
 from .tool_routes import register_tool_routes
 from .translation import (
@@ -100,6 +102,7 @@ tool_registry = load_registry()
 tool_runner = ToolRunner(
     settings, tool_registry, maps_client, artifacts=artifacts, scheduler=scheduler
 )
+jobs = JobRunner(settings, scheduler, artifacts)
 
 
 class HealthLimiter:
@@ -154,6 +157,12 @@ async def lifespan(app: FastAPI):
     await scheduler.poll_once()
     scheduler.start()
     outbox.start()
+    try:
+        jobs.open()
+        if os.environ.get("CLOUDIATOR_JOBS", "1") != "0":
+            jobs.start()
+    except Exception as exc:  # noqa: BLE001
+        scheduler.mark_degraded("jobs", f"cannot open {settings.queue_db}: {exc}")
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
     artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")
@@ -164,6 +173,8 @@ async def lifespan(app: FastAPI):
         janitor.cancel()
         artifact_janitor.cancel()
         await scheduler.stop()
+        await jobs.stop()
+        jobs.close()
         await outbox.stop()
         outbox.close()
         await ollama.aclose()
@@ -659,4 +670,78 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
+
+
+@app.post("/v1/jobs")
+async def create_job(request: Request, key=Depends(require_key("image_generation"))) -> JSONResponse:
+    """Enqueue FLUX. A repeat Idempotency-Key within 24h returns the original job."""
+    body = await _json_body(request)
+    if body.get("kind") != "image":
+        raise CloudiatorError(400, "not_supported", "kind must be image.", param="kind")
+    if body.get("n", 1) != 1:
+        raise not_supported("n > 1 is not supported.", param="n")
+    from tools.image_generate.handler import image_request
+
+    payload = image_request(body)
+    job, created = jobs.store.enqueue(
+        key_id=key.key_id,
+        tenant_id=key.tenant_id,
+        kind="image",
+        payload=payload,
+        idempotency_key=_idempotency_key(request),
+    )
+    return JSONResponse(status_code=202 if created else 200, content=public_job(job))
+
+
+@app.get("/v1/jobs/{job_id}")
+async def get_job(job_id: str, key=Depends(require_key("image_generation"))) -> JSONResponse:
+    job = jobs.store.get(job_id, key_id=key.key_id)
+    if job is None:
+        raise CloudiatorError(404, "job_not_found", "Job not found.")
+    return JSONResponse(content=public_job(job, artifacts=artifacts))
+
+
+@app.post("/v1/images/generations")
+async def image_generations(
+    request: Request, key=Depends(require_key("image_generation"))
+) -> JSONResponse:
+    """OpenAI image route. Always a job: FLUX is past the 90s sync deadline.
+
+    Salesforce keys cannot sync-wait. A browser key cannot either; the measured
+    1024² generate is about two minutes.
+    """
+    body = await _json_body(request)
+    if body.get("n", 1) != 1:
+        raise not_supported("n > 1 is not supported.", param="n")
+    from tools.image_generate.handler import image_request
+
+    payload = image_request(
+        {
+            "prompt": body.get("prompt"),
+            "size": body.get("size"),
+            "seed": body.get("seed"),
+        }
+    )
+    job, created = jobs.store.enqueue(
+        key_id=key.key_id,
+        tenant_id=key.tenant_id,
+        kind="image",
+        payload=payload,
+        idempotency_key=_idempotency_key(request),
+    )
+    return JSONResponse(status_code=202 if created else 200, content=public_job(job))
+
+
+def _idempotency_key(request: Request) -> str | None:
+    raw = request.headers.get("idempotency-key")
+    if raw is None:
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    if len(value) > 200:
+        raise CloudiatorError(
+            400, "invalid_request_error", "Idempotency-Key is too long.", param="Idempotency-Key"
+        )
+    return value
 _register_unsupported_paths(app)
