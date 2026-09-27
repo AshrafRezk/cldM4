@@ -17,9 +17,10 @@ dependencies = [
     "argon2-cffi>=23.1",
     "pyjwt[crypto]>=2.9",
     "python-multipart>=0.0.9",
-    # Phase D uses Apple Vision for OCR. It is installed in Phase A so the
-    # step 0 `import Vision` gate runs against the real venv.
+    # Phase D uses Apple Vision for OCR. pyobjc is the framework binding
+    # installed in Phase A; ocrmac is the small wrapper the OCR handler calls.
     "pyobjc-framework-Vision>=10.3; sys_platform == 'darwin'",
+    "ocrmac>=1.0; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
