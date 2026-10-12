@@ -1,0 +1,70 @@
+{
+  "x-cloudiator-scope": ["tts"],
+  "x-cloudiator-salesforce": false,
+  "paths": {
+    "/v1/audio/speech": {
+      "post": {
+        "operationId": "audioSpeechPost",
+        "summary": "Synthesize speech with Microsoft neural TTS (edge or Azure)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpeechRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed WAV artifact",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SpeechResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SpeechRequest": {
+        "type": "object",
+        "required": ["input"],
+        "properties": {
+          "input": { "type": "string" },
+          "language": { "type": "string", "description": "en | ar-EG | fr" },
+          "voice": { "type": "string" }
+        }
+      },
+      "SpeechResponse": {
+        "type": "object",
+        "required": ["id", "url", "format"],
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string" },
+          "voice": { "type": "string" },
+          "language": { "type": "string" },
+          "format": { "type": "string" }
+        }
+      }
+    }
+  }
+}

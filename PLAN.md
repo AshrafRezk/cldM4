@@ -499,13 +499,17 @@ Phase E step 0, run **interactively in Terminal**, never from the worker:
 - Quantized: https://huggingface.co/argmaxinc/mlx-FLUX.1-schnell-4bit-quantized
 - Target: 1024×1024, 4 steps, ~10–20s on M4 24GB once weights are local and pre-quantized
 
-Speech (Phase F optional):
+Speech (Phase F foundation + Phase G SIM agent):
 
 ```bash
-pip install mlx-whisper   # in worker venv
+# Mini Terminal, offline — never inside an HTTP request
+pip install mlx-whisper edge-tts pydub   # in worker venv; ffmpeg required for edge-tts MP3
+# Place weights at WHISPER_MODEL_PATH (default ~/Cloudiator/models/whisper-large-v3-turbo)
 ```
 
 https://huggingface.co/mlx-community/whisper-large-v3-turbo (~1.6 GB)
+
+**Phase G — SIM phone agent (no CPaaS):** a dedicated Android handset + physical SIM on the Mini LAN streams 16 kHz PCM over WebSocket to FastAPI. Companies set a script via API; greeting/`say` text is spoken **verbatim** with Microsoft neural TTS (`edge-tts` default: `ar-EG-SalmaNeural`, `en-US-*`, `fr-FR-*`; optional Azure Speech). Caller audio → exclusive Whisper → Gemma reply text → TTS. **One live call**; the next call starts as soon as the previous hangs up. Do not require Twilio/Vonage. Do not put the media WebSocket on the Cloudflare tunnel.
 
 Benchmarks for this SKU:
 
@@ -731,9 +735,9 @@ The same applies to `kaleido` for plotly PNGs (Family A): Chromium-backed, `cpu_
 
 shapely, pyproj, geodesic distance.
 
-### Family J — Audio ops vs Whisper
+### Family J — Audio ops vs Whisper vs phone agent
 
-pydub/ffmpeg = `tools.audio_ops` (no GPU). Whisper = exclusive GPU.
+pydub/ffmpeg = `tools.audio_ops` (no GPU). Whisper = exclusive GPU (`POST /v1/audio/transcriptions`). TTS = `tts` scope, **no** `metal_lock` (`POST /v1/audio/speech`). SIM phone agent = `voice_calls` scope (`/v1/voice/*` + LAN media WebSocket). Local MLX neural TTS is not the v1 path (Metal contention + weak Egyptian Arabic).
 
 ### v1.1 later
 
@@ -745,7 +749,7 @@ sqlite-vec RAG, rembg, weasyprint, PaddleOCR-VL for CJK.
 - **Creative:** + image_generation + diagrams
 - **Analyst:** charts/stats/data heavy
 - **Heavy:** + gpt-oss:20b exclusive
-- **Speech:** + transcriptions + audio_ops
+- **Speech:** + transcriptions + tts + voice_calls + audio_ops
 
 ---
 
@@ -761,6 +765,7 @@ OpenAI-compatible:
 - `POST /v1/images/generations`
 - `GET /v1/models`
 - `POST /v1/audio/transcriptions`
+- `POST /v1/audio/speech` (Cloudiator TTS → signed WAV)
 
 Cloudiator:
 
@@ -768,6 +773,9 @@ Cloudiator:
 - `GET /v1/usage` `GET /v1/usage/events`
 - `POST /v1/jobs` `GET /v1/jobs/{id}`
 - `POST /v1/artifacts/{id}/sign` — re-mint a signed URL for an artifact that has not yet expired from disk
+- `POST /v1/voice/lines` `GET /v1/voice/lines` `PUT /v1/voice/lines/{id}/script`
+- `POST /v1/voice/calls` `GET /v1/voice/calls/{id}` `POST /v1/voice/calls/{id}/hangup`
+- WebSocket `/v1/voice/lines/{id}/media` — LAN Android handset only (not on the Cloudflare tunnel)
 - Tools routes listed in families
 - `GET /v1/health` — `{ "ok", "free_mb", "loaded", "queue_depth", "outbox_depth", "pressure", "free_disk_gb", "db", "version" }` (no secrets)
 - `POST /v1/admin/...` — Cloudflare Access only, never public
@@ -1048,6 +1056,7 @@ Uploading files **from** Apex is genuinely painful: hand-rolled multipart means 
 | D3 | Image ops, docs, mermaid, utilities, SF IDs | Mini |
 | E | mflux exclusive + jobs queue | Mini |
 | F | Salesforce pack + optional Whisper | Mini + a Salesforce org |
+| G | SIM phone agent (Android bridge, TTS, voice API) | Mini + Android handset + SIM |
 
 v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional), **vLLM-metal exclusive text experiment** (separate Python 3.12 venv, `max-num-seqs=1`, Gemma vision stays on Ollama until proven).
 

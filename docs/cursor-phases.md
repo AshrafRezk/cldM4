@@ -393,6 +393,52 @@ Tests: tests/test_sf_stream_downgrade.py, tests/test_response_size_cap.py.
 
 ---
 
+## Phase G — SIM phone agent (no CPaaS)
+
+**Model: Claude Sonnet 5.**
+
+Do not start until Phase F Whisper foundation exists (`POST /v1/audio/transcriptions` + exclusive whisper teardown). No Twilio/Vonage. Telephony is a dedicated Android handset + physical SIM on the Mini LAN.
+
+```
+Phase G only.
+
+1. mlx-whisper large-v3-turbo via subprocess (`python -m app.whisper_cli`) under run_exclusive("whisper"). WHISPER_MODEL_PATH must be a local directory — never download weights inside an HTTP request.
+2. POST /v1/audio/transcriptions (multipart) scoped to transcriptions.
+3. TTS: TTS_PROVIDER=edge (default, Microsoft neural voices via edge-tts including ar-EG-SalmaNeural / en / fr) or azure (AZURE_SPEECH_KEY + AZURE_SPEECH_REGION). POST /v1/audio/speech scoped to tts. TTS must not take metal_lock.
+4. Voice API scoped to voice_calls:
+   - POST/GET /v1/voice/lines
+   - PUT /v1/voice/lines/{id}/script
+   - POST /v1/voice/calls (outbound)
+   - GET /v1/voice/calls/{id}
+   - POST /v1/voice/calls/{id}/hangup
+   - WebSocket /v1/voice/lines/{id}/media?token=... (LAN handset only; PCM 16 kHz mono)
+5. Call turn loop: verbatim greeting TTS → CPU VAD → Whisper → Gemma reply text (script as system prompt) → TTS. One live call; second inbound/outbound while busy → busy / 429.
+6. apps/phone-bridge Android companion scaffold (WebSocket PCM bridge, permissions, README). Prefer Magisk/root VOICE_CALL capture; document no-root speakerphone path.
+7. Scopes: speech preset = chat + transcriptions + tts + voice_calls + tools.audio_ops.
+8. Do not expose the media WebSocket on the Cloudflare tunnel. Handset stays on LAN.
+
+Tests: tests/test_whisper_transcriptions.py, tests/test_tts.py, tests/test_voice_agent.py, scripts/smoke-phase-g.sh.
+```
+
+**Files that must exist after:** `apps/worker/app/whisper.py`, `apps/worker/app/whisper_cli.py`, `apps/worker/app/tts.py`, `apps/worker/app/vad.py`, `apps/worker/app/voice.py`, `apps/worker/app/voice_routes.py`, `apps/phone-bridge/README.md`, the three test files, `scripts/smoke-phase-g.sh`.
+
+**Prove it:**
+
+```bash
+# Offline: download whisper-large-v3-turbo into WHISPER_MODEL_PATH first (Mini Terminal).
+cd apps/worker && .venv/bin/pytest tests/test_whisper_transcriptions.py tests/test_tts.py tests/test_voice_agent.py -q
+scripts/smoke-phase-g.sh
+# With handset connected on LAN:
+# 1) PUT script language=ar-EG greeting=...
+# 2) Call the SIM — greeting plays; speak; agent replies
+# 3) Hang up; call again immediately — answers without reboot
+# ollama ps: at most one generative model; sysctl vm.swapusage used=0
+```
+
+**Rollback:** `git checkout -- apps/worker apps/phone-bridge packages/schema docs scripts`; remove `~/Cloudiator/voice.db` if corrupt; Whisper weights under `~/Cloudiator/models/` can stay.
+
+---
+
 ## What not to do in any phase
 
 - `ollama pull` 70B / 120B / default 27B / `gemma4:26b*` / `gemma4:31b*` / `gemma4:*-mlx` as DEFAULT / Gemma Q8 or bf16 as the hot model

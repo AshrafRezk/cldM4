@@ -1,0 +1,245 @@
+{
+  "x-cloudiator-scope": ["voice_calls"],
+  "x-cloudiator-salesforce": false,
+  "paths": {
+    "/v1/voice/lines": {
+      "post": {
+        "operationId": "voiceLinesPost",
+        "summary": "Register an Android SIM handset line",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VoiceLineCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Line created (token shown once)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceLine" }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "voiceLinesGet",
+        "summary": "List voice lines for this key",
+        "responses": {
+          "200": {
+            "description": "Lines",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceLineList" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice/lines/{line_id}/script": {
+      "put": {
+        "operationId": "voiceLineScriptPut",
+        "summary": "Set the inbound agent script for a line",
+        "parameters": [
+          {
+            "name": "line_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VoiceScript" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated line",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceLine" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice/calls": {
+      "post": {
+        "operationId": "voiceCallsPost",
+        "summary": "Start an outbound scripted call on a SIM line",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VoiceCallCreate" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Call accepted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceCall" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice/calls/{call_id}": {
+      "get": {
+        "operationId": "voiceCallsGet",
+        "summary": "Get call status and transcript turns",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Call",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceCall" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice/calls/{call_id}/hangup": {
+      "post": {
+        "operationId": "voiceCallsHangupPost",
+        "summary": "Hang up an active call",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Call after hangup",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VoiceCall" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VoiceScript": {
+        "type": "object",
+        "required": ["script"],
+        "properties": {
+          "script": { "type": "string" },
+          "language": { "type": "string" },
+          "greeting": { "type": "string" },
+          "voice": { "type": "string" },
+          "max_turns": { "type": "integer" }
+        }
+      },
+      "VoiceLineCreate": {
+        "type": "object",
+        "required": ["e164"],
+        "properties": {
+          "line_id": { "type": "string" },
+          "e164": { "type": "string" },
+          "token": { "type": "string" },
+          "script": { "type": "string" },
+          "language": { "type": "string" },
+          "greeting": { "type": "string" },
+          "voice": { "type": "string" },
+          "max_turns": { "type": "integer" }
+        }
+      },
+      "VoiceLine": {
+        "type": "object",
+        "required": ["line_id", "e164", "connected", "has_script"],
+        "properties": {
+          "line_id": { "type": "string" },
+          "e164": { "type": "string" },
+          "connected": { "type": "boolean" },
+          "has_script": { "type": "boolean" },
+          "token": { "type": "string" },
+          "script": { "$ref": "#/components/schemas/VoiceScript" }
+        }
+      },
+      "VoiceLineList": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VoiceLine" }
+          }
+        }
+      },
+      "VoiceCallCreate": {
+        "type": "object",
+        "required": ["line_id", "to"],
+        "properties": {
+          "line_id": { "type": "string" },
+          "to": { "type": "string" },
+          "script": { "type": "string" },
+          "language": { "type": "string" },
+          "greeting": { "type": "string" },
+          "voice": { "type": "string" },
+          "max_turns": { "type": "integer" }
+        }
+      },
+      "VoiceTurn": {
+        "type": "object",
+        "required": ["role", "text"],
+        "properties": {
+          "role": { "type": "string" },
+          "text": { "type": "string" },
+          "at": { "type": "number" }
+        }
+      },
+      "VoiceCall": {
+        "type": "object",
+        "required": ["id", "line_id", "direction", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "line_id": { "type": "string" },
+          "direction": { "type": "string" },
+          "status": { "type": "string" },
+          "language": { "type": "string" },
+          "greeting": { "type": "string" },
+          "voice": { "type": "string" },
+          "max_turns": { "type": "integer" },
+          "to": { "type": "string" },
+          "from": { "type": "string" },
+          "turns": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/VoiceTurn" }
+          },
+          "error": { "type": "string" },
+          "recording_id": { "type": "string" },
+          "created_at": { "type": "number" },
+          "ended_at": { "type": "number" }
+        }
+      }
+    }
+  }
+}
