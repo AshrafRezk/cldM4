@@ -17,6 +17,17 @@
   framework = "#custom"
   autoLaunch = false
 
+# Cloudflare Access is the only login. Do not enable Netlify Identity.
+# This root file is what Netlify uses when base = apps/dashboard. Host rules
+# must live here (apps/dashboard/netlify.toml alone does not win for this site).
+
+[[redirects]]
+  from = "/*"
+  to = "https://app.cloudiator.org/:splat"
+  status = 301
+  force = true
+  conditions = {Host = ["cloudiator.netlify.app"]}
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
