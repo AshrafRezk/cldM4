@@ -16,12 +16,14 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
   const [install, setInstall] = useState(null);
   const [installError, setInstallError] = useState("");
   const [loginTarget, setLoginTarget] = useState("login");
+  const [connectKey, setConnectKey] = useState(plaintext || "");
+  const [busyInstall, setBusyInstall] = useState(false);
   const service = SERVICES.find((row) => row.id === serviceId) || SERVICES[0];
   const stepsNc = namedCredentialSteps(url);
   const stepsInstall = installSteps();
   const apexPkg = apexSnippet(url);
   const apexNc = apexNamedCredentialSnippet();
-  const keyHint = plaintext || "sk-cld-…";
+  const keyHint = connectKey || plaintext || "sk-cld-…";
   const curlOas = openApiCurl(url, keyHint);
   const bodyJson = useMemo(
     () => (service.body ? JSON.stringify(service.body, null, 2) : "// not available yet"),
@@ -35,25 +37,49 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
       .catch((err) => setInstallError(err.message));
   }, []);
 
-  async function startInstall() {
+  useEffect(() => {
+    // Fresh mint fills the field; existing keys stay whatever the operator pastes.
+    if (plaintext) setConnectKey(plaintext);
+  }, [plaintext]);
+
+  async function startInstall(configureOnly) {
     setInstallError("");
+    const apiKey = connectKey.trim();
+    if (configureOnly && !apiKey) {
+      setInstallError("Paste an existing sk-cld-… key (from your password manager) to connect it.");
+      return;
+    }
+    if (apiKey && !/^sk-cld-[a-z0-9]+_[A-Za-z0-9_-]+$/.test(apiKey)) {
+      setInstallError("API key must look like sk-cld-{public_id}_{secret}.");
+      return;
+    }
+    if (
+      apiKey &&
+      selectedKey?.publicId &&
+      !apiKey.startsWith(`sk-cld-${selectedKey.publicId}_`)
+    ) {
+      setInstallError(
+        `This key does not match the selected key public id (${selectedKey.publicId}). Select the matching key or paste the right secret.`,
+      );
+      return;
+    }
+    setBusyInstall(true);
     try {
-      // Salesforce hosts login. We only start the redirect; no client secret on Netlify.
-      const body = {
+      const result = await api.startSalesforceInstall({
         login: loginTarget,
-        apiKey: plaintext || undefined,
+        apiKey: apiKey || undefined,
         baseUrl: url,
-      };
-      const result = await api.startSalesforceInstall(body);
+        configureOnly: Boolean(configureOnly),
+      });
       if (!result?.redirectUrl) throw new Error("No redirect URL from install start.");
       window.location.href = result.redirectUrl;
     } catch (err) {
-      // GET fallback for package-only mode / older handlers
-      if (install?.packageInstallUrl) {
+      if (!configureOnly && install?.packageInstallUrl && !apiKey) {
         window.location.href = api.salesforceInstallStartUrl(loginTarget);
         return;
       }
       setInstallError(err.message);
+      setBusyInstall(false);
     }
   }
 
@@ -61,26 +87,53 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
     <div className="sf-guide">
       {installBanner ? (
         <section className={installBanner.ok ? "card glass" : "card glass warn"}>
-          <h2>{installBanner.ok ? "Salesforce package installed" : "Salesforce install issue"}</h2>
+          <h2>
+            {installBanner.ok
+              ? installBanner.mode === "connect"
+                ? "Salesforce key connected"
+                : "Salesforce package installed"
+              : "Salesforce install issue"}
+          </h2>
           <p className="muted">{installBanner.text}</p>
         </section>
       ) : null}
 
       <section className="card glass lift">
-        <h2>Install into Salesforce</h2>
+        <h2>Install / connect Salesforce</h2>
         <p className="muted">
-          Salesforce logs you in. Cloudiator then deploys the app (Setup, Flows, call logs), assigns{" "}
-          <strong>Cloudiator Admin</strong>, and — if you just minted a key — writes it into the org so Salesforce can
-          call the Mini. No client secret on Netlify.
+          Salesforce logs you in. Deploy the app (or connect a key to an org that already has it). The key is written into
+          org <strong>Cloudiator Setup</strong> so Salesforce can call the Mini. Works for a fresh mint or an existing key
+          from your password manager.
         </p>
-        {plaintext ? (
-          <p className="card warn">Using the freshly minted key from this session for org setup.</p>
+        {selectedKey ? (
+          <p className="muted">
+            Selected key: <code>sk-cld-{selectedKey.publicId}_…</code>
+            {selectedKey.revokedAt ? " (revoked)" : ""}
+          </p>
         ) : (
-          <p className="muted">Tip: mint a Salesforce engineer key above first so Install can wire it automatically.</p>
+          <p className="muted">Select a key above, or paste any sk-cld-… secret below.</p>
         )}
         {installError ? <p className="card warn">{installError}</p> : null}
         {install ? (
           <>
+            <label className="field">
+              <span>API key to put in the org</span>
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={
+                  selectedKey
+                    ? `Paste full secret for sk-cld-${selectedKey.publicId}_…`
+                    : "sk-cld-… (fresh mint or existing)"
+                }
+                value={connectKey}
+                onChange={(event) => setConnectKey(event.target.value)}
+              />
+            </label>
+            {plaintext && connectKey === plaintext ? (
+              <p className="muted">Using the key minted in this browser session.</p>
+            ) : null}
             <label className="field">
               <span>Org type</span>
               <select value={loginTarget} onChange={(event) => setLoginTarget(event.target.value)}>
@@ -89,8 +142,21 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
               </select>
             </label>
             <div className="row" style={{ gap: "0.6rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
-              <button type="button" className="btn" disabled={!install.oneClick} onClick={startInstall}>
-                {install.mode === "package" ? "Install with Salesforce" : "Install with Salesforce"}
+              <button
+                type="button"
+                className="btn"
+                disabled={!install.oneClick || busyInstall}
+                onClick={() => startInstall(false)}
+              >
+                Install &amp; connect
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={!install.oauthReady || busyInstall || !connectKey.trim()}
+                onClick={() => startInstall(true)}
+              >
+                Connect existing key only
               </button>
               <a className="btn btn-ghost" href={install.zipDownloadPath || "/salesforce/cloudiator-unmanaged.zip"} download>
                 Download zip
@@ -105,9 +171,8 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
               </p>
             ) : (
               <p className="muted" style={{ marginTop: "0.75rem" }}>
-                {install.mode === "package"
-                  ? "Opens Salesforce’s package installer — you authenticate there."
-                  : "Salesforce login (PKCE) → deploy app → permission set → write API key into Cloudiator Setup."}
+                <strong>Install &amp; connect</strong> deploys the unmanaged app + writes the key.{" "}
+                <strong>Connect existing key only</strong> skips deploy (org already has Cloudiator) and only updates Setup.
               </p>
             )}
           </>
@@ -129,11 +194,13 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
       </section>
 
       <section className="card glass">
-        <h2>1. Mint → install → configure</h2>
+        <h2>1. Mint or reconnect → install → configure</h2>
         <ol className="steps">
-          <li>Mint a Salesforce engineer key in this Console (copy plaintext once).</li>
-          <li>Click <strong>Connect Salesforce &amp; install</strong> above (or download zip / CLI).</li>
-          <li>In the org: App Launcher → Cloudiator → Setup → paste key → Test /v1/health.</li>
+          <li>Mint a Salesforce engineer key, or select an existing one and paste the full <code>sk-cld-…</code> from your password manager.</li>
+          <li>
+            <strong>Install &amp; connect</strong> (first deploy) or <strong>Connect existing key only</strong> (org already has the app).
+          </li>
+          <li>Confirm in the org: App Launcher → Cloudiator → Setup → Test /v1/health (key should already be written).</li>
           <li>Build Flows with Cloudiator:* actions; inspect Call Logs.</li>
         </ol>
         <details>

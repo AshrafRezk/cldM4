@@ -46,10 +46,10 @@ export function namedCredentialSteps(apiUrl) {
 
 export function installSteps() {
   return [
-    "Mint a Salesforce engineer key in the Console.",
-    "Deploy salesforce/force-app (sf project deploy) or Workbench zip from scripts/pack-salesforce-unmanaged.sh.",
-    "Assign permission set Cloudiator Admin.",
-    "App Launcher → Cloudiator → Setup → paste key → Test /v1/health.",
+    "Mint a Salesforce engineer key, or paste an existing sk-cld-… from your password manager.",
+    "Console → Salesforce → Install & connect, or Connect existing key only if the org already has the app.",
+    "Fallback: deploy salesforce/force-app (sf project deploy) or Workbench zip; assign Cloudiator Admin.",
+    "App Launcher → Cloudiator → Setup → confirm key → Test /v1/health.",
     "Use Cloudiator:* Flow actions; inspect Cloudiator Call Logs.",
   ];
 }

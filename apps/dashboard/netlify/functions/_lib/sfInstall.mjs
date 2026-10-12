@@ -122,6 +122,7 @@ export async function startSalesforceInstall(event) {
   let login = "login";
   let apiKey = "";
   let baseUrl = publicApiUrl();
+  let configureOnly = false;
 
   if (method === "POST") {
     const body = event.body
@@ -129,16 +130,25 @@ export async function startSalesforceInstall(event) {
       : {};
     login = String(body.login || "login").toLowerCase();
     apiKey = String(body.apiKey || "").trim();
+    configureOnly = Boolean(body.configureOnly);
     if (body.baseUrl) baseUrl = String(body.baseUrl).trim().replace(/\/$/, "");
   } else {
     const qs = event.queryStringParameters || {};
     login = String(qs.login || "login").toLowerCase();
   }
 
+  if (apiKey && !/^sk-cld-[a-z0-9]+_[A-Za-z0-9_-]+$/.test(apiKey)) {
+    throw httpError(400, "API key must look like sk-cld-{public_id}_{secret}.");
+  }
+  if (configureOnly && !apiKey) {
+    throw httpError(400, "Paste an existing sk-cld-… key to connect it to the org.");
+  }
+
   const host = loginHost(login);
 
   // Salesforce-native package installer — no OAuth client on Cloudiator.
-  if (cfg.packageInstallUrl) {
+  // Key wiring still needs PKCE configure; package URL alone cannot write the key.
+  if (cfg.packageInstallUrl && !configureOnly && !apiKey) {
     const url = login === "test" || login === "sandbox" ? cfg.packageInstallUrlSandbox : cfg.packageInstallUrl;
     if (method === "POST") {
       return {
@@ -165,6 +175,7 @@ export async function startSalesforceInstall(event) {
       login,
       apiKey: apiKey || undefined,
       baseUrl,
+      configureOnly,
       exp: Date.now() + STATE_MAX_AGE * 1000,
     },
     secret,
@@ -346,41 +357,46 @@ export async function completeSalesforceInstall(event) {
     return fail(e.message || "Token exchange failed.");
   }
 
-  const path = zipPath();
-  if (!existsSync(path)) {
-    return fail("Package zip missing on server. Rebuild the dashboard with stage-sf-package.");
-  }
-
   const conn = new Connection({
     instanceUrl: token.instance_url,
     accessToken: token.access_token,
     version: "62.0",
   });
 
-  let deployResult;
-  try {
-    deployResult = await deployZip(conn, readFileSync(path));
-  } catch (e) {
-    return fail(`Deploy failed: ${e.message || e}`);
-  }
-
-  if (!deployResult?.success) {
-    const details = (deployResult?.details?.componentFailures || [])
-      .slice(0, 3)
-      .map((f) => f.problem || f.fullName)
-      .join("; ");
-    return fail(details || "Metadata deploy reported failure.");
+  let components = 0;
+  if (!payload.configureOnly) {
+    const path = zipPath();
+    if (!existsSync(path)) {
+      return fail("Package zip missing on server. Rebuild the dashboard with stage-sf-package.");
+    }
+    let deployResult;
+    try {
+      deployResult = await deployZip(conn, readFileSync(path));
+    } catch (e) {
+      return fail(`Deploy failed: ${e.message || e}`);
+    }
+    if (!deployResult?.success) {
+      const details = (deployResult?.details?.componentFailures || [])
+        .slice(0, 3)
+        .map((f) => f.problem || f.fullName)
+        .join("; ");
+      return fail(details || "Metadata deploy reported failure.");
+    }
+    components = deployResult.numberComponentsDeployed || 0;
   }
 
   const perm = await assignAdminPermset(conn);
   const cfgWrite = await writeOrgConfig(conn, payload.apiKey, payload.baseUrl);
-  const components = deployResult.numberComponentsDeployed || 0;
+  if (payload.configureOnly && !cfgWrite.written) {
+    return fail(cfgWrite.reason || "Could not write API key into org Cloudiator Setup.");
+  }
   const q = new URLSearchParams({
     tab: "salesforce",
     sf_install: "ok",
     components: String(components),
     permset: perm.assigned ? "1" : "0",
     key: cfgWrite.written ? "1" : "0",
+    mode: payload.configureOnly ? "connect" : "install",
   });
   return {
     statusCode: 302,

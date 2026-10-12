@@ -18,11 +18,12 @@ Operator-facing guide for the installable package under [`salesforce/`](../sales
 
 You should **not** put a Salesforce client secret in Netlify.
 
-1. Mint a **Salesforce engineer** key in the Console (keep the plaintext for the next step).  
-2. **Salesforce** tab → Production or Sandbox → **Install with Salesforce**.  
-3. Log into the target org on **login.salesforce.com** / **test.salesforce.com**.  
-4. Cloudiator deploys the unmanaged app, assigns **Cloudiator Admin**, and writes the minted key into org Setup when the key was in the browser session.  
-5. App Launcher → **Cloudiator** → quick chat / Flows. Salesforce is now calling the Mini.
+1. Select a key (or mint a new **Salesforce engineer** key).  
+2. **Salesforce** tab → paste the full `sk-cld-…` secret (fresh mint is filled automatically; existing keys come from your password manager).  
+3. Production or Sandbox → **Install & connect** (first time) or **Connect existing key only** (org already has the app).  
+4. Log into the target org on Salesforce.  
+5. Cloudiator deploys if needed, assigns **Cloudiator Admin**, and writes the key into org Setup.  
+6. App Launcher → **Cloudiator** → Flows / Apex. Salesforce calls the Mini.
 
 ### One-time product config (public ids only)
 

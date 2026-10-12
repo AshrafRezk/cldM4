@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import { apexSnippet, jsonBodyExample } from "../netlify/functions/_lib/salesforce.mjs";
 import { mintSecret } from "../netlify/functions/_lib/keys.mjs";
+import { installSteps } from "../src/salesforceSnippets.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,18 @@ test("the client playground calls the Mini API, not a Netlify inference function
   assert.match(src, /\$\{apiUrl\}\/v1\/chat\/completions/);
   assert.equal(src.includes("ollama"), false);
   assert.equal(src.includes("11434"), false);
+});
+
+test("Console can connect an already-minted sk-cld key without redeploying", () => {
+  const panel = readFileSync(join(here, "../src/SalesforcePanel.jsx"), "utf8");
+  const install = readFileSync(join(here, "../netlify/functions/_lib/sfInstall.mjs"), "utf8");
+  assert.match(panel, /Connect existing key only/);
+  assert.match(panel, /configureOnly/);
+  assert.match(install, /configureOnly/);
+  assert.match(install, /mode: payload\.configureOnly \? "connect" : "install"/);
+  const steps = installSteps().join(" ");
+  assert.match(steps, /Connect existing key only/);
+  assert.match(steps, /existing sk-cld/);
 });
 
 test("the built client bundle contains the Apex timeout and stream:false", async () => {
