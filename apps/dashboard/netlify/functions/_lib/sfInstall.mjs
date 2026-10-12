@@ -225,7 +225,22 @@ export async function startSalesforceInstall(event) {
 }
 
 function zipPath() {
-  return join(dirname(fileURLToPath(import.meta.url)), ZIP_REL);
+  // Netlify’s esbuild CJS bundle empties import.meta — try several layouts.
+  const candidates = [];
+  try {
+    if (import.meta?.url) candidates.push(join(dirname(fileURLToPath(import.meta.url)), ZIP_REL));
+  } catch {
+    /* CJS bundle */
+  }
+  candidates.push(
+    join(process.cwd(), "netlify/functions/_lib", ZIP_REL),
+    join(process.cwd(), "sf-package", "cloudiator-unmanaged.zip"),
+    join(process.cwd(), ZIP_REL),
+  );
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return candidates[0];
 }
 
 async function exchangeCode(host, code, verifier) {

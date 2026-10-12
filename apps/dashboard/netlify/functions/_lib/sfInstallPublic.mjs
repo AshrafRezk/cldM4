@@ -1,14 +1,31 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function loadCfg() {
+  const names = ["sfInstallConfig.json"];
+  const dirs = [];
   try {
-    const here = dirname(fileURLToPath(import.meta.url));
-    return JSON.parse(readFileSync(join(here, "sfInstallConfig.json"), "utf8"));
+    if (import.meta?.url) dirs.push(dirname(fileURLToPath(import.meta.url)));
   } catch {
-    return {};
+    /* CJS bundle empties import.meta */
   }
+  dirs.push(
+    join(process.cwd(), "netlify/functions/_lib"),
+    process.cwd(),
+  );
+  for (const dir of dirs) {
+    for (const name of names) {
+      const path = join(dir, name);
+      if (!existsSync(path)) continue;
+      try {
+        return JSON.parse(readFileSync(path, "utf8"));
+      } catch {
+        /* try next */
+      }
+    }
+  }
+  return {};
 }
 
 const cfg = loadCfg();
