@@ -143,6 +143,10 @@ Ollama's own variables belong on the **Ollama LaunchAgent / app**, not only on F
 | `ADMIN_SESSION_SECRET` | cookie signing |
 | `PUBLIC_API_URL` | `https://api.example.com` shown in snippets |
 | `DEV_ACCESS_EMAIL` | **local `netlify dev` only** — never set in production |
+| `SF_PACKAGE_VERSION_ID` | optional public `04t…` — preferred; Install opens Salesforce’s native package installer (no OAuth secret) |
+| `SF_OAUTH_CLIENT_ID` | optional public Connected App **Consumer Key** (PKCE). Prefer committing it in `apps/dashboard/netlify/functions/_lib/sfInstallConfig.json` instead of Netlify env |
+
+**Do not set a Salesforce client secret on Netlify.** Install uses Salesforce login + PKCE or the native `04t` installer. See [salesforce-app.md](salesforce-app.md).
 
 There is no admin password variable. The dashboard is protected by Cloudflare Access on `app.<domain>`; server functions read `Cf-Access-Authenticated-User-Email` and trust nothing else.
 

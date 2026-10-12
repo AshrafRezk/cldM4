@@ -30,8 +30,52 @@ export function Console({ go, path }) {
   const [tenantName, setTenantName] = useState("");
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState("playground");
+  const [sfInstallBanner, setSfInstallBanner] = useState(null);
 
   const selectedKey = keys.find((key) => key.id === selectedKeyId) || null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextTab = params.get("tab");
+    if (nextTab && TABS.some((item) => item.id === nextTab)) {
+      setTab(nextTab);
+    }
+    const sf = params.get("sf_install");
+    if (sf === "ok") {
+      const components = params.get("components") || "?";
+      const permset = params.get("permset") === "1";
+      const key = params.get("key") === "1";
+      const mode = params.get("mode");
+      setSfInstallBanner({
+        ok: true,
+        mode: mode || "install",
+        text:
+          mode === "connect"
+            ? `${key ? "API key written into org Cloudiator Setup." : "Connect finished."}${
+                permset ? " Cloudiator Admin assigned." : ""
+              } Salesforce can call the Mini.`
+            : `Deployed ${components} metadata components.${
+                permset ? " Cloudiator Admin assigned." : " Assign Cloudiator Admin if the app is hidden."
+              }${
+                key
+                  ? " API key written into org Cloudiator Setup — Salesforce can call the Mini."
+                  : " Paste a key and use Connect existing key only, or Install & connect again with a key."
+              }`,
+      });
+      haptic("success");
+    } else if (sf === "err") {
+      setSfInstallBanner({
+        ok: false,
+        text: params.get("message") || "Salesforce install failed.",
+      });
+      haptic("warn");
+    }
+    if (nextTab || sf) {
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.pathname);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setError("");
@@ -353,7 +397,14 @@ export function Console({ go, path }) {
           </section>
         ) : null}
 
-        {tab === "salesforce" ? <SalesforcePanel apiUrl={me?.apiUrl || "https://api.cloudiator.org"} /> : null}
+        {tab === "salesforce" ? (
+          <SalesforcePanel
+            apiUrl={me?.apiUrl || "https://api.cloudiator.org"}
+            selectedKey={selectedKey}
+            plaintext={plaintext}
+            installBanner={sfInstallBanner}
+          />
+        ) : null}
 
         {tab === "playground" ? (
           <Playground

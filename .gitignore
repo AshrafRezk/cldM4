@@ -21,3 +21,8 @@ artifacts/
 .vscode/
 cloudflared-credentials.json
 .sf/
+
+# Generated Salesforce package zips (rebuilt on dashboard npm run build)
+apps/dashboard/netlify/functions/_lib/sf-package/
+apps/dashboard/public/salesforce/*.zip
+apps/dashboard/.sf-package-stage/

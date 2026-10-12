@@ -35,6 +35,11 @@ export const api = {
   revokeKey: (keyId) => request(`/keys/${keyId}/revoke`, { method: "POST", body: "{}" }),
   usage: (keyId) => request(`/keys/${keyId}/usage`),
   salesforce: () => request("/salesforce-snippet"),
+  salesforceInstallStatus: () => request("/salesforce/install/status"),
+  salesforceInstallStartUrl: (login = "login") =>
+    `/api/salesforce/install/start?login=${encodeURIComponent(login)}`,
+  startSalesforceInstall: (body) =>
+    request("/salesforce/install/start", { method: "POST", body: JSON.stringify(body) }),
   openapiUrl: (keyId, target) =>
     target ? `/api/keys/${keyId}/openapi?target=${encodeURIComponent(target)}` : `/api/keys/${keyId}/openapi`,
 };

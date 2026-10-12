@@ -1,0 +1,39 @@
+<template>
+  <lightning-card title="Cloudiator" icon-name="custom:custom67">
+    <div class="slds-p-around_medium">
+      <p class="slds-m-bottom_small">
+        Plug-and-play appliance API for Flows and Apex. Configure the minted key under
+        <strong>Cloudiator Setup</strong>. Full guide:
+        <a href="https://app.cloudiator.org/console" target="_blank">Console → Salesforce</a>.
+      </p>
+      <div class="slds-grid slds-wrap slds-gutters">
+        <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+          <h3 class="slds-text-heading_small">Services</h3>
+          <template for:each={services} for:item="svc">
+            <div key={svc.name} class="slds-box slds-m-bottom_x-small slds-box_x-small">
+              <strong>{svc.label}</strong>
+              <div class="slds-text-body_small">{svc.path}</div>
+              <div class="slds-text-body_small">{svc.modalityIn} → {svc.modalityOut}</div>
+              <div class="slds-text-color_weak">{svc.description}</div>
+            </div>
+          </template>
+        </div>
+        <div class="slds-col slds-size_1-of-1 slds-large-size_1-of-2">
+          <h3 class="slds-text-heading_small">Quick chat</h3>
+          <lightning-textarea label="Prompt" value={prompt} onchange={onPrompt}></lightning-textarea>
+          <lightning-button class="slds-m-top_small" variant="brand" label="Run chat" onclick={runChat} disabled={busy}></lightning-button>
+          <template if:true={chatResult}>
+            <pre class="slds-box slds-m-top_small slds-scrollable_y" style="max-height:16rem;white-space:pre-wrap">{chatResult}</pre>
+          </template>
+          <h3 class="slds-text-heading_small slds-m-top_large">Recent call logs</h3>
+          <lightning-datatable
+            key-field="Id"
+            data={logs}
+            columns={columns}
+            hide-checkbox-column
+          ></lightning-datatable>
+        </div>
+      </div>
+    </div>
+  </lightning-card>
+</template>

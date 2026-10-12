@@ -7,8 +7,21 @@ import { identify } from "./_lib/access.mjs";
 import { dashboardOrigin, publicApiUrl, sql } from "./_lib/db.mjs";
 import { httpError, json, readJson, routePath } from "./_lib/http.mjs";
 import { hashSecret, mintSecret, parsePreset } from "./_lib/keys.mjs";
-import { apexSnippet, DEFAULT_MODEL, jsonBodyExample, namedCredentialSteps } from "./_lib/salesforce.mjs";
+import {
+  apexSnippet,
+  DEFAULT_MODEL,
+  installSteps,
+  jsonBodyExample,
+  namedCredentialSteps,
+  packageApexSnippet,
+  SERVICES,
+} from "./_lib/salesforce.mjs";
 import { buildOpenApi, loadScopes } from "./_lib/schema.mjs";
+import {
+  completeSalesforceInstall,
+  salesforceInstallConfigured,
+  startSalesforceInstall,
+} from "./_lib/sfInstall.mjs";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 const KNOWN_CAPABILITIES = new Set();
@@ -65,11 +78,34 @@ async function handle(event) {
     return { statusCode: 204, headers: { "Access-Control-Allow-Methods": "GET, POST, OPTIONS" } };
   }
 
-  const { email, cookie } = identify(event);
   const path = routePath(event);
   const method = event.httpMethod;
+
+  // OAuth callback must work even if the Access JWT cookie raced the redirect.
+  // Authorization is the signed state minted while Access-authenticated.
+  if (method === "GET" && path === "/salesforce/oauth/callback") {
+    return completeSalesforceInstall(event);
+  }
+
+  const { email, cookie } = identify(event);
   const db = sql();
   const apiUrl = publicApiUrl();
+
+  if (method === "GET" && path === "/salesforce/install/status") {
+    const cfg = salesforceInstallConfigured();
+    return ok(
+      {
+        ...cfg,
+        callbackUrl: `${dashboardOrigin().replace(/\/$/, "")}/api/salesforce/oauth/callback`,
+        oneClick: cfg.oneClick,
+      },
+      cookie,
+    );
+  }
+
+  if ((method === "GET" || method === "POST") && path === "/salesforce/install/start") {
+    return startSalesforceInstall(event);
+  }
 
   if (method === "GET" && path === "/me") {
     return ok(
@@ -89,11 +125,20 @@ async function handle(event) {
   }
 
   if (method === "GET" && path === "/salesforce-snippet") {
+    const model = process.env.DEFAULT_MODEL || DEFAULT_MODEL;
     return ok(
       {
+        install: installSteps(),
         namedCredential: namedCredentialSteps(apiUrl),
-        apex: apexSnippet(apiUrl, process.env.DEFAULT_MODEL || DEFAULT_MODEL),
-        jsonBody: jsonBodyExample(process.env.DEFAULT_MODEL || DEFAULT_MODEL),
+        services: SERVICES,
+        apex: apexSnippet(apiUrl, model),
+        packageApex: packageApexSnippet(model),
+        jsonBody: jsonBodyExample(model),
+        docs: {
+          app: "docs/salesforce-app.md",
+          namedCredential: "docs/salesforce.md",
+          package: "salesforce/",
+        },
       },
       cookie,
     );

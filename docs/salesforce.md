@@ -1,5 +1,7 @@
 # Salesforce integration
 
+**Plug-and-play unmanaged app** (Lightning app, Setup UI, Flow actions, call logs): [salesforce-app.md](salesforce-app.md) and repo folder [`salesforce/`](../salesforce/). Console guide: **Console → Salesforce**.
+
 Apex HTTP callouts default to **10 seconds** and max out at **120 seconds**. The dashboard snippet must always set `req.setTimeout(120000)`. Cumulative callout time per transaction is also 120s.
 
 But 120s is not the real ceiling. Cloudflare's proxy read timeout is about **100 seconds** and is not configurable on the plans this project uses; past that you get a 524 **HTML** page, not JSON. The worker therefore returns its own error at 90s (`PLAN.md` §10, timeout ladder), and the 120000 in Apex is headroom so the error you see is Cloudiator's.
