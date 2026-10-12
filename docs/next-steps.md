@@ -110,7 +110,9 @@ Expect `301` and `location: https://app.cloudiator.org/`. An incognito window on
 
 ## 5. Phase F — Salesforce pack
 
-Docs for the org are already in [salesforce.md](salesforce.md): Named Credential, External Credential, the permission set that grants the **principal** (without it Apex 401s while curl works), `req.setTimeout(120000)`, `"stream": false`, and poll patterns A/B/C (one poll per transaction). Do not rewrite that page from scratch.
+**Worker side is done.** Org proof is finish-line **5b** — paste Session A from [finish-v1-mini.md](finish-v1-mini.md) on the Mini.
+
+Docs for the org are already in [salesforce.md](salesforce.md): Named Credential, External Credential, the permission set that grants the **principal** (without it Apex 401s while curl works), `req.setTimeout(120000)`, `"stream": false`, and poll patterns A/B/C (one poll per transaction). Deployable Apex: `examples/salesforce/`. Do not rewrite that page from scratch.
 
 **Phase F worker code is in the repo** (`resolve_stream_downgrade`, `enforce_max_response_bytes`, `tests/test_sf_stream_downgrade.py`, `tests/test_response_size_cap.py`). After that commit is on `main` and pulled on the Mini:
 
@@ -141,11 +143,11 @@ mlx-whisper stays optional and uses the same exclusive slot as FLUX. Skip it for
 
 ## 6. Unattended boot and alerting
 
-These are still blank in [operator-checklist.md](operator-checklist.md). A power cut with FileVault on stops at the unlock screen: no LaunchAgent, no Ollama, Salesforce sees 503, and nobody is paged.
+Paste Session B from [finish-v1-mini.md](finish-v1-mini.md) on the Mini. These are still blank in [operator-checklist.md](operator-checklist.md). A power cut with FileVault on stops at the unlock screen: no LaunchAgent, no Ollama, Salesforce sees 503, and nobody is paged.
 
 - Tick exactly one of §6 A / B / C. Recommended: FileVault on, a UPS, manual unlock.
 - Automatic login for `ashrafrezk`. Energy: computer does not sleep; wake for network; start up after a power failure.
-- `SLACK_WEBHOOK_URL` in `/Users/ashrafrezk/Cloudiator/.env`. Install the 2-minute health ping from [host-setup.md](host-setup.md) §10. Stop the worker once and confirm the alert fires, then start it again.
+- `SLACK_WEBHOOK_URL` in `/Users/ashrafrezk/Cloudiator/.env`. Run `scripts/install-health-alert-launchagent.sh` (see [host-setup.md](host-setup.md) §10). Stop the worker once and confirm the alert fires, then start it again.
 
 Also still open, and worth doing in the same sitting:
 
