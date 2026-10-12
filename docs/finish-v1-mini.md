@@ -56,15 +56,15 @@ Finish-line 5 only — Salesforce pack proof.
    head -c 200 /tmp/r.txt
    If HTML: fix operator-checklist §2a (Security Level Essentially Off + BIC OFF for api.cloudiator.org) before Apex.
 3. I will mint a Salesforce engineer key in https://app.cloudiator.org/console — I paste only public_id into checklist §10, never the secret into git.
-4. Walk me through Named Credential + External Credential + Principal + permission set from docs/salesforce.md (step 5 permission set is mandatory).
-5. Help me download GET /v1/openapi.json?target=salesforce with that key and import External Services (OpenAPI 3.0.3).
-6. Deploy examples/salesforce/CloudiatorChatCallout.cls (or Anonymous Apex from docs/salesforce.md) with setTimeout(120000), stream false. Prove chat JSON < 120s. Log X-Request-Id.
-7. Prove ONE job poll pattern (A Queueable in examples/salesforce/CloudiatorJobPoller.cls, or B/C). One poll per transaction.
+4. Prefer deploy salesforce/ unmanaged app (sf project deploy) + Cloudiator Admin permset; paste key in Cloudiator Setup; Test /v1/health. Fallback: Named Credential path in docs/salesforce.md (principal permission set mandatory).
+5. Download GET /v1/openapi.json?target=salesforce and optionally import External Services (OpenAPI 3.0.3). Console guide: docs/salesforce-app.md.
+6. Prove chat via CloudiatorService.chat or Flow action Cloudiator: Chat (<120s). Confirm Cloudiator_Call_Log__c Success row + X-Request-Id.
+7. Prove ONE other modality (OCR or Chart) and ONE job poll pattern if the key has image_generation (else skip FLUX and note it).
 8. Tick operator-checklist §10 rows that we complete. Do not invent org credentials.
-Stop when Apex chat returns JSON and one poll pattern is proven.
+Stop when chat works and a call log row exists.
 ```
 
-Apex sources in-repo: [examples/salesforce/](../examples/salesforce/).
+Installable app: [salesforce/](../salesforce/) + guide [salesforce-app.md](salesforce-app.md). Standalone Apex samples: [examples/salesforce/](../examples/salesforce/).
 
 ---
 

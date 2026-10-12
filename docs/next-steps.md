@@ -35,7 +35,7 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Steps 1
 - [x] **3. Neon retention nightly on the Mini** — LaunchAgent + `run-neon-retention.sh` (null `key_id` rollup fix on `main`).
 - [x] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Root + dashboard host 301; production deploy 2026-10-12 proved `301` + `location: https://app.cloudiator.org/`.
 - [x] **5a. Phase F worker code** — `force_no_stream` / `max_response_bytes` + tests on `main`.
-- [ ] **5b. Salesforce org proof** — External Services import + real Apex callout ([salesforce.md](salesforce.md), Apex under `examples/salesforce/`). Mini chat: Session A in [finish-v1-mini.md](finish-v1-mini.md).
+- [ ] **5b. Salesforce org proof** — Deploy `salesforce/` unmanaged app (or Named Credential + Apex), External Services from `?target=salesforce`, real callout + call log row ([salesforce-app.md](salesforce-app.md)). Mini chat: Session A in [finish-v1-mini.md](finish-v1-mini.md).
 - [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested Slack health alert (`scripts/install-health-alert-launchagent.sh`). Mini chat: Session B in [finish-v1-mini.md](finish-v1-mini.md).
 
 After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**. Phase G SIM phone is [#21](https://github.com/AshrafRezk/cldM4/pull/21) — not a v1 checkbox.

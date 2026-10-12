@@ -7,7 +7,15 @@ import { identify } from "./_lib/access.mjs";
 import { dashboardOrigin, publicApiUrl, sql } from "./_lib/db.mjs";
 import { httpError, json, readJson, routePath } from "./_lib/http.mjs";
 import { hashSecret, mintSecret, parsePreset } from "./_lib/keys.mjs";
-import { apexSnippet, DEFAULT_MODEL, jsonBodyExample, namedCredentialSteps } from "./_lib/salesforce.mjs";
+import {
+  apexSnippet,
+  DEFAULT_MODEL,
+  installSteps,
+  jsonBodyExample,
+  namedCredentialSteps,
+  packageApexSnippet,
+  SERVICES,
+} from "./_lib/salesforce.mjs";
 import { buildOpenApi, loadScopes } from "./_lib/schema.mjs";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
@@ -89,11 +97,20 @@ async function handle(event) {
   }
 
   if (method === "GET" && path === "/salesforce-snippet") {
+    const model = process.env.DEFAULT_MODEL || DEFAULT_MODEL;
     return ok(
       {
+        install: installSteps(),
         namedCredential: namedCredentialSteps(apiUrl),
-        apex: apexSnippet(apiUrl, process.env.DEFAULT_MODEL || DEFAULT_MODEL),
-        jsonBody: jsonBodyExample(process.env.DEFAULT_MODEL || DEFAULT_MODEL),
+        services: SERVICES,
+        apex: apexSnippet(apiUrl, model),
+        packageApex: packageApexSnippet(model),
+        jsonBody: jsonBodyExample(model),
+        docs: {
+          app: "docs/salesforce-app.md",
+          namedCredential: "docs/salesforce.md",
+          package: "salesforce/",
+        },
       },
       cookie,
     );

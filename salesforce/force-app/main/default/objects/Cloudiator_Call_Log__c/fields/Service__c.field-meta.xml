@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Service__c</fullName>
+    <description>Cloudiator operation invoked</description>
+    <label>Service</label>
+    <required>false</required>
+    <trackHistory>true</trackHistory>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+        <value><fullName>Chat</fullName><default>false</default><label>Chat</label></value>
+        <value><fullName>Embeddings</fullName><default>false</default><label>Embeddings</label></value>
+        <value><fullName>OCR</fullName><default>false</default><label>OCR</label></value>
+        <value><fullName>Geocode</fullName><default>false</default><label>Geocode</label></value>
+        <value><fullName>Research</fullName><default>false</default><label>Research</label></value>
+        <value><fullName>Chart</fullName><default>false</default><label>Chart</label></value>
+        <value><fullName>Stats</fullName><default>false</default><label>Stats</label></value>
+        <value><fullName>Query</fullName><default>false</default><label>Query</label></value>
+        <value><fullName>Document</fullName><default>false</default><label>Document</label></value>
+        <value><fullName>Text</fullName><default>false</default><label>Text</label></value>
+        <value><fullName>Time</fullName><default>false</default><label>Time</label></value>
+        <value><fullName>ImageOps</fullName><default>false</default><label>ImageOps</label></value>
+        <value><fullName>JobCreate</fullName><default>false</default><label>JobCreate</label></value>
+        <value><fullName>JobPoll</fullName><default>false</default><label>JobPoll</label></value>
+        <value><fullName>ArtifactSign</fullName><default>false</default><label>ArtifactSign</label></value>
+        <value><fullName>Health</fullName><default>false</default><label>Health</label></value>
+        <value><fullName>Models</fullName><default>false</default><label>Models</label></value>
+        <value><fullName>Usage</fullName><default>false</default><label>Usage</label></value>
+        <value><fullName>Other</fullName><default>false</default><label>Other</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

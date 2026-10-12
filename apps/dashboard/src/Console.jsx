@@ -353,7 +353,13 @@ export function Console({ go, path }) {
           </section>
         ) : null}
 
-        {tab === "salesforce" ? <SalesforcePanel apiUrl={me?.apiUrl || "https://api.cloudiator.org"} /> : null}
+        {tab === "salesforce" ? (
+          <SalesforcePanel
+            apiUrl={me?.apiUrl || "https://api.cloudiator.org"}
+            selectedKey={selectedKey}
+            plaintext={plaintext}
+          />
+        ) : null}
 
         {tab === "playground" ? (
           <Playground
