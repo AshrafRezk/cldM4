@@ -1,0 +1,6 @@
+# Host-based redirects must win over the SPA /* → index.html rule.
+# Netlify copies public/ into dist/ at build time.
+https://cloudiator.netlify.app/*  https://app.cloudiator.org/:splat  301!
+http://cloudiator.netlify.app/*   https://app.cloudiator.org/:splat  301!
+/api/*  /.netlify/functions/api/:splat  200
+/*    /index.html  200
