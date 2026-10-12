@@ -1,6 +1,6 @@
 # Agent notes
 
-Read `PLAN.md`, `docs/hardware-and-network.md`, and `docs/cursor-settings.md` before generating code. `docs/plan-review-findings.md` explains why the harder constraints exist.
+Read `PLAN.md`, `docs/hardware-and-network.md`, and `docs/cursor-settings.md` before generating code. `docs/plan-review-findings.md` explains why the harder constraints exist. To close v1 on the Mini, use `docs/finish-v1-mini.md` (Salesforce + boot/alert prompts).
 
 - Mac Mini M4 24GB appliance. One Metal model at a time.
 - Execute only the current phase from `docs/cursor-phases.md`. Each phase lists files, proof commands, and rollback.

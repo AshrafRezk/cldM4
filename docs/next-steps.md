@@ -6,7 +6,7 @@ Repo on the Mini: `/Users/ashrafrezk/cldM4`
 Env (outside git, `chmod 600`): `/Users/ashrafrezk/Cloudiator/.env`  
 Secrets stay in the password manager, not this file. Blanks: [operator-checklist.md](operator-checklist.md).
 
-v1 is finished when every box in [Finish line](#finish-line) is checked. Work top to bottom. Steps 1–4 are operator actions on the Mini, Neon, Netlify, and Cloudflare. Step 5 is the only remaining code phase.
+v1 is finished when every box in [Finish line](#finish-line) is checked. Steps 1–4 and Phase F **worker** code are done. Remaining: Salesforce org proof (5b) and Mini boot/alert (6). Continue on the Mini with [finish-v1-mini.md](finish-v1-mini.md).
 
 **To use what is already live** — mint a key, send a playground chat, and call every tool Phases A–E shipped — follow [using-console.md](using-console.md).
 
@@ -28,14 +28,17 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 
 ## Finish line
 
-- [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0. *(Mini operator — cannot do from Cloud Agent.)*
-- [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears. *(Mini / browser with Access.)*
-- [ ] **3. Neon retention nightly on the Mini.** Repo now has `scripts/run-neon-retention.sh` + `scripts/install-retention-launchagent.sh`. On the Mini: run the installer, then one manual `run-neon-retention.sh`. Do not use `pg_cron`.
-- [ ] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Redirect is already in `apps/dashboard/netlify.toml`. Prove after production deploy: `curl -sI https://cloudiator.netlify.app/ | grep -i location`.
-- [x] **5. Phase F worker code** — `force_no_stream` accepts `stream: true` with `x-cloudiator-stream-downgraded: true`; `max_response_bytes` returns artifact + truncated preview. Tests: `test_sf_stream_downgrade.py`, `test_response_size_cap.py`. **Still open on a Salesforce org:** External Services import + real Apex callout ([salesforce.md](salesforce.md)).
-- [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert. *(Mini operator.)*
+**Mini session playbook (copy-paste prompts):** [finish-v1-mini.md](finish-v1-mini.md).
 
-After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**.
+- [x] **1. Reboot clears leftover swap** — proven on Mini post-reboot (`ok: true`, `swap_used_mb` 0).
+- [x] **2. Playground chat** — console chat + `usage_daily` row proven.
+- [x] **3. Neon retention nightly on the Mini** — LaunchAgent + `run-neon-retention.sh` (null `key_id` rollup fix on `main`).
+- [x] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Root + dashboard host 301; production deploy 2026-10-12 proved `301` + `location: https://app.cloudiator.org/`.
+- [x] **5a. Phase F worker code** — `force_no_stream` / `max_response_bytes` + tests on `main`.
+- [ ] **5b. Salesforce org proof** — External Services import + real Apex callout ([salesforce.md](salesforce.md), Apex under `examples/salesforce/`). Mini chat: Session A in [finish-v1-mini.md](finish-v1-mini.md).
+- [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested Slack health alert (`scripts/install-health-alert-launchagent.sh`). Mini chat: Session B in [finish-v1-mini.md](finish-v1-mini.md).
+
+After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**. Phase G SIM phone is [#21](https://github.com/AshrafRezk/cldM4/pull/21) — not a v1 checkbox.
 
 Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal, a Cloudflare Worker, `apps/gateway/`. Phase G (SIM phone) is a separate product phase, not a v1 finish-line checkbox.
 
