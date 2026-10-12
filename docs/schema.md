@@ -112,6 +112,7 @@ SELECT date_trunc('day', ts)::date, key_id, tenant_id, route,
        coalesce(sum(bytes_out), 0)
 FROM usage_events
 WHERE ts < date_trunc('day', now())
+  AND key_id IS NOT NULL
 GROUP BY 1, 2, 3, 4
 ON CONFLICT (day, key_id, route) DO UPDATE SET
   calls             = EXCLUDED.calls,
@@ -122,6 +123,8 @@ ON CONFLICT (day, key_id, route) DO UPDATE SET
 
 DELETE FROM usage_events WHERE ts < now() - interval '30 days';
 ```
+
+`usage_events.key_id` is `ON DELETE SET NULL`. Skip null `key_id` in the rollup — `usage_daily` primary-keys on it. Those orphan rows still age out in the DELETE.
 
 Schedule it (Neon scheduled job, a cron on the Mini, or a Netlify scheduled function) and tick it off in `docs/operator-checklist.md` §3.
 

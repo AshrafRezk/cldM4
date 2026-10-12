@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run on the Mac Mini AFTER reboot + unlock + login as the appliance user.
-# Pulls merged Phase F, restarts the worker, installs Neon retention, proves health.
+# Pulls main, restarts the worker, installs Neon retention, proves health.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,10 +22,19 @@ launchctl kickstart -k "gui/$UID/ai.cloudiator.worker" 2>/dev/null \
   || warn "kickstart failed — is ai.cloudiator.worker installed?"
 sleep 3
 HEALTH="$(/usr/bin/curl -sS --max-time 10 http://127.0.0.1:8080/v1/health || true)"
-echo "$HEALTH" | /usr/bin/python3 -m json.tool || echo "$HEALTH"
-echo "$HEALTH" | grep -q '"ok": true' && pass "health ok" || fail "health not ok — check swap/degraded"
-echo "$HEALTH" | grep -q '"swap_used_mb": 0' && pass "swap cleared" \
-  || warn "swap still non-zero — another reboot or quit heavy apps"
+echo "$HEALTH" | /usr/bin/python3 -m json.tool 2>/dev/null || echo "$HEALTH"
+
+# FastAPI emits compact JSON ("ok":true). Do not grep for pretty-printed spaces.
+if /usr/bin/python3 -c 'import json,sys; h=json.loads(sys.argv[1]); sys.exit(0 if h.get("ok") is True else 1)' "$HEALTH" 2>/dev/null; then
+  pass "health ok"
+else
+  fail "health not ok — check swap/degraded"
+fi
+if /usr/bin/python3 -c 'import json,sys; h=json.loads(sys.argv[1]); sys.exit(0 if float(h.get("swap_used_mb") or 0)==0 else 1)' "$HEALTH" 2>/dev/null; then
+  pass "swap cleared"
+else
+  warn "swap still non-zero — another reboot or quit heavy apps"
+fi
 
 section "Neon retention"
 mkdir -p "$HOME/Cloudiator/logs"
