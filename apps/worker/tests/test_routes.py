@@ -203,8 +203,10 @@ async def test_an_oversized_prompt_is_rejected_before_ollama_truncates_it(client
     assert response.json()["error"]["code"] == "context_length_exceeded"
 
 
-async def test_streaming_is_refused_loudly(client):
-    async with client:
+async def test_streaming_is_refused_loudly_for_browser_keys(make_client, install_key):
+    """Default Salesforce keys downgrade stream; browser keys still 400 (Phase F)."""
+    _record, headers = install_key(force_no_stream=False, capabilities=["chat"])
+    async with make_client(headers) as client:
         response = await client.post(
             "/v1/chat/completions",
             json={"messages": [{"role": "user", "content": "hi"}], "stream": True},
@@ -212,6 +214,18 @@ async def test_streaming_is_refused_loudly(client):
 
     assert response.status_code == 400
     assert response.json()["error"]["param"] == "stream"
+
+
+async def test_salesforce_key_downgrades_stream_instead_of_400(client):
+    """cached_key is force_no_stream=True — External Services may send stream:true."""
+    async with client:
+        response = await client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": "hi"}], "stream": True},
+        )
+
+    assert response.status_code == 200
+    assert response.headers.get("x-cloudiator-stream-downgraded") == "true"
 
 
 async def test_embeddings_returns_a_vector_per_input(client):

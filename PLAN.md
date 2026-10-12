@@ -1051,6 +1051,8 @@ Uploading files **from** Apex is genuinely painful: hand-rolled multipart means 
 
 v1.1: rembg, sqlite-vec, video experiment (Wan 1.3B only, still optional), **vLLM-metal exclusive text experiment** (separate Python 3.12 venv, `max-num-seqs=1`, Gemma vision stays on Ollama until proven).
 
+Product backlog after the v1 finish line (voice console, CRM write-back, WhatsApp, campaigns, RAG, second Mini, …): **[docs/future-phases.md](docs/future-phases.md)**.
+
 ---
 
 ## 16. Performance targets

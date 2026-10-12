@@ -40,12 +40,8 @@ def validate_chat_params(body: dict[str, Any]) -> None:
         raise _reject("best_of", "it multiplies generations on a single Metal slot")
     if body.get("logit_bias"):
         raise _reject("logit_bias", "Ollama does not accept a logit bias map")
-    if body.get("stream"):
-        raise _reject(
-            "stream",
-            "streaming arrives with the browser keys in a later phase; Salesforce keys are "
-            "non-streaming by design",
-        )
+    # stream is handled by resolve_stream_downgrade: Salesforce keys downgrade;
+    # other keys still get a loud 400 until browser streaming ships.
     tool_choice = body.get("tool_choice")
     if isinstance(tool_choice, str) and tool_choice not in ("auto", "none"):
         raise _reject("tool_choice", "only 'auto' and 'none' are supported")
@@ -62,6 +58,98 @@ def validate_chat_params(body: dict[str, Any]) -> None:
                 "response_format",
                 f"{kind!r} is not supported; use 'text' or 'json_object'",
             )
+
+
+def resolve_stream_downgrade(body: dict[str, Any], *, force_no_stream: bool) -> bool:
+    """Return True when stream:true was requested and must be served as JSON.
+
+    Salesforce / force_no_stream keys accept stream:true from External Services
+    generators, force a non-streaming body, and set x-cloudiator-stream-downgraded.
+    Other keys still reject stream until a later browser-streaming phase.
+    """
+    if not body.get("stream"):
+        return False
+    if force_no_stream:
+        return True
+    raise _reject(
+        "stream",
+        "streaming arrives with the browser keys in a later phase; Salesforce keys are "
+        "non-streaming by design",
+    )
+
+
+def enforce_max_response_bytes(
+    payload: dict[str, Any],
+    *,
+    max_bytes: int,
+    artifacts,
+) -> dict[str, Any]:
+    """If the JSON body would exceed max_bytes, stash it and return a preview.
+
+    Salesforce Apex heap is ~6 MB; keys with force_no_stream default to 1 MB.
+    The full completion is a signed artifact; the inline message is truncated.
+    """
+    if max_bytes <= 0:
+        return payload
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if len(raw) <= max_bytes:
+        return payload
+
+    artifact_id = artifacts.save(raw, ".json")
+    url = artifacts.sign(artifact_id)
+    # Leave headroom for the artifact envelope itself.
+    budget = max(256, max_bytes - 512)
+    preview = _truncate_chat_payload(payload, budget=budget)
+    preview["artifact"] = {
+        "id": artifact_id,
+        "url": url,
+        "bytes": len(raw),
+        "truncated": True,
+        "max_response_bytes": max_bytes,
+    }
+    # Final guard: if the preview is still huge, cut content aggressively.
+    encoded = json.dumps(preview, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if len(encoded) > max_bytes:
+        message = preview["choices"][0]["message"]
+        message["content"] = (
+            f"[truncated: response was {len(raw)} bytes; full JSON at artifact id {artifact_id}]"
+        )
+        preview["choices"][0]["finish_reason"] = "length"
+    return preview
+
+
+def _truncate_chat_payload(payload: dict[str, Any], *, budget: int) -> dict[str, Any]:
+    out = json.loads(json.dumps(payload))  # deep copy via JSON
+    choices = out.get("choices") or []
+    if not choices:
+        return out
+    message = choices[0].get("message") or {}
+    content = message.get("content") or ""
+    if not isinstance(content, str):
+        content = str(content)
+    # Shrink content until the serialized body fits the budget.
+    lo, hi = 0, len(content)
+    best = 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        message["content"] = content[:mid] + ("…[truncated]" if mid < len(content) else "")
+        choices[0]["message"] = message
+        choices[0]["finish_reason"] = "length" if mid < len(content) else choices[0].get(
+            "finish_reason", "stop"
+        )
+        out["choices"] = choices
+        size = len(json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        if size <= budget:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    message["content"] = content[:best] + ("…[truncated]" if best < len(content) else "")
+    choices[0]["message"] = message
+    if best < len(content):
+        choices[0]["finish_reason"] = "length"
+    out["choices"] = choices
+    return out
 
 
 def resolve_max_tokens(body: dict[str, Any], settings) -> int:

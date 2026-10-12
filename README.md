@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. How to mint a key and use the playground and tools is [docs/using-console.md](docs/using-console.md). What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md).
+**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. How to mint a key and use the playground and tools is [docs/using-console.md](docs/using-console.md). What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md). After v1: ideas that still fit this Mac are [docs/future-phases.md](docs/future-phases.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 

@@ -61,10 +61,12 @@ from .translation import (
     build_options,
     chat_response_to_openai,
     embeddings_response_to_openai,
+    enforce_max_response_bytes,
     models_response_to_openai,
     normalize_embeddings_input,
     resolve_max_tokens,
     resolve_num_ctx,
+    resolve_stream_downgrade,
     validate_chat_params,
 )
 from .usage import UsageEvent, UsageOutbox
@@ -413,6 +415,7 @@ async def chat_completions(
     started = time.monotonic()
     body = await _json_body(request)
     validate_chat_params(body)
+    stream_downgraded = resolve_stream_downgrade(body, force_no_stream=key.force_no_stream)
 
     messages = body.get("messages")
     if not isinstance(messages, list) or not messages:
@@ -497,8 +500,14 @@ async def chat_completions(
         message["content"] = cite_answer(message.get("content") or "", research_bundle.get("references") or [])
         message.pop("tool_calls", None)
         payload["research"] = research_bundle
+    if key.force_no_stream:
+        payload = enforce_max_response_bytes(
+            payload, max_bytes=key.max_response_bytes, artifacts=artifacts
+        )
     response = JSONResponse(content=payload)
     response.headers["x-cloudiator-tool-iterations"] = str(iterations)
+    if stream_downgraded:
+        response.headers["x-cloudiator-stream-downgraded"] = "true"
     if research_bundle is not None:
         response.headers["x-cloudiator-research"] = "1"
     return response

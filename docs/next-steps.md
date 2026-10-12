@@ -28,14 +28,16 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 
 ## Finish line
 
-- [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0.
-- [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears.
-- [ ] **3. `infra/neon-retention.sql` runs nightly from the Mini.** Raw `usage_events` older than 30 days get deleted. Do not use `pg_cron`: this Neon compute scales to zero, and a suspended compute skips the job.
-- [ ] **4. `cloudiator.netlify.app` redirects to `https://app.cloudiator.org`.** Netlify will not delete that hostname. The redirect is in `apps/dashboard/netlify.toml` and applies on the next production deploy.
-- [ ] **5. Phase F** — Salesforce stream downgrade and 1 MB cap in the worker, then a real External Services import and Apex callout.
-- [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert.
+- [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0. *(Mini operator — cannot do from Cloud Agent.)*
+- [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears. *(Mini / browser with Access.)*
+- [ ] **3. Neon retention nightly on the Mini.** Repo now has `scripts/run-neon-retention.sh` + `scripts/install-retention-launchagent.sh`. On the Mini: run the installer, then one manual `run-neon-retention.sh`. Do not use `pg_cron`.
+- [ ] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Redirect is already in `apps/dashboard/netlify.toml`. Prove after production deploy: `curl -sI https://cloudiator.netlify.app/ | grep -i location`.
+- [x] **5. Phase F worker code** — `force_no_stream` accepts `stream: true` with `x-cloudiator-stream-downgraded: true`; `max_response_bytes` returns artifact + truncated preview. Tests: `test_sf_stream_downgrade.py`, `test_response_size_cap.py`. **Still open on a Salesforce org:** External Services import + real Apex callout ([salesforce.md](salesforce.md)).
+- [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert. *(Mini operator.)*
 
-Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, mlx-whisper, vLLM-metal, a Cloudflare Worker, `apps/gateway/`.
+After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**.
+
+Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal, a Cloudflare Worker, `apps/gateway/`. Phase G (SIM phone) is a separate product phase, not a v1 finish-line checkbox.
 
 ---
 
@@ -51,6 +53,7 @@ FileVault policy is still unticked (§6). A reboot stops at the unlock screen un
 
 ```bash
 cd /Users/ashrafrezk/cldM4
+git pull origin main
 # reboot from the Apple menu, unlock, log in as ashrafrezk, then:
 launchctl print gui/$UID/ai.cloudiator.worker | head -5
 /usr/bin/curl -s http://127.0.0.1:8080/v1/health | /usr/bin/python3 -m json.tool
@@ -69,87 +72,11 @@ Free-tier storage fills if raw `usage_events` are kept forever, and then **key m
 Run it from the Mini, not from `pg_cron`. The Neon compute scales to zero, and `pg_cron` only fires while that compute is awake — a missed night is dropped, not retried. The Mini is already on. A LaunchAgent at 03:15 local runs the SQL through the worker's Neon client, which wakes the compute, then lets it suspend again.
 
 ```bash
+cd /Users/ashrafrezk/cldM4
+git pull origin main
 mkdir -p /Users/ashrafrezk/Cloudiator/logs
-cat > /Users/ashrafrezk/Cloudiator/retention.sh << 'EOF'
-#!/bin/bash
-set -euo pipefail
-. /Users/ashrafrezk/cldM4/scripts/lib/load-env.sh
-load_env_file /Users/ashrafrezk/Cloudiator/.env
-cd /Users/ashrafrezk/cldM4/apps/worker
-exec .venv/bin/python - << 'PY'
-import asyncio
-from pathlib import Path
-
-from app.config import get_settings
-from app.db import Neon
-
-SQL_PATH = Path("/Users/ashrafrezk/cldM4/infra/neon-retention.sql")
-
-def statements(sql: str) -> list[str]:
-    kept = []
-    for line in sql.splitlines():
-        if line.strip().startswith("--"):
-            continue
-        kept.append(line)
-    return [part.strip() for part in "\n".join(kept).split(";") if part.strip()]
-
-async def main() -> None:
-    db = Neon(get_settings())
-    try:
-        for stmt in statements(SQL_PATH.read_text()):
-            await db.execute_script(stmt, timeout_seconds=120)
-
-        async def counts(con):
-            old = await con.fetchval(
-                "SELECT count(*) FROM usage_events WHERE ts < now() - interval '30 days'"
-            )
-            total = await con.fetchval("SELECT count(*) FROM usage_events")
-            days = await con.fetchval("SELECT count(*) FROM usage_daily")
-            return old, total, days
-
-        old, total, days = await db.run(counts, statement_timeout_seconds=30)
-        print(
-            f"retention ok: usage_events={total} older_than_30d={old} usage_daily_rows={days}",
-            flush=True,
-        )
-    finally:
-        await db.close()
-
-asyncio.run(main())
-PY
-EOF
-chmod 700 /Users/ashrafrezk/Cloudiator/retention.sh
-/bin/bash /Users/ashrafrezk/Cloudiator/retention.sh
-
-cat > /Users/ashrafrezk/Library/LaunchAgents/ai.cloudiator.retention.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>ai.cloudiator.retention</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>/Users/ashrafrezk/Cloudiator/retention.sh</string>
-  </array>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>3</integer>
-    <key>Minute</key>
-    <integer>15</integer>
-  </dict>
-  <key>StandardOutPath</key>
-  <string>/Users/ashrafrezk/Cloudiator/logs/retention.log</string>
-  <key>StandardErrorPath</key>
-  <string>/Users/ashrafrezk/Cloudiator/logs/retention.err</string>
-</dict>
-</plist>
-EOF
-launchctl bootout gui/$UID/ai.cloudiator.retention 2>/dev/null || true
-launchctl bootstrap gui/$UID /Users/ashrafrezk/Library/LaunchAgents/ai.cloudiator.retention.plist
-launchctl enable gui/$UID/ai.cloudiator.retention
+scripts/install-retention-launchagent.sh
+scripts/run-neon-retention.sh
 launchctl print gui/$UID/ai.cloudiator.retention | head -12
 ```
 
@@ -177,26 +104,7 @@ Expect `301` and `location: https://app.cloudiator.org/`. An incognito window on
 
 Docs for the org are already in [salesforce.md](salesforce.md): Named Credential, External Credential, the permission set that grants the **principal** (without it Apex 401s while curl works), `req.setTimeout(120000)`, `"stream": false`, and poll patterns A/B/C (one poll per transaction). Do not rewrite that page from scratch.
 
-The worker does **not** meet the Phase F code bar yet:
-
-- `apps/worker/app/translation.py` **rejects** `stream: true`. Salesforce keys must accept it, force a JSON body, and set `x-cloudiator-stream-downgraded: true`.
-- `max_response_bytes` is stored on the key (default 1 MB) and is not enforced on the response. An oversized body must become an artifact id plus a truncated preview.
-- Missing tests: `apps/worker/tests/test_sf_stream_downgrade.py`, `apps/worker/tests/test_response_size_cap.py`.
-
-New Agent chat on the Mini. Model **Claude Sonnet 5**. Auto off. Attach `@PLAN.md` `@docs/cursor-phases.md` `@docs/salesforce.md`. Paste:
-
-```
-Phase F only. Repo is /Users/ashrafrezk/cldM4. Docs in docs/salesforce.md already cover Named Credential, the External Credential principal permission set, setTimeout(120000), stream false, and the three poll patterns. Do not duplicate that prose.
-
-1. Salesforce keys (force_no_stream): if the body has stream true, serve non-streaming JSON and set x-cloudiator-stream-downgraded: true. Do not 400.
-2. Enforce max_response_bytes (1 MB) for those keys. Oversized JSON returns an artifact id plus a truncated preview, not a multi-megabyte body.
-3. Tests: apps/worker/tests/test_sf_stream_downgrade.py and apps/worker/tests/test_response_size_cap.py.
-4. Leave mlx-whisper and /v1/audio/transcriptions out unless I ask. Do not pull gpt-oss:20b. Do not run FLUX 8-bit.
-
-Prove: cd /Users/ashrafrezk/cldM4/apps/worker && .venv/bin/pytest tests/test_sf_stream_downgrade.py tests/test_response_size_cap.py -q
-```
-
-After that commit is on `main`:
+**Phase F worker code is in the repo** (`resolve_stream_downgrade`, `enforce_max_response_bytes`, `tests/test_sf_stream_downgrade.py`, `tests/test_response_size_cap.py`). After that commit is on `main` and pulled on the Mini:
 
 ```bash
 cd /Users/ashrafrezk/cldM4

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. scripts/install-retention-launchagent.sh substitutes __HOME__ and __REPO__.
+  Calendar job at 03:15 local. Not KeepAlive — Neon is woken only when this fires.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.cloudiator.retention</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__REPO__/scripts/run-neon-retention.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Cloudiator/logs/retention.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Cloudiator/logs/retention.err</string>
+</dict>
+</plist>
