@@ -90,6 +90,11 @@ The outbox lives in `QUEUE_DB`, so it survives a worker restart. Its depth is `o
 | `RESEARCH_CACHE_DB` | `/Users/<you>/Cloudiator/research.db` | 1-hour TTL for `research: true` lookups; misses only |
 | `MFLUX_MODEL_PATH` | `/Users/<you>/Cloudiator/models/flux-schnell-4bit` | always passed explicitly so a request can never trigger a weight download |
 | `MFLUX_LOW_RAM` | `true` | required on the 24 GB Mini. A 1024² run without it peaked at 19.08 GB and swapped; with it, peak MLX memory was 8.43 GB |
+| `WHISPER_MODEL_PATH` | `/Users/<you>/Cloudiator/models/whisper-large-v3-turbo` | local mlx-whisper weights only; a missing directory returns 503 instead of downloading |
+| `VOICE_DB` | `/Users/<you>/Cloudiator/voice.db` | SIM lines + call history for Phase G |
+| `TTS_PROVIDER` | `edge` | `edge` (Microsoft neural via edge-tts, default) or `azure` or `fake` (tests) |
+| `AZURE_SPEECH_KEY` | | required only when `TTS_PROVIDER=azure` |
+| `AZURE_SPEECH_REGION` | `eastus` | required only when `TTS_PROVIDER=azure` |
 | `HF_HOME` | `/Users/<you>/.cache/huggingface` | excluded from Time Machine and Spotlight |
 
 ## Mini worker — secrets and admin

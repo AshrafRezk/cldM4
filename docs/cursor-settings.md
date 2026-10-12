@@ -55,6 +55,7 @@ Do not also pay for a separate Claude.ai subscription unless you want chat outsi
 | D3 Image ops, docs, mermaid, IDs | **Grok 4.6** or Sonnet | Cursor / Other | Many similar tools; save Opus |
 | E mflux FLUX + jobs queue | **Claude Opus 5** | Other | Exclusive RAM slot + Salesforce jobs |
 | F Salesforce pack, optional Whisper | **Claude Sonnet 5** | Other | Docs + Apex; Opus if Named Credential auth is messy |
+| G SIM phone agent | **Claude Sonnet 5** | Other | Whisper + voice API + Android bridge; Opus if Metal/RAM fights |
 | “Fix this pytest / LaunchAgent” | **Grok 4.6** or **Composer 2.5** | Cursor | Cheap iteration |
 
 If the newest names in your picker are **Opus 4.8 / Sonnet 4.6** instead of 5, use the **latest Opus** for A/B/D/E and the **latest Sonnet** for C/D2/F. Same idea.

@@ -1,9 +1,9 @@
-"""Cloudiator worker — Phases A–D.
+"""Cloudiator worker — Phases A–G.
 
 Bound to 127.0.0.1:8080, single process, one Metal slot. Chat, embeddings, and
 models are OpenAI-compatible. OCR and maps are library tools: FastAPI runs the
 tool loop, Ollama only proposes calls. Neon is never on the critical path of a
-chat.
+chat. Phase G adds SIM phone agent routes (Whisper exclusive, TTS, voice lines).
 """
 
 from __future__ import annotations
@@ -70,6 +70,8 @@ from .translation import (
     validate_chat_params,
 )
 from .usage import UsageEvent, UsageOutbox
+from .voice import VoiceManager
+from .voice_routes import register_voice_routes
 
 log = logging.getLogger("cloudiator.worker")
 
@@ -119,6 +121,7 @@ tool_runner = ToolRunner(
     research=research_client,
 )
 jobs = JobRunner(settings, scheduler, artifacts)
+voice = VoiceManager(settings, scheduler=scheduler, ollama=ollama, artifacts=artifacts)
 
 
 class HealthLimiter:
@@ -179,6 +182,10 @@ async def lifespan(app: FastAPI):
             jobs.start()
     except Exception as exc:  # noqa: BLE001
         scheduler.mark_degraded("jobs", f"cannot open {settings.queue_db}: {exc}")
+    try:
+        voice.open()
+    except Exception as exc:  # noqa: BLE001
+        scheduler.mark_degraded("voice", f"cannot open voice store: {exc}")
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
     artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")
@@ -191,6 +198,7 @@ async def lifespan(app: FastAPI):
         await scheduler.stop()
         await jobs.stop()
         jobs.close()
+        voice.close()
         await outbox.stop()
         outbox.close()
         await ollama.aclose()
@@ -722,6 +730,9 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
+register_voice_routes(
+    app, voice=voice, require_key=require_key, settings=settings, scheduler=scheduler
+)
 
 
 @app.post("/v1/jobs")

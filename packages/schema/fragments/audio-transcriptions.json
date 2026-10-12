@@ -1,0 +1,67 @@
+{
+  "x-cloudiator-scope": ["transcriptions"],
+  "x-cloudiator-salesforce": false,
+  "paths": {
+    "/v1/audio/transcriptions": {
+      "post": {
+        "operationId": "audioTranscriptionsPost",
+        "summary": "Transcribe audio with local mlx-whisper (exclusive Metal slot)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "model": { "type": "string" },
+                  "language": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcript",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TranscriptionResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TranscriptionResponse": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" },
+          "language": { "type": "string" },
+          "model": { "type": "string" }
+        }
+      }
+    }
+  }
+}

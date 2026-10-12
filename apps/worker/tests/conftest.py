@@ -43,6 +43,9 @@ os.environ.update(
         "MFLUX_LOW_RAM": "true",
         # The suite must not drain the queue into a real mflux or Ollama.
         "CLOUDIATOR_JOBS": "0",
+        "TTS_PROVIDER": "fake",
+        "VOICE_DB": os.path.join(_TEST_STATE_DIR, "voice.db"),
+        "WHISPER_MODEL_PATH": os.path.join(_TEST_STATE_DIR, "whisper-large-v3-turbo"),
     }
 )
 # No Neon from the test suite. A configured URL is opted into per test.
@@ -221,6 +224,23 @@ def reset_worker_state():
 
     main.key_cache.flush()
     main.rate_limiter._buckets.clear()
+    # Voice manager is process-global; clear live call state between tests.
+    for task in list(main.voice._tasks):
+        task.cancel()
+    main.voice._tasks.clear()
+    main.voice.active_call = None
+    main.voice.calls.clear()
+    main.voice.lines.clear()
+    main.voice._media.clear()
+    main.voice._uplink_queues.clear()
+    try:
+        main.voice.open()
+    except Exception:  # noqa: BLE001
+        pass
     yield
+    for task in list(main.voice._tasks):
+        task.cancel()
+    main.voice._tasks.clear()
+    main.voice.active_call = None
     main.key_cache.flush()
     main.rate_limiter._buckets.clear()

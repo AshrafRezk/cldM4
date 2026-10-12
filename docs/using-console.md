@@ -20,9 +20,9 @@ Presets come from `packages/schema/scopes.json`. Tick extra checkboxes when a pr
 | Creative | Chat, embeddings, FLUX image jobs, diagrams, OCR, image ops. |
 | Analyst | Chat, embeddings, charts, stats, DuckDB, documents, text. |
 | Heavy | Chat and embeddings only. `gpt-oss:20b` is not installed. |
-| Speech | Checkboxes only. Transcription and audio routes are not in v1. |
+| Speech | `transcriptions`, `tts`, `voice_calls` (Phase G). Needs local Whisper weights + Android SIM bridge for live calls. |
 
-These mint-form checkboxes have no route yet: `transcriptions`, `tools.audio_ops`, `tools.fx`, `tools.google_places`, `tools.face_detect`.
+These mint-form checkboxes have no route yet: `tools.audio_ops`, `tools.fx`, `tools.google_places`, `tools.face_detect`. Speech scopes (`transcriptions`, `tts`, `voice_calls`) are Phase G — see `docs/cursor-phases.md`.
 
 **Revoke** is on the selected key. It takes up to 60 seconds because the Mini caches key lookups. On the Mini, `POST http://127.0.0.1:8080/v1/admin/cache/flush` makes it immediate.
 

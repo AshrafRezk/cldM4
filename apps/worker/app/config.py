@@ -218,6 +218,25 @@ class Settings:
         default_factory=lambda: _str("MFLUX_LOW_RAM", "true").lower() in ("1", "true", "yes")
     )
 
+    # Phase F/G speech. Local mlx-whisper weights only — never download on request.
+    whisper_model_path: str = field(
+        default_factory=lambda: _str(
+            "WHISPER_MODEL_PATH",
+            os.path.expanduser("~/Cloudiator/models/whisper-large-v3-turbo"),
+        )
+    )
+    voice_db: str = field(
+        default_factory=lambda: _str(
+            "VOICE_DB", os.path.expanduser("~/Cloudiator/voice.db")
+        )
+    )
+    # edge = Microsoft neural voices via edge-tts (default, no Azure bill).
+    # azure = Azure Speech REST when AZURE_SPEECH_KEY/REGION are set.
+    # fake = silent PCM for tests.
+    tts_provider: str = field(default_factory=lambda: _str("TTS_PROVIDER", "edge"))
+    azure_speech_key: str | None = field(default_factory=lambda: _opt("AZURE_SPEECH_KEY"))
+    azure_speech_region: str | None = field(default_factory=lambda: _opt("AZURE_SPEECH_REGION"))
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

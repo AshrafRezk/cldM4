@@ -4,6 +4,8 @@
     "embeddings",
     "image_generation",
     "transcriptions",
+    "tts",
+    "voice_calls",
     "tools.ocr",
     "tools.maps",
     "tools.research",
@@ -71,7 +73,13 @@
       "note": "gpt-oss:20b is exclusive and Phase E only; do not list it until pulled"
     },
     "speech": {
-      "capabilities": ["chat", "transcriptions", "tools.audio_ops"]
+      "capabilities": [
+        "chat",
+        "transcriptions",
+        "tts",
+        "voice_calls",
+        "tools.audio_ops"
+      ]
     }
   }
 }

@@ -41,6 +41,11 @@ dependencies = [
     # installed in Phase A; ocrmac is the small wrapper the OCR handler calls.
     "pyobjc-framework-Vision>=10.3; sys_platform == 'darwin'",
     "ocrmac>=1.0; sys_platform == 'darwin'",
+    # Phase F/G speech. mlx-whisper is Darwin-only (Metal); edge-tts is the
+    # default TTS path and does not use Metal. pydub decodes edge-tts MP3.
+    "edge-tts>=6.1",
+    "pydub>=0.25",
+    "mlx-whisper>=0.4; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]
