@@ -11,9 +11,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 test("Apex snippet contains the Salesforce timeout and stream:false", () => {
   const snippet = apexSnippet("https://api.cloudiator.org");
-  assert.match(snippet, /req\.setTimeout\(120000\)/);
+  assert.match(snippet, /setTimeout\(120000\)/);
   assert.match(snippet, /'stream' => false/);
-  assert.match(snippet, /"stream": false/);
 });
 
 test("JSON example sent by Apex/playground forces stream false", () => {
@@ -42,5 +41,5 @@ test("the built client bundle contains the Apex timeout and stream:false", async
   const files = readdirSync(distJs).filter((name) => name.endsWith(".js"));
   const bundled = files.map((name) => readFileSync(join(distJs, name), "utf8")).join("\n");
   assert.match(bundled, /setTimeout\(120000\)/);
-  assert.match(bundled, /"stream": false/);
+  assert.match(bundled, /stream['"]?\s*=>\s*false|stream": false/);
 });

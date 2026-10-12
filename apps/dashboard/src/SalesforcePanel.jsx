@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
 import {
   SERVICES,
@@ -10,9 +10,12 @@ import {
 } from "./salesforceSnippets.js";
 import { CopyButton } from "./SiteNav.jsx";
 
-export function SalesforcePanel({ apiUrl, selectedKey, plaintext }) {
+export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner }) {
   const url = apiUrl || "https://api.cloudiator.org";
   const [serviceId, setServiceId] = useState("chat");
+  const [install, setInstall] = useState(null);
+  const [installError, setInstallError] = useState("");
+  const [loginTarget, setLoginTarget] = useState("login");
   const service = SERVICES.find((row) => row.id === serviceId) || SERVICES[0];
   const stepsNc = namedCredentialSteps(url);
   const stepsInstall = installSteps();
@@ -25,14 +28,82 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext }) {
     [service],
   );
 
+  useEffect(() => {
+    api
+      .salesforceInstallStatus()
+      .then(setInstall)
+      .catch((err) => setInstallError(err.message));
+  }, []);
+
+  function startInstall() {
+    // Full navigation so Set-Cookie + Salesforce redirect work.
+    window.location.href = api.salesforceInstallStartUrl(loginTarget);
+  }
+
   return (
     <div className="sf-guide">
+      {installBanner ? (
+        <section className={installBanner.ok ? "card glass" : "card glass warn"}>
+          <h2>{installBanner.ok ? "Salesforce package installed" : "Salesforce install issue"}</h2>
+          <p className="muted">{installBanner.text}</p>
+        </section>
+      ) : null}
+
+      <section className="card glass lift">
+        <h2>Install into Salesforce</h2>
+        <p className="muted">
+          One click: authenticate to your org, then Cloudiator deploys the unmanaged app (Setup, Flow actions, call
+          logs). Afterward, paste your minted key in <strong>Cloudiator Setup</strong> inside Salesforce.
+        </p>
+        {installError ? <p className="card warn">{installError}</p> : null}
+        {install ? (
+          <>
+            <label className="field">
+              <span>Org type</span>
+              <select value={loginTarget} onChange={(event) => setLoginTarget(event.target.value)}>
+                <option value="login">Production / Developer Edition</option>
+                <option value="test">Sandbox</option>
+              </select>
+            </label>
+            <div className="row" style={{ gap: "0.6rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={!install.oneClick}
+                onClick={startInstall}
+              >
+                {install.packageInstallUrl ? "Install package (Salesforce login)" : "Connect Salesforce & install"}
+              </button>
+              <a className="btn btn-ghost" href={install.zipDownloadPath || "/salesforce/cloudiator-unmanaged.zip"} download>
+                Download zip
+              </a>
+            </div>
+            {!install.oneClick ? (
+              <p className="card warn" style={{ marginTop: "0.85rem" }}>
+                One-click is off until Netlify has <code>SF_OAUTH_CLIENT_ID</code> +{" "}
+                <code>SF_OAUTH_CLIENT_SECRET</code> (Connected App callback{" "}
+                <code>{install.callbackUrl}</code>), or <code>SF_PACKAGE_VERSION_ID</code> (04t…). See{" "}
+                <code>docs/salesforce-app.md</code>.
+              </p>
+            ) : (
+              <p className="muted" style={{ marginTop: "0.75rem" }}>
+                {install.packageInstallUrl
+                  ? "Uses Salesforce’s native package installer (you pick the org after login)."
+                  : "OAuth → Metadata deploy of the unmanaged package → assigns Cloudiator Admin when possible."}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="muted">Checking install configuration…</p>
+        )}
+      </section>
+
       <section className="card glass">
         <h2>Salesforce — plug and play</h2>
         <p className="muted">
-          Install the unmanaged <strong>Cloudiator</strong> app from the repo (<code>salesforce/</code>), paste a minted
-          key in <strong>Cloudiator Setup</strong>, then call every scoped service from Flows or Apex. Call outcomes land
-          in <code>Cloudiator_Call_Log__c</code>. This is outbound Bearer auth — not a Salesforce Connected App.
+          The unmanaged <strong>Cloudiator</strong> app stores your minted key in protected config, exposes Flow
+          actions, and writes <code>Cloudiator_Call_Log__c</code>. Outbound auth is Bearer / Named Credential — not a
+          Salesforce Connected App for callouts (the Connected App above is only for this install OAuth).
         </p>
         <p className="muted">
           Full write-up: <code>docs/salesforce-app.md</code> · Named Credential detail: <code>docs/salesforce.md</code>
@@ -42,27 +113,33 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext }) {
       <section className="card glass">
         <h2>1. Mint → install → configure</h2>
         <ol className="steps">
-          {stepsInstall.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
+          <li>Mint a Salesforce engineer key in this Console (copy plaintext once).</li>
+          <li>Click <strong>Connect Salesforce &amp; install</strong> above (or download zip / CLI).</li>
+          <li>In the org: App Launcher → Cloudiator → Setup → paste key → Test /v1/health.</li>
+          <li>Build Flows with Cloudiator:* actions; inspect Call Logs.</li>
         </ol>
-        <div className="snippet-head">
-          <span>CLI deploy</span>
-          <CopyButton
-            text={`cd salesforce\nsf project deploy start --source-dir force-app --target-org myorg\nsf org assign permset --name Cloudiator_Admin --target-org myorg`}
-          />
-        </div>
-        <pre className="snippet">{`cd salesforce
+        <details>
+          <summary className="muted">CLI / Workbench fallback</summary>
+          <ol className="steps">
+            {stepsInstall.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          <div className="snippet-head">
+            <span>CLI deploy</span>
+            <CopyButton
+              text={`cd salesforce\nsf project deploy start --source-dir force-app --target-org myorg\nsf org assign permset --name Cloudiator_Admin --target-org myorg`}
+            />
+          </div>
+          <pre className="snippet">{`cd salesforce
 sf project deploy start --source-dir force-app --target-org myorg
 sf org assign permset --name Cloudiator_Admin --target-org myorg`}</pre>
+        </details>
         {plaintext ? (
           <p className="card warn" style={{ marginTop: "1rem" }}>
-            Fresh key in this browser session — paste it into <strong>Cloudiator Setup</strong> in the org now. It will
-            not be shown again.
+            Fresh key in this browser session — paste it into <strong>Cloudiator Setup</strong> in the org after install.
           </p>
-        ) : (
-          <p className="muted">Mint a Salesforce engineer key above if you do not have plaintext in hand.</p>
-        )}
+        ) : null}
       </section>
 
       <section className="card glass">

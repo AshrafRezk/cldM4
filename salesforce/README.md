@@ -13,7 +13,9 @@ Outbound auth is **Bearer API key** (Named Credential / External Credential pref
 
 ## Install (org)
 
-Prereqs: Salesforce CLI (`sf`), or Workbench / change set from this folder.
+**Preferred:** https://app.cloudiator.org/console → **Salesforce** → **Connect Salesforce & install** (Production or Sandbox). Requires Netlify env `SF_OAUTH_CLIENT_ID` + `SF_OAUTH_CLIENT_SECRET` (see [docs/salesforce-app.md](../docs/salesforce-app.md)).
+
+CLI fallback:
 
 ```bash
 cd salesforce

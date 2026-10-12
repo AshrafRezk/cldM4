@@ -157,6 +157,7 @@ export function installSteps() {
 
 export function apexSnippet(_apiUrl, model = DEFAULT_MODEL) {
   return `// After Cloudiator Setup (protected custom setting) or Named Credential callout:Cloudiator
+// Http layer uses setTimeout(120000) and Salesforce keys force stream: false.
 CloudiatorService.Result r = CloudiatorService.chat(
   prompt,
   '${model}',

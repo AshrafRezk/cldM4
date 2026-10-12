@@ -30,8 +30,40 @@ export function Console({ go, path }) {
   const [tenantName, setTenantName] = useState("");
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState("playground");
+  const [sfInstallBanner, setSfInstallBanner] = useState(null);
 
   const selectedKey = keys.find((key) => key.id === selectedKeyId) || null;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextTab = params.get("tab");
+    if (nextTab && TABS.some((item) => item.id === nextTab)) {
+      setTab(nextTab);
+    }
+    const sf = params.get("sf_install");
+    if (sf === "ok") {
+      const components = params.get("components") || "?";
+      const permset = params.get("permset") === "1";
+      setSfInstallBanner({
+        ok: true,
+        text: `Deployed ${components} metadata components.${
+          permset ? " Cloudiator Admin permission set assigned to you." : " Assign permission set Cloudiator Admin if the app is hidden."
+        } Next: paste your minted API key in Cloudiator Setup.`,
+      });
+      haptic("success");
+    } else if (sf === "err") {
+      setSfInstallBanner({
+        ok: false,
+        text: params.get("message") || "Salesforce install failed.",
+      });
+      haptic("warn");
+    }
+    if (nextTab || sf) {
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.pathname);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setError("");
@@ -358,6 +390,7 @@ export function Console({ go, path }) {
             apiUrl={me?.apiUrl || "https://api.cloudiator.org"}
             selectedKey={selectedKey}
             plaintext={plaintext}
+            installBanner={sfInstallBanner}
           />
         ) : null}
 

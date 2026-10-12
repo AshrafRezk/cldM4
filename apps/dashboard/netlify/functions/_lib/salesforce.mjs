@@ -56,6 +56,7 @@ export function installSteps() {
 
 export function apexSnippet(apiUrl, model = DEFAULT_MODEL) {
   return `// Named Credential URL is ${apiUrl} (no trailing slash).
+// Salesforce keys force stream: false. Apex default timeout is 10s.
 HttpRequest req = new HttpRequest();
 req.setEndpoint('callout:Cloudiator/v1/chat/completions');
 req.setMethod('POST');

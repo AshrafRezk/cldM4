@@ -17,13 +17,32 @@ Operator-facing guide for the installable package under [`salesforce/`](../sales
 
 ## Install
 
-See [salesforce/README.md](../salesforce/README.md). Assign permission set **Cloudiator Admin**.
+### One-click from the Console (preferred)
+
+1. Operator (once): create a Salesforce **External Client App / Connected App** used only for install OAuth (not for callouts).  
+   - Callback URL: `https://app.cloudiator.org/api/salesforce/oauth/callback`  
+   - Selected OAuth scopes: **Manage user data via APIs (api)**, **Perform requests at any time (refresh_token)**  
+   - Enable web server flow; require secret  
+2. Netlify site env (server only):
+
+| Name | Purpose |
+| --- | --- |
+| `SF_OAUTH_CLIENT_ID` | Connected App consumer key |
+| `SF_OAUTH_CLIENT_SECRET` | Connected App consumer secret |
+| `SF_PACKAGE_VERSION_ID` | optional `04t…` — if set, the button opens Salesforce’s native package installer instead of Metadata deploy |
+
+3. User at https://app.cloudiator.org/console → **Salesforce** → choose Production or Sandbox → **Connect Salesforce & install**.  
+4. Log into the target org → Cloudiator deploys `salesforce/force-app` via Metadata API and tries to assign **Cloudiator Admin**.  
+5. Mint a **Salesforce engineer** key → in the org open **Cloudiator Setup** → paste key → **Test /v1/health**.
+
+CLI / Workbench: [salesforce/README.md](../salesforce/README.md).
 
 ## Mint → configure (plug and play)
 
 1. https://app.cloudiator.org/console → tenant → mint preset **Salesforce engineer** (copy plaintext once).  
-2. Salesforce App Launcher → **Cloudiator** → **Cloudiator Setup** → paste key → Save → **Test /v1/health**.  
-3. Optional hardening: create Named Credential `Cloudiator` + External Credential principal ([salesforce.md](salesforce.md) §Named Credential), grant principal access, enable **Use Named Credential** in Setup.
+2. Install via the Console button (above) or CLI.  
+3. Salesforce App Launcher → **Cloudiator** → **Cloudiator Setup** → paste key → Save → **Test /v1/health**.  
+4. Optional hardening: create Named Credential `Cloudiator` + External Credential principal ([salesforce.md](salesforce.md) §Named Credential), grant principal access, enable **Use Named Credential** in Setup.
 
 The package cannot invent your key. Minting stays on Cloudiator; the org only stores what you paste.
 

@@ -17,6 +17,11 @@ import {
   SERVICES,
 } from "./_lib/salesforce.mjs";
 import { buildOpenApi, loadScopes } from "./_lib/schema.mjs";
+import {
+  completeSalesforceInstall,
+  salesforceInstallConfigured,
+  startSalesforceInstall,
+} from "./_lib/sfInstall.mjs";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 const KNOWN_CAPABILITIES = new Set();
@@ -73,11 +78,34 @@ async function handle(event) {
     return { statusCode: 204, headers: { "Access-Control-Allow-Methods": "GET, POST, OPTIONS" } };
   }
 
-  const { email, cookie } = identify(event);
   const path = routePath(event);
   const method = event.httpMethod;
+
+  // OAuth callback must work even if the Access JWT cookie raced the redirect.
+  // Authorization is the signed state minted while Access-authenticated.
+  if (method === "GET" && path === "/salesforce/oauth/callback") {
+    return completeSalesforceInstall(event);
+  }
+
+  const { email, cookie } = identify(event);
   const db = sql();
   const apiUrl = publicApiUrl();
+
+  if (method === "GET" && path === "/salesforce/install/status") {
+    const cfg = salesforceInstallConfigured();
+    return ok(
+      {
+        ...cfg,
+        callbackUrl: `${dashboardOrigin().replace(/\/$/, "")}/api/salesforce/oauth/callback`,
+        oneClick: Boolean(cfg.oauthReady || cfg.packageInstallUrl),
+      },
+      cookie,
+    );
+  }
+
+  if (method === "GET" && path === "/salesforce/install/start") {
+    return startSalesforceInstall(event);
+  }
 
   if (method === "GET" && path === "/me") {
     return ok(
