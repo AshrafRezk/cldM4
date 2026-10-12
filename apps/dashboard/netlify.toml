@@ -19,19 +19,15 @@
 
 # Cloudflare Access is the only login. Do not enable Netlify Identity.
 # Netlify will not delete the *.netlify.app name. Force it onto the hostname
-# that Access protects. These rules must stay above the SPA fallback.
+# that Access protects. Host-conditioned rules (plus public/_redirects) must
+# stay above the SPA fallback — absolute-URL `from` alone was serving 200.
 
 [[redirects]]
-  from = "https://cloudiator.netlify.app/*"
+  from = "/*"
   to = "https://app.cloudiator.org/:splat"
   status = 301
   force = true
-
-[[redirects]]
-  from = "http://cloudiator.netlify.app/*"
-  to = "https://app.cloudiator.org/:splat"
-  status = 301
-  force = true
+  conditions = {Host = ["cloudiator.netlify.app"]}
 
 [[redirects]]
   from = "/api/*"

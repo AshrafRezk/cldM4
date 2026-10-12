@@ -43,7 +43,15 @@ Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal,
 
 ## 1. Clear leftover swap (Mini)
 
-The 19.08 GB FLUX run (no `--low-ram`) left swap in use. The later `--low-ram` job did not add any. At 17:42 UTC on 2026-09-27 health was:
+**Yes — reboot the Mini first** if `/v1/health` shows `"ok": false` and `swap_in_use` (even a few dozen MB counts). After unlock + login, run the one-shot helper (or the steps below):
+
+```bash
+cd /Users/ashrafrezk/cldM4
+git pull origin main
+scripts/post-reboot-finish-line.sh
+```
+
+That pulls Phase F, kickstarts the worker, installs Neon retention, and prints health. The 19.08 GB FLUX run (no `--low-ram`) left swap in use historically. At 17:42 UTC on 2026-09-27 health was:
 
 ```json
 {"ok": false, "state": "idle_hot_9b", "swap_used_mb": 1611.88, "degraded": ["swap_in_use"], "free_disk_gb": 375.3, "pressure": "normal"}
