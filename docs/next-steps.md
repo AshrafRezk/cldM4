@@ -100,7 +100,7 @@ Domain management cannot remove `cloudiator.netlify.app`. That page says the pro
 
 The yellow **Pending DNS verification** badge is Cloudflare sitting in front of Netlify. Click it and confirm the record it wants. In the Cloudflare DNS table for `cloudiator.org`, `app` must be a CNAME to `cloudiator.netlify.app` and stay **proxied** (orange cloud). Access only runs on a proxied hostname. Leave the proxy on. If the playground already loads, the badge can stay yellow: Netlify's checker cannot see through Cloudflare, and turning the cloud grey removes Access.
 
-`apps/dashboard/netlify.toml` forces `https://cloudiator.netlify.app/*` to `https://app.cloudiator.org/:splat` with a 301. After that file is on `main` and Netlify finishes the production deploy:
+The **repo-root** `netlify.toml` (used when `base = apps/dashboard`) forces `cloudiator.netlify.app` → `https://app.cloudiator.org/:splat` with a host-conditioned 301. `apps/dashboard/public/_redirects` mirrors it into `dist/`. After that is on `main` and Netlify finishes a **production** deploy:
 
 ```bash
 /usr/bin/curl -sI https://cloudiator.netlify.app/ | /usr/bin/grep -i -E 'HTTP/|location:'
