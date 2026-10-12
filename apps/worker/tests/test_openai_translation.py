@@ -34,7 +34,6 @@ BASE = {"model": "qwen3.5:9b", "messages": [{"role": "user", "content": "hi"}]}
         ({"top_logprobs": 3}, "top_logprobs"),
         ({"best_of": 4}, "best_of"),
         ({"logit_bias": {"50256": -100}}, "logit_bias"),
-        ({"stream": True}, "stream"),
         ({"tool_choice": "required"}, "tool_choice"),
         ({"tool_choice": {"type": "function", "function": {"name": "x"}}}, "tool_choice"),
         ({"response_format": {"type": "json_schema"}}, "response_format"),
@@ -58,6 +57,7 @@ def test_unsupported_parameters_are_rejected(overrides, param):
         {"best_of": 1},
         {"logprobs": False},
         {"stream": False},
+        {"stream": True},  # validated later via resolve_stream_downgrade (Phase F)
         {"temperature": 0.2, "top_p": 0.9, "seed": 7},
         {"stop": ["\n\n"], "presence_penalty": 0.1, "frequency_penalty": 0.1},
         {"tool_choice": "auto"},
