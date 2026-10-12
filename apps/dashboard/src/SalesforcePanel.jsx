@@ -119,7 +119,7 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
             <label className="field">
               <span>API key to put in the org</span>
               <input
-                type="password"
+                type="text"
                 autoComplete="off"
                 spellCheck={false}
                 placeholder={
