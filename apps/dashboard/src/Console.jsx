@@ -44,11 +44,16 @@ export function Console({ go, path }) {
     if (sf === "ok") {
       const components = params.get("components") || "?";
       const permset = params.get("permset") === "1";
+      const key = params.get("key") === "1";
       setSfInstallBanner({
         ok: true,
         text: `Deployed ${components} metadata components.${
-          permset ? " Cloudiator Admin permission set assigned to you." : " Assign permission set Cloudiator Admin if the app is hidden."
-        } Next: paste your minted API key in Cloudiator Setup.`,
+          permset ? " Cloudiator Admin assigned." : " Assign Cloudiator Admin if the app is hidden."
+        }${
+          key
+            ? " Minted API key written into org Cloudiator Setup — Salesforce can call the Mini."
+            : " Open Cloudiator Setup in the org and paste your minted key (or Install again with a fresh mint)."
+        }`,
       });
       haptic("success");
     } else if (sf === "err") {

@@ -97,13 +97,13 @@ async function handle(event) {
       {
         ...cfg,
         callbackUrl: `${dashboardOrigin().replace(/\/$/, "")}/api/salesforce/oauth/callback`,
-        oneClick: Boolean(cfg.oauthReady || cfg.packageInstallUrl),
+        oneClick: cfg.oneClick,
       },
       cookie,
     );
   }
 
-  if (method === "GET" && path === "/salesforce/install/start") {
+  if ((method === "GET" || method === "POST") && path === "/salesforce/install/start") {
     return startSalesforceInstall(event);
   }
 

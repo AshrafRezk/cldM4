@@ -35,9 +35,26 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
       .catch((err) => setInstallError(err.message));
   }, []);
 
-  function startInstall() {
-    // Full navigation so Set-Cookie + Salesforce redirect work.
-    window.location.href = api.salesforceInstallStartUrl(loginTarget);
+  async function startInstall() {
+    setInstallError("");
+    try {
+      // Salesforce hosts login. We only start the redirect; no client secret on Netlify.
+      const body = {
+        login: loginTarget,
+        apiKey: plaintext || undefined,
+        baseUrl: url,
+      };
+      const result = await api.startSalesforceInstall(body);
+      if (!result?.redirectUrl) throw new Error("No redirect URL from install start.");
+      window.location.href = result.redirectUrl;
+    } catch (err) {
+      // GET fallback for package-only mode / older handlers
+      if (install?.packageInstallUrl) {
+        window.location.href = api.salesforceInstallStartUrl(loginTarget);
+        return;
+      }
+      setInstallError(err.message);
+    }
   }
 
   return (
@@ -52,9 +69,15 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
       <section className="card glass lift">
         <h2>Install into Salesforce</h2>
         <p className="muted">
-          One click: authenticate to your org, then Cloudiator deploys the unmanaged app (Setup, Flow actions, call
-          logs). Afterward, paste your minted key in <strong>Cloudiator Setup</strong> inside Salesforce.
+          Salesforce logs you in. Cloudiator then deploys the app (Setup, Flows, call logs), assigns{" "}
+          <strong>Cloudiator Admin</strong>, and — if you just minted a key — writes it into the org so Salesforce can
+          call the Mini. No client secret on Netlify.
         </p>
+        {plaintext ? (
+          <p className="card warn">Using the freshly minted key from this session for org setup.</p>
+        ) : (
+          <p className="muted">Tip: mint a Salesforce engineer key above first so Install can wire it automatically.</p>
+        )}
         {installError ? <p className="card warn">{installError}</p> : null}
         {install ? (
           <>
@@ -66,30 +89,25 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
               </select>
             </label>
             <div className="row" style={{ gap: "0.6rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
-              <button
-                type="button"
-                className="btn"
-                disabled={!install.oneClick}
-                onClick={startInstall}
-              >
-                {install.packageInstallUrl ? "Install package (Salesforce login)" : "Connect Salesforce & install"}
+              <button type="button" className="btn" disabled={!install.oneClick} onClick={startInstall}>
+                {install.mode === "package" ? "Install with Salesforce" : "Install with Salesforce"}
               </button>
               <a className="btn btn-ghost" href={install.zipDownloadPath || "/salesforce/cloudiator-unmanaged.zip"} download>
                 Download zip
               </a>
             </div>
-            {!install.oneClick ? (
+            {install.needsPublicConfig ? (
               <p className="card warn" style={{ marginTop: "0.85rem" }}>
-                One-click is off until Netlify has <code>SF_OAUTH_CLIENT_ID</code> +{" "}
-                <code>SF_OAUTH_CLIENT_SECRET</code> (Connected App callback{" "}
-                <code>{install.callbackUrl}</code>), or <code>SF_PACKAGE_VERSION_ID</code> (04t…). See{" "}
+                One product setting left (not a Netlify secret): put a public <code>04t…</code> package id or Connected
+                App <strong>Consumer Key</strong> (PKCE, no secret) in{" "}
+                <code>apps/dashboard/netlify/functions/_lib/sfInstallConfig.json</code>. See{" "}
                 <code>docs/salesforce-app.md</code>.
               </p>
             ) : (
               <p className="muted" style={{ marginTop: "0.75rem" }}>
-                {install.packageInstallUrl
-                  ? "Uses Salesforce’s native package installer (you pick the org after login)."
-                  : "OAuth → Metadata deploy of the unmanaged package → assigns Cloudiator Admin when possible."}
+                {install.mode === "package"
+                  ? "Opens Salesforce’s package installer — you authenticate there."
+                  : "Salesforce login (PKCE) → deploy app → permission set → write API key into Cloudiator Setup."}
               </p>
             )}
           </>
