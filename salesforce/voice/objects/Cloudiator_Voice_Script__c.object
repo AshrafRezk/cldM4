@@ -2,7 +2,7 @@
 <CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Cloudiator Voice Script</label>
     <pluralLabel>Cloudiator Voice Scripts</pluralLabel>
-    <description>Phone intake script published to the Cloudiator appliance. Definition__c is the script JSON from docs/voice.md.</description>
+    <description>Voice call script published to the Cloudiator appliance. With Question child records, Publish builds Definition__c from them; without, Definition__c is the script JSON from docs/voice.md.</description>
     <nameField>
         <label>Script Name</label>
         <type>Text</type>
@@ -55,5 +55,83 @@
         <fullName>Last_Publish_Error__c</fullName>
         <label>Last Publish Error</label>
         <type>TextArea</type>
+    </fields>
+    <fields>
+        <fullName>Languages__c</fullName>
+        <label>Languages</label>
+        <description>Caller language buttons, in order: ar-EG;en-US. The first is the default (and the Twilio language).</description>
+        <type>Text</type>
+        <length>40</length>
+        <defaultValue>&quot;ar-EG;en-US&quot;</defaultValue>
+    </fields>
+    <fields>
+        <fullName>Arabic_Greeting__c</fullName>
+        <label>Arabic Greeting</label>
+        <description>Spoken first, in Egyptian Arabic. Questions follow.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Greeting__c</fullName>
+        <label>English Greeting</label>
+        <description>Spoken first, in English.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Arabic_Closing__c</fullName>
+        <label>Arabic Closing</label>
+        <description>Spoken after the last question, then the call ends.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Closing__c</fullName>
+        <label>English Closing</label>
+        <description>Spoken after the last question, then the call ends.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Arabic_Voice__c</fullName>
+        <label>Arabic Voice</label>
+        <description>VoiceTut speaker for Arabic: Hadeer, Hanan, Mariam, Rana, Sarah, Yasmin, Yara, Ahmed, Ali, Hassan, Karim, Mahmoud, Mohammed, Mostafa, Ramy, Shaker, Tareq, Yehia, Youssef.</description>
+        <type>Text</type>
+        <length>40</length>
+        <defaultValue>&quot;Hadeer&quot;</defaultValue>
+    </fields>
+    <fields>
+        <fullName>English_Voice__c</fullName>
+        <label>English Voice</label>
+        <description>VoiceTut speaker for English (same names).</description>
+        <type>Text</type>
+        <length>40</length>
+        <defaultValue>&quot;Hadeer&quot;</defaultValue>
+    </fields>
+    <fields>
+        <fullName>Transcript_Field__c</fullName>
+        <label>Transcript Field</label>
+        <description>Object.Field that receives the full call transcript, e.g. Case.Description.</description>
+        <type>Text</type>
+        <length>120</length>
+    </fields>
+    <fields>
+        <fullName>Record_Links__c</fullName>
+        <label>Record Links</label>
+        <description>Child.LookupField=Parent pairs, semicolon separated, e.g. Case.ContactId=Contact. Parents are created first.</description>
+        <type>Text</type>
+        <length>255</length>
+    </fields>
+    <fields>
+        <fullName>Fixed_Values__c</fullName>
+        <label>Fixed Values</label>
+        <description>One Object.Field=Value per line, e.g. Case.Origin=Phone. Set on every record the call creates.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>4</visibleLines>
     </fields>
 </CustomObject>

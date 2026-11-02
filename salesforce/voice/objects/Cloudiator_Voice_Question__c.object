@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cloudiator Voice Question</label>
+    <pluralLabel>Cloudiator Voice Questions</pluralLabel>
+    <description>One question the voice agent asks, in Egyptian Arabic and English, and the field its answer fills. Attach a recording as a File titled ar-EG or en-US to use a person's voice instead of the generated one.</description>
+    <nameField>
+        <label>Question Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>Q-{0000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <fields>
+        <fullName>Script__c</fullName>
+        <label>Script</label>
+        <type>MasterDetail</type>
+        <referenceTo>Cloudiator_Voice_Script__c</referenceTo>
+        <relationshipName>Questions</relationshipName>
+        <relationshipLabel>Questions</relationshipLabel>
+        <relationshipOrder>0</relationshipOrder>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>Order__c</fullName>
+        <label>Order</label>
+        <type>Number</type>
+        <precision>3</precision>
+        <scale>0</scale>
+        <required>true</required>
+    </fields>
+    <fields>
+        <fullName>Step_Key__c</fullName>
+        <label>Answer Key</label>
+        <description>Optional name for the answer (letters, digits, _). Defaults to q + Order. Usable in Fixed Values as {{key}}.</description>
+        <type>Text</type>
+        <length>40</length>
+    </fields>
+    <fields>
+        <fullName>Arabic_Text__c</fullName>
+        <label>Arabic Text</label>
+        <description>The question in Egyptian Arabic, as it should be spoken.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Text__c</fullName>
+        <label>English Text</label>
+        <description>The question in English.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Target_Field__c</fullName>
+        <label>Target Field</label>
+        <description>Object.Field the answer fills, e.g. Case.Subject or Contact.MobilePhone. Blank keeps the answer in the transcript only.</description>
+        <type>Text</type>
+        <length>120</length>
+    </fields>
+    <fields>
+        <fullName>Required__c</fullName>
+        <label>Required</label>
+        <description>If the caller still gives no answer after the attempts, end the call politely instead of moving on.</description>
+        <type>Checkbox</type>
+        <defaultValue>false</defaultValue>
+    </fields>
+    <fields>
+        <fullName>Max_Attempts__c</fullName>
+        <label>Attempts</label>
+        <description>How many times to ask before giving up on this question (1-5).</description>
+        <type>Number</type>
+        <precision>1</precision>
+        <scale>0</scale>
+        <defaultValue>2</defaultValue>
+    </fields>
+</CustomObject>

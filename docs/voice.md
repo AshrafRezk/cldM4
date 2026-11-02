@@ -7,11 +7,50 @@ Two front doors share one engine, one session store, one commit document, and th
 | **Browser call** (default) | free, no vendor | on the Mini: macOS `say` (TTS) + whisper.cpp on the **CPU** (STT) | none — a link |
 | Twilio | Twilio's per-minute price | Twilio `<Say>` / speech recognition | yes |
 
+## Who it is for
+
+Case management, patient support programs, and any call center that onboards customers or records cases: the caller answers a short scripted interview, and the answers land in the CRM as records. The questions are written in Salesforce, not on the Mini.
+
+## Languages and voices
+
+A script lists its `languages` (e.g. `["ar-EG", "en-US"]`); every line has text for each. The call page shows one button per language (**اتصل بالعربي** / **Call in English**); the caller's choice decides what they hear, the language whisper listens for, and the session's `language`.
+
+What the caller hears, per line, in order of preference:
+
+1. **A person's recording** uploaded for that line and language (`PUT /v1/voice/scripts/{id}/recordings/{step}/{lang}`, or a File attached in Salesforce, below).
+2. **VoiceTut-TTS** — natural Egyptian Arabic and English ([VoiceTut-TTS](https://huggingface.co/mohammedaly22/VoiceTut-TTS), Apache-2.0, fine-tuned from k2-fsa OmniVoice, Apache-2.0, on ~380 h of Egyptian speech; 19 speakers). Script lines are fixed, so every line is rendered **once, when the script is published**, in the background, on the CPU, in its own venv (`~/Cloudiator/tts-venv`), then the process exits. It never runs during a call and never touches the Metal GPU. Clips are keyed by speaker+language+text, so republishing only renders changed lines. Pick speakers per language with `voices` (`{"ar-EG": "Hadeer", "en-US": "Hadeer"}`; female: Hadeer, Hanan, Mariam, Rana, Sarah, Yasmin, Yara; male: Ahmed, Ali, Hassan, Karim, Mahmoud, Mohammed, Mostafa, Ramy, Shaker, Tareq, Yehia, Youssef).
+3. **macOS `say`** (Majed / Samantha) while a render has not landed yet, so a call never waits.
+
+`GET /v1/voice/scripts/{id}/audio` lists every line with its source (`recording`, `rendered`, `fallback`), `ready`/`total`, and the last render error.
+
+## Writing scripts in Salesforce
+
+`salesforce/voice` adds **Cloudiator Voice Script** with child **Cloudiator Voice Question** records:
+
+| Script field | Meaning |
+| --- | --- |
+| Languages | `ar-EG;en-US` — the call buttons, in order |
+| Arabic / English Greeting, Closing | spoken before the first and after the last question |
+| Arabic / English Voice | VoiceTut speaker per language |
+| Transcript Field | `Case.Description` — receives the whole conversation |
+| Fixed Values | one `Object.Field=Value` per line, e.g. `Case.Origin=Phone` |
+| Record Links | `Case.ContactId=Contact` — create the Contact first, link the Case to it |
+
+| Question field | Meaning |
+| --- | --- |
+| Order | sequence |
+| Arabic Text / English Text | the question as spoken (write Arabic the way an Egyptian agent says it) |
+| Target Field | `Object.Field` the answer fills, e.g. `Contact.MobilePhone`; blank keeps it in the transcript only |
+| Required | no answer after the attempts → polite goodbye instead of moving on |
+| Attempts | 1–5 |
+
+**Publish Cloudiator voice script** builds the script from those records, writes it to Definition__c (so you can see what was sent), publishes it, and uploads recordings: a File on a Question titled `ar-EG` or `en-US`, or on the Script titled `greeting.ar-EG`, `goodbye.en-US`. **Create Cloudiator voice script from template** makes a ready-to-edit script: `case_intake` (Case with Supplied Name/Phone, Subject), `patient_support` (Contact + Case linked to it), `customer_onboarding` (Lead).
+
 ## Browser call
 
 1. Publish a script (`POST /v1/voice/scripts`, below). `inbound_numbers` may be empty.
 2. Mint a link: `POST /v1/voice/scripts/{id}/web-link` with a `voice` key. The response `url` (`https://api.cloudiator.org/v1/voice/web/cl_…`) is shown once; only its hash is stored. `POST …/web-link/revoke` kills every link for that script.
-3. Anyone with the link opens it, presses **Call**, allows the microphone, and talks. Each answer is recorded in the browser (silence detection, 16 kHz WAV), transcribed on the Mini, and answered with locally synthesized audio. The finished call is `ready_to_commit` exactly like a Twilio call; `from` is `web`.
+3. Anyone with the link opens it, picks a language, allows the microphone, and talks. Each answer is recorded in the browser (silence detection, 16 kHz WAV), transcribed on the Mini, and answered with locally synthesized audio. The finished call is `ready_to_commit` exactly like a Twilio call; `from` is `web`.
 
 The link is the only credential on the page and only starts calls on that one script; it never carries an `sk-cld-` key. Turns are rate limited per client IP (40/min, from `CF-Connecting-IP`), one answer is capped at `VOICE_WEB_MAX_AUDIO_BYTES` (2 MB ≈ 60 s), and a retried turn replays its cached reply without transcribing again.
 

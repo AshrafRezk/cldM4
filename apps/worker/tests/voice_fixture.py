@@ -80,3 +80,30 @@ def intake(**overrides):
     script = copy.deepcopy(INTAKE_AR)
     script.update(overrides)
     return script
+
+
+INTAKE_BILINGUAL = {
+    "id": "case-intake",
+    "display_name": "Case intake",
+    "languages": ["ar-EG", "en-US"],
+    "voices": {"ar-EG": "Hadeer", "en-US": "Hadeer"},
+    "inbound_numbers": [],
+    "steps": [
+        {"key": "greeting", "gather": False, "next": "ask_name",
+         "say": {"ar-EG": "أهلاً بيك في خدمة العملاء.", "en-US": "Welcome to customer care."}},
+        {"key": "ask_name", "gather": True, "next": "ask_issue",
+         "say": {"ar-EG": "ممكن تقولي اسمك بالكامل؟", "en-US": "May I have your full name?"}},
+        {"key": "ask_issue", "gather": True, "next": "goodbye",
+         "say": {"ar-EG": "قولي باختصار إيه المشكلة؟", "en-US": "Briefly, what is the problem?"}},
+        {"key": "goodbye", "gather": False, "next": None,
+         "say": {"ar-EG": "شكراً ليك، هنكلمك قريب.", "en-US": "Thank you, we will be in touch."}},
+    ],
+    "commit": {"records": [{"sobject": "Case", "fields": {
+        "SuppliedName": "{{ask_name}}", "Subject": "{{ask_issue}}", "Origin": "Web", "Description": "{{transcript}}"}}]},
+}
+
+
+def bilingual(**overrides):
+    script = copy.deepcopy(INTAKE_BILINGUAL)
+    script.update(overrides)
+    return script

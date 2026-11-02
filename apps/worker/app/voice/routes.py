@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, Response
 
 from ..errors import CloudiatorError, not_supported
 from .crm import transcript_text
-from .engine import ScriptInvalid, VoiceEngine, validate_script
+from .engine import ScriptInvalid, VoiceEngine, languages_of, validate_script
 from .store import NumberTaken, iso
 
 SALESFORCE_ID = re.compile(r"^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$")
@@ -23,7 +23,7 @@ SESSION_STATUSES = {"in_progress", "ready_to_commit", "committed", "abandoned"}
 TWIML = "application/xml"
 
 
-def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_key) -> None:
+def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, require_key) -> None:
     store = engine.store
 
     @app.post("/v1/voice/scripts")
@@ -51,7 +51,49 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, settings, requir
                 f"{exc} already answers for another tenant.",
                 param="inbound_numbers",
             ) from exc
+        # Natural audio for every fixed line renders in the background; calls
+        # use macOS voices until it lands.
+        result["audio_rendering"] = audio.schedule(script)
         return JSONResponse(content=result)
+
+    @app.get("/v1/voice/scripts/{script_id}/audio")
+    async def script_audio(script_id: str, key=Depends(require_key("voice"))) -> JSONResponse:
+        found = store.script_by_id(key.tenant_id, script_id)
+        if found is None:
+            raise CloudiatorError(404, "script_not_found", "No active script with that id.")
+        lines = audio.status(key.tenant_id, found[1])
+        return JSONResponse(
+            content={
+                "script_id": script_id,
+                "lines": lines,
+                "ready": sum(1 for l in lines if l["source"] != "fallback"),
+                "total": len(lines),
+                "last_error": audio.last_error,
+            }
+        )
+
+    @app.put("/v1/voice/scripts/{script_id}/recordings/{step}/{language}")
+    async def put_recording(
+        script_id: str, step: str, language: str, request: Request, key=Depends(require_key("voice"))
+    ) -> JSONResponse:
+        """A person's recording of one line. Body is the audio (any common format)."""
+        script = _script_with_line(store, key, script_id, step, language)
+        body = await request.body()
+        if not body or len(body) > 5_000_000:
+            raise CloudiatorError(400, "invalid_request_error", "Send 1 byte to 5 MB of audio.")
+        try:
+            await audio.save_recording(key.tenant_id, script["id"], step, language, body)
+        except Exception as exc:  # noqa: BLE001
+            raise CloudiatorError(400, "invalid_audio", "That audio could not be read.") from exc
+        request.state.usage.tool = "voice_recording"
+        return JSONResponse(content={"script_id": script_id, "step": step, "language": language, "source": "recording"})
+
+    @app.delete("/v1/voice/scripts/{script_id}/recordings/{step}/{language}")
+    async def delete_recording(
+        script_id: str, step: str, language: str, key=Depends(require_key("voice"))
+    ) -> JSONResponse:
+        _script_with_line(store, key, script_id, step, language)
+        return JSONResponse(content={"deleted": audio.delete_recording(key.tenant_id, script_id, step, language)})
 
     @app.get("/v1/voice/scripts")
     async def list_scripts(key=Depends(require_key("voice"))) -> JSONResponse:
@@ -168,6 +210,7 @@ def public_session(session: dict[str, Any]) -> dict[str, Any]:
         "script_id": session["script_id"],
         "script_version": session["script_version"],
         "status": session["status"],
+        "language": session.get("language") or (session.get("definition") or {}).get("language"),
         "current_step": session.get("current_step"),
         "answers": session.get("answers") or {},
         "transcript": transcript_text(session.get("turns") or []),
@@ -180,6 +223,17 @@ def public_session(session: dict[str, Any]) -> dict[str, Any]:
         "created_at": iso(session.get("created_at")),
         "updated_at": iso(session.get("updated_at")),
     }
+
+
+def _script_with_line(store, key, script_id: str, step: str, language: str) -> dict[str, Any]:
+    found = store.script_by_id(key.tenant_id, script_id)
+    if found is None:
+        raise CloudiatorError(404, "script_not_found", "No active script with that id.")
+    script = found[1]
+    keys = {s["key"] for s in script["steps"]} | {"__fail__"}
+    if step not in keys or language not in languages_of(script):
+        raise CloudiatorError(404, "line_not_found", "That script has no such step and language.")
+    return script
 
 
 def _owned(store, key, session_id: str) -> dict[str, Any]:

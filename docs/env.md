@@ -139,6 +139,10 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
 | `VOICE_WEB_MAX_AUDIO_BYTES` | `2000000` | cap on one recorded answer |
+| `VOICE_TTS_ENGINE` | `voicetut` | `voicetut` renders script lines at publish time; `say` turns rendering off (macOS voices only) |
+| `VOICETUT_PYTHON` | `~/Cloudiator/tts-venv/bin/python` | the isolated venv with torch, OmniVoice, and voicetut-tts |
+| `VOICETUT_THREADS` | `6` | CPU threads for a render (it runs `nice -n 10`) |
+| `VOICE_AUDIO_DIR` | `~/Cloudiator/voice-audio` | `rendered/` (content-addressed clips) and `recordings/` (per tenant/script/line) |
 
 ## Mini worker — renderers
 

@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..errors import CloudiatorError
 from . import speech
-from .engine import VoiceEngine
+from .engine import ScriptInvalid, VoiceEngine, languages_of, session_language
 from .web_page import render_page
 
 log = logging.getLogger("cloudiator.voice.web")
@@ -50,7 +50,7 @@ class _IpLimiter:
         hits.append(now)
 
 
-def register_web_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_key) -> None:
+def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, require_key) -> None:
     store = engine.store
     limiter = _IpLimiter(PER_IP_PER_MINUTE)
 
@@ -90,7 +90,7 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_
             raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
         _version, script = found
         return HTMLResponse(
-            render_page(title=script.get("display_name") or script_id, language=script.get("language")),
+            render_page(title=script.get("display_name") or script_id, languages=languages_of(script)),
             headers={
                 "Cache-Control": "no-store",
                 "Referrer-Policy": "no-referrer",
@@ -104,12 +104,19 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_
         tenant_id, script_id = link(request, token)
         call_sid = "WB" + uuid.uuid4().hex
         request.state.usage.tool = "voice_web_start"
-        reply = engine.start_call(
-            tenant_id=tenant_id, script_id=script_id, call_sid=call_sid, from_label="web"
-        )
+        try:
+            reply = engine.start_call(
+                tenant_id=tenant_id,
+                script_id=script_id,
+                call_sid=call_sid,
+                from_label="web",
+                language=request.query_params.get("lang") or None,
+            )
+        except ScriptInvalid as exc:
+            raise CloudiatorError(400, "invalid_request_error", str(exc), param="lang") from exc
         if reply is None:
             raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
-        return JSONResponse(content=await _turn(call_sid, reply, settings, heard=None))
+        return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
 
     @app.post("/v1/voice/web/{token}/turn")
     async def turn(token: str, request: Request) -> JSONResponse:
@@ -130,17 +137,17 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_
             raise CloudiatorError(400, "invalid_request_error", "attempt must be an integer.") from exc
         step = params.get("step") or ""
 
-        audio = await request.body()
-        if len(audio) > settings.voice_web_max_audio_bytes:
+        answer = await request.body()
+        if len(answer) > settings.voice_web_max_audio_bytes:
             raise CloudiatorError(413, "request_too_large", "Audio is too long for one answer.")
         request.state.usage.tool = "voice_web_turn"
         # A retry of an answered turn replays without transcribing again.
         cached = store.reply_for(call_sid, step, attempt)
         if cached is not None:
-            return JSONResponse(content=await _turn(call_sid, cached, settings, heard=None))
+            return JSONResponse(content=await _turn(audio, tenant_id, call_sid, cached, store, heard=None))
         try:
             heard = await speech.transcribe(
-                audio, language=session["definition"].get("language"), settings=settings
+                answer, language=session_language(session), settings=settings
             )
         except speech.SpeechUnavailable as exc:
             log.error("speech recognition unavailable: %s", exc)
@@ -149,43 +156,36 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, settings, require_
                 error_type="server_error",
             ) from exc
         reply = engine.on_gather(call_sid=call_sid, step=step, attempt=attempt, speech=heard)
-        return JSONResponse(content=await _turn(call_sid, reply, settings, heard=heard))
+        return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=heard))
 
 
-async def _turn(call_sid: str, reply: dict[str, Any], settings, *, heard: str | None) -> dict[str, Any]:
+async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], store, *, heard: str | None) -> dict[str, Any]:
     """Reply → what the page plays: ordered clips, then listen or hang up."""
-    voice_args = {
-        "language": reply.get("language"),
-        "local_voice": reply.get("local_voice"),
-        "cache_dir": settings.voice_tts_cache,
-    }
+    session = store.session_by_call(call_sid)
+    script = session["definition"] if session else {"id": reply.get("script_id") or ""}
+    language = reply.get("language") or "en-US"
     clips = []
     listen = None
     done = False
     for verb in reply["verbs"]:
-        text = verb.get("say") or (verb.get("gather") or {}).get("prompt")
+        gather = verb.get("gather") or {}
+        text = verb.get("say") or gather.get("prompt")
         if text:
-            clips.append({"text": text, "audio": await _audio(text, voice_args)})
-        if "gather" in verb:
-            g = verb["gather"]
+            data_url, source = await audio.clip(
+                tenant_id=tenant_id, script=script, key=verb.get("key") or gather.get("step"),
+                language=language, text=text,
+            )
+            clips.append({"text": text, "audio": data_url, "source": source})
+        if gather:
             listen = {
-                "step": g["step"],
-                "attempt": g["attempt"],
-                "timeout": g["timeout"],
-                "speech_timeout": g["speech_timeout"],
+                "step": gather["step"],
+                "attempt": gather["attempt"],
+                "timeout": gather["timeout"],
+                "speech_timeout": gather["speech_timeout"],
             }
         if verb.get("hangup"):
             done = True
-    return {"call_id": call_sid, "heard": heard, "clips": clips, "listen": listen, "done": done}
-
-
-async def _audio(text: str, voice_args: dict[str, Any]) -> str | None:
-    # No audio still leaves the text on screen; the call keeps working.
-    try:
-        return await speech.synthesize_data_url(text, **voice_args)
-    except speech.SpeechUnavailable as exc:
-        log.warning("tts unavailable: %s", exc)
-        return None
+    return {"call_id": call_sid, "language": language, "heard": heard, "clips": clips, "listen": listen, "done": done}
 
 
 def _client_ip(request: Request) -> str:

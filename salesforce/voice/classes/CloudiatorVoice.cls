@@ -27,6 +27,24 @@ public with sharing class CloudiatorVoice {
         return JSON.deserializeUntyped(res.getBody());
     }
 
+    /** Binary body (a recording). Same Named Credential, timeout and errors. */
+    public static Object sendBlob(String method, String path, Blob body, String contentType) {
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint(NAMED_CREDENTIAL + path);
+        req.setMethod(method);
+        req.setHeader('Content-Type', contentType);
+        req.setTimeout(120000);
+        req.setBodyAsBlob(body);
+        HttpResponse res = new Http().send(req);
+        if (res.getStatusCode() >= 300) {
+            throw new CalloutFailure(
+                method + ' ' + path + ' -> ' + res.getStatusCode() + ' ' + errorMessage(res.getBody())
+                + ' (X-Request-Id ' + res.getHeader('X-Request-Id') + ')'
+            );
+        }
+        return JSON.deserializeUntyped(res.getBody());
+    }
+
     private static String errorMessage(String body) {
         try {
             Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(body);

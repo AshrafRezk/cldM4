@@ -5,11 +5,15 @@ Metadata API format. Operator runbook and script format: [docs/voice.md](../../d
 | File | What |
 | --- | --- |
 | `objects/Cloudiator_Voice_Script__c.object` | Script record: `Definition__c` (script JSON), `External_Id__c` (script id, unique), `Inbound_Numbers__c` (comma-separated E.164), `Active__c`, plus `Published_Version__c` / `Last_Publish_Error__c` written back by Publish |
+| `objects/Cloudiator_Voice_Question__c.object` | One question per record (master-detail to the script): Order, Arabic/English text, Target Field, Required, Attempts |
 | `classes/CloudiatorVoice.cls` | callout helper: `callout:Cloudiator`, `setTimeout(120000)`, OpenAI-shaped error → exception with `X-Request-Id` |
-| `classes/CloudiatorVoicePublish.cls` | Invocable **Publish Cloudiator voice script** (record Ids, max 10). `External_Id__c`, `Inbound_Numbers__c`, `Active__c` override the same keys inside `Definition__c` |
+| `classes/CloudiatorVoicePublish.cls` | Invocable **Publish Cloudiator voice script** (record Ids, max 10). With questions, builds the script from them and writes it to `Definition__c`; without, sends `Definition__c` with `External_Id__c`, `Inbound_Numbers__c`, `Active__c` overriding. Then queues the recording upload |
+| `classes/CloudiatorVoiceScriptBuilder.cls` | Script + Questions → script JSON: greeting, questions, closing; answers, fixed values, transcript, and record links → commit records, parents first |
+| `classes/CloudiatorVoiceRecordings.cls` | Queueable: Files titled `ar-EG`/`en-US` on a question, or `greeting.ar-EG`/`goodbye.en-US` on the script, are uploaded as that line's recording |
+| `classes/CloudiatorVoiceTemplates.cls` | Invocable **Create Cloudiator voice script from template**: `case_intake`, `patient_support`, `customer_onboarding`, in Egyptian Arabic and English |
 | `classes/CloudiatorVoiceCommit.cls` | Invocable **Commit Cloudiator voice sessions**. Blank session id = every `ready_to_commit` session (max 10). Inserts `commit_json` records in order, resolving `{{Lead.Id}}`-style placeholders, then enqueues the ack |
 | `classes/CloudiatorVoiceTest.cls` | mock-callout tests |
-| `permissionsets/Cloudiator_Voice.permissionset` | object/field access + both Apex classes |
+| `permissionsets/Cloudiator_Voice.permissionset` | object/field access for scripts and questions + the Publish, Commit, and Templates actions |
 
 ## Deploy
 

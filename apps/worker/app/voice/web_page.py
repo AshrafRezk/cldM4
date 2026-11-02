@@ -30,7 +30,8 @@ p.sub{color:var(--muted);margin:0 0 20px;font-size:14px}
 .you{align-self:flex-end;background:var(--you)}
 .row{display:flex;gap:12px;align-items:center}
 button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointer}
-#call{background:var(--accent);color:#fff}
+.call{background:var(--accent);color:#fff}
+.row{flex-wrap:wrap}
 #hang{background:transparent;color:var(--danger);border:1px solid var(--line);display:none}
 #status{color:var(--muted);font-size:14px;flex:1}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--danger);margin-inline-end:6px;animation:p 1s infinite}
@@ -40,11 +41,11 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
 <body>
 <main>
 <h1>__TITLE__</h1>
-<p class="sub">Voice call in your browser. Allow the microphone when asked.</p>
+<p class="sub">Choose a language, then allow the microphone. <span dir="rtl">اختار اللغة، وبعدين اسمح باستخدام المايك.</span></p>
 <div class="card">
   <div id="log" aria-live="polite"></div>
   <div class="row">
-    <button id="call">Call</button>
+    __BUTTONS__
     <button id="hang">Hang up</button>
     <span id="status"></span>
   </div>
@@ -54,7 +55,15 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
 (() => {
   const base = location.pathname.replace(/\\/$/, "");
   const $ = (id) => document.getElementById(id);
-  const logEl = $("log"), statusEl = $("status"), callBtn = $("call"), hangBtn = $("hang");
+  const logEl = $("log"), statusEl = $("status"), hangBtn = $("hang");
+  const callBtns = [...document.querySelectorAll(".call")];
+  const TEXT = {
+    ar: { listening: "بسمعك…", speaking: "بيتكلم…", thinking: "لحظة واحدة…", connecting: "بنوصّلك…",
+          ended: "المكالمة خلصت. شكراً ليك.", hung: "إنت قفلت المكالمة.", failed: "المكالمة ما اشتغلتش: ", hang: "إنهاء المكالمة" },
+    en: { listening: "Listening…", speaking: "Speaking…", thinking: "One moment…", connecting: "Connecting…",
+          ended: "Call ended. Thank you.", hung: "You hung up.", failed: "Call failed: ", hang: "Hang up" },
+  };
+  let t$ = TEXT.en;
   let ctx = null, stream = null, source = null, live = false;
 
   const say = (who, text) => {
@@ -110,7 +119,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
         resolve(heard ? wav(chunks, ctx.sampleRate) : new Blob([]));
       }
       source.connect(proc); proc.connect(ctx.destination);
-      status('<span class="dot"></span>Listening…');
+      status('<span class="dot"></span>' + t$.listening);
     });
   }
 
@@ -137,40 +146,43 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       if (t.heard) say("you", t.heard);
       for (const clip of t.clips) {
         say("agent", clip.text);
-        if (clip.audio && live) { status("Speaking…"); await play(clip.audio); }
+        if (clip.audio && live) { status(t$.speaking); await play(clip.audio); }
       }
       if (t.done || !t.listen || !live) break;
       const audio = await listen(t.listen);
       if (!live) break;
-      status("Thinking…");
+      status(t$.thinking);
       const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt });
       t = await post("/turn?" + q, audio);
     }
-    end(live ? "Call ended. Thank you." : "You hung up.");
+    end(live ? t$.ended : t$.hung);
   }
 
   function end(message) {
     live = false;
     if (stream) stream.getTracks().forEach((tr) => tr.stop());
-    callBtn.style.display = ""; hangBtn.style.display = "none"; callBtn.disabled = false;
+    callBtns.forEach((b) => { b.style.display = ""; b.disabled = false; }); hangBtn.style.display = "none";
     status(message);
   }
 
-  callBtn.onclick = async () => {
-    callBtn.disabled = true; status("Connecting…");
+  async function call(lang) {
+    t$ = TEXT[lang.split("-")[0]] || TEXT.en;
+    hangBtn.textContent = t$.hang;
+    callBtns.forEach((b) => { b.disabled = true; }); status(t$.connecting);
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       await ctx.resume();
       source = ctx.createMediaStreamSource(stream);
       live = true; logEl.textContent = "";
-      callBtn.style.display = "none"; hangBtn.style.display = "";
-      await handle(await post("/start"));
+      callBtns.forEach((b) => { b.style.display = "none"; }); hangBtn.style.display = "";
+      await handle(await post("/start?lang=" + encodeURIComponent(lang)));
     } catch (err) {
-      end("Call failed: " + err.message);
+      end(t$.failed + err.message);
     }
-  };
-  hangBtn.onclick = () => end("You hung up.");
+  }
+  callBtns.forEach((b) => { b.onclick = () => call(b.dataset.lang); });
+  hangBtn.onclick = () => end(t$.hung);
 })();
 </script>
 </body>
@@ -178,6 +190,18 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
 """
 
 
-def render_page(*, title: str, language: str | None) -> str:
-    lang = escape((language or "en").split("-")[0], quote=True)
-    return _PAGE.replace("__TITLE__", escape(title)).replace("__LANG__", lang)
+BUTTON_LABELS = {"ar": "اتصل بالعربي", "en": "Call in English"}
+
+
+def render_page(*, title: str, languages: list[str]) -> str:
+    buttons = "\n    ".join(
+        f'<button class="call" data-lang="{escape(lang, quote=True)}" lang="{escape(lang, quote=True)}">'
+        f'{escape(BUTTON_LABELS.get(lang.split("-")[0], f"Call ({lang})"))}</button>'
+        for lang in languages
+    )
+    first = escape(languages[0].split("-")[0], quote=True)
+    return (
+        _PAGE.replace("__TITLE__", escape(title))
+        .replace("__LANG__", first)
+        .replace("__BUTTONS__", buttons)
+    )
