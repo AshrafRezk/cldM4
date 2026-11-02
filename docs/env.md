@@ -122,6 +122,16 @@ Public `/v1/admin/*` is Cloudflare Access + JWT validation, not a bearer token. 
 | `SLACK_WEBHOOK_URL` | optional but strongly recommended — this is how you learn the Mini is down |
 | `HF_TOKEN` | optional; FLUX schnell is Apache 2.0 and does not need one |
 
+## Mini worker — voice intake
+
+See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or Neon.
+
+| Name | Default | Notes |
+| --- | --- | --- |
+| `TWILIO_AUTH_TOKEN` | unset | secret. Required for the `/v1/voice/twilio/*` webhooks; without it they return 503. The Salesforce-side `/v1/voice/*` routes work regardless |
+| `VOICE_DB` | `~/Cloudiator/voice.db` | SQLite for published scripts and call sessions |
+| `VOICE_SESSION_TTL_DAYS` | `7` | sessions (transcripts included) are deleted this long after ack, or after the last update if never acked |
+
 ## Mini worker — renderers
 
 | Name | Default | Notes |

@@ -1,4 +1,4 @@
-"""Cloudiator worker — Phases A–D.
+"""Cloudiator worker — Phases A–F plus voice intake.
 
 Bound to 127.0.0.1:8080, single process, one Metal slot. Chat, embeddings, and
 models are OpenAI-compatible. OCR and maps are library tools: FastAPI runs the
@@ -57,6 +57,9 @@ from .ssrf import prepare_messages_for_ollama, validate_image_inputs
 from .jobs import JobRunner, public_job
 from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
 from .tool_routes import register_tool_routes
+from .voice.engine import VoiceEngine
+from .voice.routes import register_voice_routes
+from .voice.store import VoiceStore
 from .translation import (
     build_options,
     chat_response_to_openai,
@@ -119,6 +122,11 @@ tool_runner = ToolRunner(
     research=research_client,
 )
 jobs = JobRunner(settings, scheduler, artifacts)
+voice = VoiceEngine(
+    VoiceStore(settings.voice_db),
+    public_base_url=settings.public_base_url,
+    ttl_days=settings.voice_session_ttl_days,
+)
 
 
 class HealthLimiter:
@@ -722,6 +730,7 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
+register_voice_routes(app, engine=voice, settings=settings, require_key=require_key)
 
 
 @app.post("/v1/jobs")

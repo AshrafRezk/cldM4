@@ -39,6 +39,8 @@ os.environ.update(
         "OSRM_URL": "https://osrm.test",
         # Never the operator's real ~/Cloudiator/queue.db.
         "QUEUE_DB": os.path.join(_TEST_STATE_DIR, "queue.db"),
+        "VOICE_DB": os.path.join(_TEST_STATE_DIR, "voice.db"),
+        "TWILIO_AUTH_TOKEN": "test-twilio-auth-token",
         "MFLUX_MODEL_PATH": os.path.join(_TEST_STATE_DIR, "flux-schnell-4bit"),
         "MFLUX_LOW_RAM": "true",
         # The suite must not drain the queue into a real mflux or Ollama.

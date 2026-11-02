@@ -63,6 +63,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
 | [docs/using-console.md](docs/using-console.md) | **Use it.** Mint a key, send a playground chat, call every live tool |
 | [docs/claude-code-handoff.md](docs/claude-code-handoff.md) | **Claude Code (Opus).** Business brief + scripted phone → CRM contract; 120-minute implementation window |
+| [docs/voice.md](docs/voice.md) | Voice intake runbook: Twilio webhooks, script format, Salesforce deploy, retention |
 | [docs/next-steps.md](docs/next-steps.md) | **Current.** What remains to finish v1. Do not put secrets here |
 | [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |

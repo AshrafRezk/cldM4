@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Cloudiator_Voice_Script__c</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>CloudiatorVoice</members>
+        <members>CloudiatorVoicePublish</members>
+        <members>CloudiatorVoiceCommit</members>
+        <members>CloudiatorVoiceTest</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>Cloudiator_Voice</members>
+        <name>PermissionSet</name>
+    </types>
+    <version>62.0</version>
+</Package>

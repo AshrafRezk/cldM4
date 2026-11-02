@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cloudiator Voice</label>
+    <description>Edit and publish voice scripts and run the commit action. External Credential principal access is granted separately (docs/salesforce.md step 5).</description>
+    <classAccesses><apexClass>CloudiatorVoicePublish</apexClass><enabled>true</enabled></classAccesses>
+    <classAccesses><apexClass>CloudiatorVoiceCommit</apexClass><enabled>true</enabled></classAccesses>
+    <objectPermissions>
+        <object>Cloudiator_Voice_Script__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Definition__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Inbound_Numbers__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Active__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Published_Version__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Last_Publish_Error__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+</PermissionSet>
