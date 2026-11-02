@@ -203,7 +203,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       const audio = await listen(t.listen);
       if (!live) break;
       status(t$.thinking);
-      const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt });
+      const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt, turn: t.listen.turn });
       t = await post("/turn?" + q, audio);
     }
     if (live) callId = null;  // the Mini already freed the line when the call finished

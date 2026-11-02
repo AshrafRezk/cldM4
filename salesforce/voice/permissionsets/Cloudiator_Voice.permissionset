@@ -44,4 +44,8 @@
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Target_Field__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Required__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Max_Attempts__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Variables__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Announcement__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Next_Key__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Routes__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
 </PermissionSet>

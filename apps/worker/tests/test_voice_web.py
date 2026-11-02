@@ -91,7 +91,7 @@ async def test_silence_is_not_transcribed_and_replays(make_client, install_key, 
     async with make_client() as anon:
         turn = (await anon.post(f"{path}/start")).json()
         again = (await answer(anon, path, turn, audio=b"")).json()
-    assert again["listen"] == {**turn["listen"], "attempt": 2}
+    assert again["listen"] == {**turn["listen"], "attempt": 2, "turn": turn["listen"]["turn"] + 1}
     assert calls["stt"] == 1  # called, but with empty audio it returns "" without work
 
 

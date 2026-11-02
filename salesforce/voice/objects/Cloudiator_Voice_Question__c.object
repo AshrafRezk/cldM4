@@ -78,4 +78,26 @@
         <scale>0</scale>
         <defaultValue>2</defaultValue>
     </fields>
+    <fields>
+        <fullName>Announcement__c</fullName>
+        <label>Announcement</label>
+        <description>Speak this line and continue without waiting for an answer (e.g. an opening-hours notice).</description>
+        <type>Checkbox</type>
+        <defaultValue>false</defaultValue>
+    </fields>
+    <fields>
+        <fullName>Next_Key__c</fullName>
+        <label>Next</label>
+        <description>Answer key of the step to go to next (or goodbye). Blank = the next question by Order. Also used when no route matches.</description>
+        <type>Text</type>
+        <length>40</length>
+    </fields>
+    <fields>
+        <fullName>Routes__c</fullName>
+        <label>Routes</label>
+        <description>One per line: keywords => next key [= stored value]. Example: new, جديد, أول مرة => new_case = New. The first line whose keyword appears in the answer wins.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>4</visibleLines>
+    </fields>
 </CustomObject>

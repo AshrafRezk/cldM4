@@ -7,6 +7,8 @@ Two front doors share one engine, one session store, one commit document, and th
 | **Browser call** (default) | free, no vendor | on the Mini: macOS `say` (TTS) + whisper.cpp on the **CPU** (STT) | none — a link |
 | Twilio | Twilio's per-minute price | Twilio `<Say>` / speech recognition | yes |
 
+**Setting up a client (company name, questions, announcements, routes): [configuring-voice.md](configuring-voice.md).**
+
 ## Who it is for
 
 Case management, patient support programs, and any call center that onboards customers or records cases: the caller answers a short scripted interview, and the answers land in the CRM as records. The questions are written in Salesforce, not on the Mini.
