@@ -152,8 +152,13 @@ class VoiceAudio:
             raw.write_bytes(audio)
             out = Path(tmp) / "out.m4a"
             await speech._run(
+                # Studio takes are laptop-mic recordings: cut rumble, drop the
+                # silence before the first word, and level every line the same.
                 [self.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-i", str(raw),
-                 "-t", "60", "-ac", "1", "-ar", "24000", "-c:a", "aac", "-b:a", "64k", str(out)],
+                 "-t", "60", "-ac", "1",
+                 "-af", "highpass=f=80,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.15,"
+                        "loudnorm=I=-16:TP=-1.5:LRA=11",
+                 "-ar", "24000", "-c:a", "aac", "-b:a", "96k", str(out)],
                 30.0,
             )
             path.write_bytes(out.read_bytes())
