@@ -311,6 +311,12 @@ Cloudflare Access on `app.<domain>` and `api.<domain>/v1/admin*`. Record the tea
 
 ## 10. Health ping
 
+Two layers, because the Mini cannot report its own power cut or a dead internet line:
+
+- **Off-box (no setup):** `.github/workflows/uptime.yml` probes `https://api.cloudiator.org/v1/health` every 10 minutes from GitHub. Three failures open one issue labelled `uptime` (GitHub emails the repo owner); the next success closes it. Run it once from the Actions tab (“Run workflow”) to prove it.
+- **On-box (optional):** the script below catches `ok: false` states (swap, disk, Neon outbox) that still answer HTTP 200.
+
+
 `scripts/health-ping.sh` runs every 2 minutes from the `ai.cloudiator.health-ping` LaunchAgent. It probes `127.0.0.1:8080/v1/health` and the same route through the tunnel (`PUBLIC_BASE_URL`), and alerts only on a state change: two consecutive failures → one DOWN message, `ok: false` → one degraded message, back to ok → one recovery message.
 
 Set at least one channel in `~/Cloudiator/.env`: `SLACK_WEBHOOK_URL`, or `NTFY_URL=https://ntfy.sh/<long-random-topic>` and subscribe to that topic in the ntfy phone app. Then:

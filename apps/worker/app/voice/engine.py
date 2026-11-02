@@ -133,6 +133,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "display_name": str(body.get("display_name") or script_id),
         "language": str(body.get("language") or "en-US"),
         "voice": body.get("voice") or None,
+        # macOS `say` voice for the browser call (e.g. Majed, Samantha).
+        "local_voice": body.get("local_voice") or None,
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
         "fail_say": body.get("fail_say") or None,
@@ -160,6 +162,14 @@ def _reject_cycles(steps: list[dict[str, Any]]) -> None:
 
 
 class VoiceEngine:
+    """Channel-neutral step machine.
+
+    Every webhook returns a Reply: an ordered list of verbs, each one of
+    {"say": text}, {"gather": {...}}, or {"hangup": True}. Twilio renders it to
+    TwiML (`render_twiml`); the browser call renders it to text plus audio.
+    The cache stores the Reply, so a retry on either channel replays exactly.
+    """
+
     def __init__(self, store: VoiceStore, *, public_base_url: str, ttl_days: float) -> None:
         self.store = store
         self.base_url = public_base_url.rstrip("/")
@@ -170,9 +180,10 @@ class VoiceEngine:
             {"step": step, "attempt": attempt}
         )
 
-    # Webhooks ----------------------------------------------------------------
+    # Calls -------------------------------------------------------------------
 
-    def on_inbound(self, *, call_sid: str, from_number: str, to_number: str) -> str:
+    def on_inbound(self, *, call_sid: str, from_number: str, to_number: str) -> Reply:
+        """Twilio: the dialled number picks the script."""
         cached = self.store.reply_for(call_sid, INBOUND_STEP, 0)
         if cached is not None:
             return cached
@@ -180,8 +191,25 @@ class VoiceEngine:
         found = self.store.script_for_number(to_number)
         if found is None:
             log.warning("inbound call to an unrouted number; hanging up")
-            return twiml.response(twiml.hangup())
+            return _reply(None, [{"hangup": True}])
         tenant_id, version, script = found
+        return self._start(tenant_id, version, script, call_sid, from_number, to_number)
+
+    def start_call(
+        self, *, tenant_id: str, script_id: str, call_sid: str, from_label: str
+    ) -> Reply | None:
+        """Browser call: the call link already names tenant and script."""
+        cached = self.store.reply_for(call_sid, INBOUND_STEP, 0)
+        if cached is not None:
+            return cached
+        self.store.purge_expired(self.ttl_days)
+        found = self.store.script_by_id(tenant_id, script_id)
+        if found is None:
+            return None
+        version, script = found
+        return self._start(tenant_id, version, script, call_sid, from_label, f"web:{script_id}")
+
+    def _start(self, tenant_id, version, script, call_sid, from_number, to_number) -> Reply:
         session = self.store.create_session(
             tenant_id=tenant_id,
             call_sid=call_sid,
@@ -196,7 +224,7 @@ class VoiceEngine:
         self.store.save_reply(call_sid, INBOUND_STEP, 0, reply)
         return reply
 
-    def on_gather(self, *, call_sid: str, step: str, attempt: int, speech: str) -> str:
+    def on_gather(self, *, call_sid: str, step: str, attempt: int, speech: str) -> Reply:
         cached = self.store.reply_for(call_sid, step, attempt)
         if cached is not None:
             return cached
@@ -208,7 +236,7 @@ class VoiceEngine:
             or session["attempt"] != attempt
         ):
             # Out of order or forged-but-signed: never continue the script.
-            return twiml.response(twiml.hangup())
+            return _reply(None, [{"hangup": True}])
 
         script = session["definition"]
         current = _step(script, step)
@@ -223,7 +251,7 @@ class VoiceEngine:
             reply = self._advance({**session, "turns": turns, "answers": answers}, current["next"])
         elif attempt < current["max_attempts"]:
             self.store.update_session(session["id"], attempt=attempt + 1)
-            reply = self._render_gather({**session, "attempt": attempt + 1}, current)
+            reply = _reply(script, [self._gather_verb({**session, "attempt": attempt + 1}, current)])
         elif current["on_fail"] == "continue":
             answers[step] = ""
             self.store.update_session(session["id"], answers=answers)
@@ -237,7 +265,7 @@ class VoiceEngine:
                 session["id"], status="abandoned", current_step=None, turns=turns
             )
             log.info("voice session %s abandoned at %s", session["id"], step)
-            reply = twiml.response(self._say(script, message), twiml.hangup())
+            reply = _reply(script, [{"say": message}, {"hangup": True}])
 
         self.store.save_reply(call_sid, step, attempt, reply)
         return reply
@@ -249,19 +277,39 @@ class VoiceEngine:
 
     # Rendering ---------------------------------------------------------------
 
-    def _advance(self, session: dict[str, Any], key: str | None) -> str:
+    def render_twiml(self, reply: Reply) -> str:
+        verbs = []
+        for verb in reply["verbs"]:
+            if "say" in verb:
+                verbs.append(twiml.say(verb["say"], voice=reply.get("voice"), language=reply.get("language")))
+            elif "gather" in verb:
+                g = verb["gather"]
+                verbs.append(
+                    twiml.gather(
+                        twiml.say(g["prompt"], voice=reply.get("voice"), language=reply.get("language")),
+                        action=self.gather_url(g["step"], g["attempt"]),
+                        language=reply.get("language"),
+                        timeout=g["timeout"],
+                        speech_timeout=g["speech_timeout"],
+                    )
+                )
+            elif verb.get("hangup"):
+                verbs.append(twiml.hangup())
+        return twiml.response(*verbs)
+
+    def _advance(self, session: dict[str, Any], key: str | None) -> Reply:
         """Speak non-gather steps from `key` until a gather or the end."""
         script = session["definition"]
         turns = list(session["turns"])
-        verbs: list[str] = []
+        verbs: list[dict[str, Any]] = []
         while key is not None:
             step = _step(script, key)
             if step["gather"]:
                 self.store.update_session(session["id"], current_step=key, attempt=1)
                 verbs.append(self._gather_verb({**session, "turns": turns, "attempt": 1}, step))
-                return twiml.response(*verbs)
+                return _reply(script, verbs)
             turns.append({"role": "agent", "text": step["say"]})
-            verbs.append(self._say(script, step["say"]))
+            verbs.append({"say": step["say"]})
             key = step["next"]
 
         commit = render_commit(
@@ -282,28 +330,35 @@ class VoiceEngine:
             commit_doc=commit,
         )
         log.info("voice session %s ready to commit", session["id"])
-        verbs.append(twiml.hangup())
-        return twiml.response(*verbs)
+        verbs.append({"hangup": True})
+        return _reply(script, verbs)
 
-    def _render_gather(self, session: dict[str, Any], step: dict[str, Any]) -> str:
-        return twiml.response(self._gather_verb(session, step))
-
-    def _gather_verb(self, session: dict[str, Any], step: dict[str, Any]) -> str:
+    def _gather_verb(self, session: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
         """The gather prompt is a turn too; it is recorded with any says before it."""
-        script = session["definition"]
         turns = list(session["turns"]) + [{"role": "agent", "text": step["say"]}]
         self.store.update_session(session["id"], turns=turns)
-        return twiml.gather(
-            self._say(script, step["say"]),
-            action=self.gather_url(step["key"], session["attempt"]),
-            language=script.get("language"),
-            timeout=step["timeout"],
-            speech_timeout=step["speech_timeout"],
-        )
+        return {
+            "gather": {
+                "step": step["key"],
+                "attempt": session["attempt"],
+                "prompt": step["say"],
+                "timeout": step["timeout"],
+                "speech_timeout": step["speech_timeout"],
+            }
+        }
 
-    @staticmethod
-    def _say(script: Mapping[str, Any], text: str) -> str:
-        return twiml.say(text, voice=script.get("voice"), language=script.get("language"))
+
+Reply = dict[str, Any]
+
+
+def _reply(script: Mapping[str, Any] | None, verbs: list[dict[str, Any]]) -> Reply:
+    script = script or {}
+    return {
+        "language": script.get("language"),
+        "voice": script.get("voice"),
+        "local_voice": script.get("local_voice"),
+        "verbs": verbs,
+    }
 
 
 def _step(script: Mapping[str, Any], key: str) -> dict[str, Any]:

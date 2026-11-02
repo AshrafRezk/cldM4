@@ -1,4 +1,25 @@
-# Voice intake — Twilio phone into Salesforce
+# Voice intake — scripted calls into Salesforce
+
+Two front doors share one engine, one session store, one commit document, and the same Salesforce Apex:
+
+| Front door | Cost | Speech | Phone number |
+| --- | --- | --- | --- |
+| **Browser call** (default) | free, no vendor | on the Mini: macOS `say` (TTS) + whisper.cpp on the **CPU** (STT) | none — a link |
+| Twilio | Twilio's per-minute price | Twilio `<Say>` / speech recognition | yes |
+
+## Browser call
+
+1. Publish a script (`POST /v1/voice/scripts`, below). `inbound_numbers` may be empty.
+2. Mint a link: `POST /v1/voice/scripts/{id}/web-link` with a `voice` key. The response `url` (`https://api.cloudiator.org/v1/voice/web/cl_…`) is shown once; only its hash is stored. `POST …/web-link/revoke` kills every link for that script.
+3. Anyone with the link opens it, presses **Call**, allows the microphone, and talks. Each answer is recorded in the browser (silence detection, 16 kHz WAV), transcribed on the Mini, and answered with locally synthesized audio. The finished call is `ready_to_commit` exactly like a Twilio call; `from` is `web`.
+
+The link is the only credential on the page and only starts calls on that one script; it never carries an `sk-cld-` key. Turns are rate limited per client IP (40/min, from `CF-Connecting-IP`), one answer is capped at `VOICE_WEB_MAX_AUDIO_BYTES` (2 MB ≈ 60 s), and a retried turn replays its cached reply without transcribing again.
+
+**Speech stays off the GPU.** TTS is `say` (`Majed` for Arabic, `Samantha` for English, or the script's `local_voice`), cached under `VOICE_TTS_CACHE` by text+voice, so static prompts are a file read after the first call. STT is `whisper-cli --no-gpu` with `WHISPER_THREADS` CPU threads, one transcription at a time, through `ffmpeg` to 16 kHz mono. It never touches Ollama or the Metal slot. Apple's recognizer is not used: it is on-device for English only and sends Arabic to Apple.
+
+Setup: `brew install whisper-cpp` (done on the Mini 2026-11-02) and a ggml model at `WHISPER_MODEL` (default `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin`). Without the model, calls still start and speak, and each answer returns `503 speech_unavailable`.
+
+## Twilio
 
 A Twilio number rings the Mini. The Mini reads a **script published from Salesforce**, speaks with Twilio `<Say>`, hears the caller through Twilio's own speech recognition (`<Gather input="speech">`), and when the script ends produces a **CRM commit document**. Apex in the org inserts those records and acks the session.
 

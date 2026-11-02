@@ -59,6 +59,7 @@ from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_l
 from .tool_routes import register_tool_routes
 from .voice.engine import VoiceEngine
 from .voice.routes import register_voice_routes
+from .voice.web import register_web_routes
 from .voice.store import VoiceStore
 from .translation import (
     build_options,
@@ -731,6 +732,7 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
 register_voice_routes(app, engine=voice, settings=settings, require_key=require_key)
+register_web_routes(app, engine=voice, settings=settings, require_key=require_key)
 
 
 @app.post("/v1/jobs")
