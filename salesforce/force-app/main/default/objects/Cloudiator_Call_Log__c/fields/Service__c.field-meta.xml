@@ -28,6 +28,7 @@
         <value><fullName>Health</fullName><default>false</default><label>Health</label></value>
         <value><fullName>Models</fullName><default>false</default><label>Models</label></value>
         <value><fullName>Usage</fullName><default>false</default><label>Usage</label></value>
+        <value><fullName>Voice</fullName><default>false</default><label>Voice</label></value>
         <value><fullName>Other</fullName><default>false</default><label>Other</label></value>
         </valueSetDefinition>
     </valueSet>

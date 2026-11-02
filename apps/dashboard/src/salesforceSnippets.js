@@ -123,13 +123,22 @@ export const SERVICES = [
     body: { kind: "image", prompt: "a red bicycle" },
   },
   {
-    id: "audio",
-    name: "Audio / speech",
-    path: "—",
-    flow: "—",
-    modality: "Audio → Text (later)",
-    note: "Not in v1 OpenAPI / engineer preset. Whisper lands with Phase G; do not promise /v1/audio yet.",
-    body: null,
+    id: "voice",
+    name: "Voice calls (scripts, call links, CRM commit)",
+    path: "POST /v1/voice/scripts · POST /v1/voice/scripts/{id}/web-link · GET /v1/voice/sessions + POST …/ack",
+    flow: "Commit Cloudiator voice sessions (scheduled Flow, salesforce/voice package)",
+    modality: "Speech → Record (Egyptian Arabic / English)",
+    note: "Needs the voice scope on the key (tick it under Keys → Scopes). Deploy salesforce/voice for the Script, Question and FAQ objects, publishing and the commit job; see docs/salesforce-voice-setup.md.",
+    body: {
+      id: "patient-support",
+      display_name: "Patient Support",
+      languages: ["ar-EG", "en-US"],
+      steps: [
+        { key: "name", gather: true, say: { "ar-EG": "ممكن اسمك؟", "en-US": "May I have your name?" }, next: "done" },
+        { key: "done", say: { "ar-EG": "شكراً.", "en-US": "Thank you." } },
+      ],
+      commit: { records: [{ sobject: "Contact", fields: { LastName: "{{name}}" } }] },
+    },
   },
 ];
 
