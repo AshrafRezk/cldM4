@@ -1,5 +1,7 @@
 # Salesforce metadata — Cloudiator voice
 
+Step-by-step developer setup: [docs/salesforce-voice-setup.md](../../docs/salesforce-voice-setup.md).
+
 Metadata API format. Operator runbook and script format: [docs/voice.md](../../docs/voice.md).
 
 | File | What |
@@ -12,14 +14,16 @@ Metadata API format. Operator runbook and script format: [docs/voice.md](../../d
 | `classes/CloudiatorVoiceRecordings.cls` | Queueable: Files titled `ar-EG`/`en-US` on a question, or `greeting.ar-EG`/`goodbye.en-US` on the script, are uploaded as that line's recording |
 | `classes/CloudiatorVoiceTemplates.cls` | Invocable **Create Cloudiator voice script from template**: `case_intake`, `patient_support`, `customer_onboarding`, in Egyptian Arabic and English |
 | `classes/CloudiatorVoiceCommit.cls` | Invocable **Commit Cloudiator voice sessions**. Blank session id = every `ready_to_commit` session (max 10). Inserts `commit_json` records in order, resolving `{{Lead.Id}}`-style placeholders, then enqueues the ack |
-| `classes/CloudiatorVoiceTest.cls` | mock-callout tests |
+| `classes/CloudiatorVoiceCommitJob.cls` | Schedules the commit every 15 minutes: `CloudiatorVoiceCommitJob.scheduleEvery15Minutes();` |
+| `pages/CloudiatorCall.page`, `labels/CustomLabels.labels` | Visualforce call button; set the `Cloudiator_Call_Link` label to your call link |
+| `classes/CloudiatorVoiceTest.cls` | mock-callout tests (`CloudiatorVoiceCommitJobTest.cls` for the job) |
 | `permissionsets/Cloudiator_Voice.permissionset` | object/field access for scripts and questions + the Publish, Commit, and Templates actions |
 
 ## Deploy
 
 ```bash
 sf project deploy start --metadata-dir salesforce/voice --target-org <sandbox-alias> \
-  --test-level RunSpecifiedTests --tests CloudiatorVoiceTest
+  --test-level RunSpecifiedTests --tests CloudiatorVoiceTest CloudiatorVoiceCommitJobTest
 ```
 
 Then:

@@ -1,0 +1,17 @@
+<!--
+  Call button for a Cloudiator voice script. The link is the Custom Label
+  Cloudiator_Call_Link (set its value in Setup to the call link you were given).
+  The call opens in a new tab: inside an iframe the browser blocks the microphone
+  (the call page sends Permissions-Policy: microphone=(self)).
+-->
+<apex:page showHeader="false" sidebar="false" standardStylesheets="false" applyHtmlTag="true" docType="html-5.0">
+  <div style="font-family: -apple-system, 'Segoe UI', sans-serif; padding: 24px; text-align: center;">
+    <h2>Patient Support</h2>
+    <p dir="rtl">تقدر تكلمنا من المتصفح بالعربي أو بالإنجليزي.</p>
+    <p>Talk to us from your browser, in Arabic or English.</p>
+    <apex:outputLink value="{!$Label.Cloudiator_Call_Link}" target="_blank"
+        style="display:inline-block; padding:12px 24px; border-radius:24px; background:#0d6a8a; color:#fff; text-decoration:none;">
+      اتصل بينا · Call us
+    </apex:outputLink>
+  </div>
+</apex:page>
