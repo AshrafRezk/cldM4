@@ -413,7 +413,8 @@ def require_capability(record: KeyRecord, capability: str) -> None:
     if not record.has(capability):
         raise scope_denied(
             f"This key does not have the {capability!r} capability. "
-            "Scopes are set on the key in the dashboard.",
+            "The secret can stay the same. On the Mini: "
+            f"python -m app.dbtool set-capabilities <public_id> --add {capability}",
             param=capability,
         )
 

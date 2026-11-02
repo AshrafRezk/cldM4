@@ -196,7 +196,11 @@ export function SalesforcePanel({ apiUrl, selectedKey, plaintext, installBanner 
       <section className="card glass">
         <h2>1. Mint or reconnect → install → configure</h2>
         <ol className="steps">
-          <li>Mint a Salesforce engineer key, or select an existing one and paste the full <code>sk-cld-…</code> from your password manager.</li>
+          <li>
+            Mint a Salesforce engineer or Voice intake key and confirm <code>voice</code> is ticked before you copy it.
+            A key without voice gets <code>403</code> on <code>/v1/voice</code>. To fix a key Salesforce already has,
+            on the Mini run <code>python -m app.dbtool set-capabilities --add voice</code> — the secret stays the same.
+          </li>
           <li>
             <strong>Install &amp; connect</strong> (first deploy) or <strong>Connect existing key only</strong> (org already has the app).
           </li>
@@ -257,8 +261,9 @@ sf org assign permset --name Cloudiator_Admin --target-org myorg`}</pre>
       <section className="card glass">
         <h2>3. Services & modalities</h2>
         <p className="muted">
-          Text, image, and document paths are live on the engineer preset. Audio/speech waits on Phase G. FLUX jobs need
-          an <code>image_generation</code> scope.
+          Text, image, and document paths are live on the engineer preset. Phone voice is live too, and it needs the{" "}
+          <code>voice</code> scope (Voice intake, or Salesforce engineer). Whisper transcriptions are not live yet.
+          FLUX jobs need an <code>image_generation</code> scope.
         </p>
         <label className="field">
           <span>Service</span>

@@ -28,6 +28,7 @@ export function Console({ go, path }) {
   const [keys, setKeys] = useState([]);
   const [selectedKeyId, setSelectedKeyId] = useState("");
   const [plaintext, setPlaintext] = useState("");
+  const [mintedKey, setMintedKey] = useState(null);
   const [usage, setUsage] = useState([]);
   const [error, setError] = useState("");
   const [accessBlocked, setAccessBlocked] = useState(false);
@@ -157,6 +158,7 @@ export function Console({ go, path }) {
 
   async function onMinted(result) {
     setPlaintext(result.plaintext);
+    setMintedKey(result.key);
     setKeys((current) => [result.key, ...current]);
     setSelectedKeyId(result.key.id);
     setCopied(false);
@@ -201,6 +203,7 @@ export function Console({ go, path }) {
       setTenantId(rest[0]?.id || "");
       setSelectedKeyId("");
       setPlaintext("");
+      setMintedKey(null);
       haptic("warn");
     } catch (err) {
       setError(err.message);
@@ -211,6 +214,7 @@ export function Console({ go, path }) {
 
   function onScopesSaved(updated) {
     setKeys((current) => current.map((key) => (key.id === updated.id ? { ...key, ...updated, lastUsedAt: key.lastUsedAt } : key)));
+    setMintedKey((current) => (current && current.id === updated.id ? { ...current, ...updated } : current));
   }
 
   const playgroundKey = plaintext || "";
@@ -271,6 +275,14 @@ export function Console({ go, path }) {
               <span className="pill">Store it now</span>
             </div>
             <p className="muted">Store this in the password manager. Cloudiator will not show it again.</p>
+            {mintedKey && !(mintedKey.capabilities || []).includes("voice") ? (
+              <p className="error">
+                This key has no voice scope. /v1/voice will return 403. Tick voice and save, or mint again with Voice
+                intake. Do not paste the secret into chat.
+              </p>
+            ) : (
+              <p className="muted">Voice is on. /v1/voice/scripts with this key should return 200.</p>
+            )}
             <pre className="key">{plaintext}</pre>
             <button
               type="button"
@@ -372,6 +384,7 @@ export function Console({ go, path }) {
                     {key.publicId} · {key.preset || "custom"} · created {when(key.createdAt)} · last used{" "}
                     {when(key.lastUsedAt)}
                     {key.revokedAt ? ` · revoked ${when(key.revokedAt)}` : ""}
+                    {!key.revokedAt && !(key.capabilities || []).includes("voice") ? " · no voice" : ""}
                   </span>
                 </button>
               </li>

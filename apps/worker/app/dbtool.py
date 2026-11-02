@@ -5,6 +5,7 @@
     python -m app.dbtool mint-key --tenant acme --name "Salesforce dev"
     python -m app.dbtool revoke-key <public_id>
     python -m app.dbtool list-keys
+    python -m app.dbtool set-capabilities --tenant merck --add voice
 
 Configuration comes from `~/Cloudiator/.env` (override with CLOUDIATOR_ENV_FILE)
 unless the variables are already in the environment, so these commands work in a
@@ -27,11 +28,17 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+import urllib.request
+from urllib.error import HTTPError, URLError
+from urllib.request import Request
 
 from .auth import (
     ARGON2_MEMORY_COST,
     ARGON2_PARALLELISM,
     ARGON2_TIME_COST,
+    KEY_PREFIX,
+    PUBLIC_ID_ALPHABET,
+    PUBLIC_ID_LENGTH,
     hash_secret,
     mint_secret,
 )
@@ -78,11 +85,192 @@ def load_env_file(path: Path) -> list[str]:
     return loaded
 
 
-def _presets() -> dict[str, Any]:
+def load_catalog() -> dict[str, Any]:
+    """Presets and capability names from packages/schema/scopes.json.
+
+    Read on each call so a `git pull` on the Mini is enough. The Console bundles
+    this file at deploy time and can lag behind the checkout the Mini is on.
+    """
     path = schema_dir() / "scopes.json"
     if not path.is_file():
         return {}
-    return json.loads(path.read_text()).get("presets", {})
+    document = json.loads(path.read_text())
+    return document if isinstance(document, dict) else {}
+
+
+def _presets() -> dict[str, Any]:
+    presets = load_catalog().get("presets") or {}
+    return presets if isinstance(presets, dict) else {}
+
+
+def known_capabilities() -> set[str]:
+    raw = load_catalog().get("capabilities") or []
+    return {str(item) for item in raw} if isinstance(raw, list) else set()
+
+
+def capabilities_from_row(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
+def split_capabilities(raw: str | None) -> list[str]:
+    return [item.strip() for item in (raw or "").split(",") if item.strip()]
+
+
+def parse_key_ref(raw: str) -> tuple[str, bool]:
+    """Return (public_id, was_full_key). The secret is never part of the result.
+
+    Error text must not echo `raw`: callers paste the whole sk-cld- key.
+    """
+    text = raw.strip()
+    full = False
+    if text.startswith(KEY_PREFIX):
+        full = True
+        public, separator, secret = text[len(KEY_PREFIX) :].partition("_")
+        if not separator or not public or not secret:
+            raise ValueError("That sk-cld- key is missing the public id or the secret.")
+        text = public
+    if len(text) != PUBLIC_ID_LENGTH or any(char not in PUBLIC_ID_ALPHABET for char in text):
+        raise ValueError(
+            "Pass the 12-character public id printed by list-keys. "
+            "A full sk-cld- key also works; the secret is not printed or stored again."
+        )
+    return text, full
+
+
+def resolve_capabilities(
+    current: list[str],
+    *,
+    preset: str | None = None,
+    replace: list[str] | None = None,
+    add: list[str] | None = None,
+    remove: list[str] | None = None,
+) -> list[str]:
+    """The capability list to store. Preset or replace sets the base; add/remove edit it."""
+    if preset and replace is not None:
+        raise ValueError("Pass either --preset or --capabilities, not both.")
+    if preset:
+        presets = _presets()
+        if preset not in presets:
+            known = ", ".join(sorted(presets)) or "(none)"
+            raise ValueError(f"unknown preset {preset!r}; known: {known}")
+        base = [str(item) for item in presets[preset].get("capabilities") or []]
+    elif replace is not None:
+        base = list(replace)
+    else:
+        base = list(current)
+
+    for capability in add or []:
+        if capability not in base:
+            base.append(capability)
+    removed = set(remove or [])
+    base = [item for item in base if item not in removed]
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in base:
+        if item in seen:
+            continue
+        seen.add(item)
+        ordered.append(item)
+    if not ordered:
+        raise ValueError("A key with no capabilities can call nothing.")
+
+    allowed = known_capabilities()
+    unknown = [item for item in ordered if item not in allowed]
+    if unknown:
+        known = ", ".join(sorted(allowed)) or "(catalog is empty — pull the repo)"
+        raise ValueError(f"unknown capability {unknown[0]!r}; known: {known}")
+    return ordered
+
+
+def preset_label(capabilities: list[str], preferred: str | None) -> str | None:
+    """Preset name when the set matches one. Prefer the name the operator asked for."""
+    wanted = set(capabilities)
+    matches = [
+        name
+        for name, spec in _presets().items()
+        if set(spec.get("capabilities") or []) == wanted
+    ]
+    if preferred and preferred in matches:
+        return preferred
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def format_key_line(row: Any) -> str:
+    capabilities = capabilities_from_row(row["capabilities"])
+    state = "revoked" if row["revoked_at"] else "active"
+    voice = "voice=yes" if "voice" in capabilities else "voice=NO"
+    preset = row["preset"] or "custom"
+    scopes = ", ".join(capabilities) if capabilities else "(none)"
+    head = (
+        f"{row['public_id']}  {state:8}  {row['tenant']:16}  rpm={row['rpm']:<4}  "
+        f"{voice:9}  {preset:22}  {row['name']}"
+    )
+    return f"{head}\n    {scopes}"
+
+
+def flush_local_key_cache(opener=None) -> str:
+    """Drop the worker's 60s key cache. The admin token is loopback-only.
+
+    Capability edits are invisible until this runs or the TTL expires. The token
+    is sent to 127.0.0.1 and is never included in the message we print.
+    """
+    settings = get_settings()
+    token = settings.admin_token
+    if not token:
+        return (
+            "ADMIN_TOKEN is not set, so the worker cache was not flushed. "
+            "The new scopes apply within 60 seconds, or POST "
+            "http://127.0.0.1:8080/v1/admin/cache/flush with the loopback admin token."
+        )
+    url = f"http://127.0.0.1:{settings.port}/v1/admin/cache/flush"
+    request = Request(
+        url,
+        data=b"{}",
+        method="POST",
+        headers={"X-Admin-Token": token, "Content-Type": "application/json"},
+    )
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+            raise URLError(f"refused redirect ({code})")
+
+    def _open(req: Request) -> tuple[int, str]:
+        opener = urllib.request.build_opener(_NoRedirect)
+        with opener.open(req, timeout=3) as response:
+            return response.status, response.read().decode("utf-8", "replace")
+
+    try:
+        status, body = (opener or _open)(request)
+    except HTTPError as exc:
+        return (
+            f"The worker refused the cache flush ({exc.code}). "
+            "The new scopes apply within 60 seconds."
+        )
+    except URLError as exc:
+        return (
+            f"Could not reach the worker on 127.0.0.1 to flush the key cache ({exc.reason}). "
+            "The new scopes apply within 60 seconds."
+        )
+    except OSError as exc:
+        return (
+            f"Could not reach the worker on 127.0.0.1 to flush the key cache ({exc}). "
+            "The new scopes apply within 60 seconds."
+        )
+    if token in body:
+        body = body.replace(token, "[redacted]")
+    return f"Worker key cache flushed ({status}): {body.strip()}"
 
 
 async def _verify_schema(db: Neon) -> int:
@@ -175,6 +363,10 @@ async def _mint_key(db: Neon, args: argparse.Namespace) -> int:
     print(f"public_id  {public_id}")
     print(f"tenant     {args.tenant}")
     print(f"scopes     {', '.join(capabilities)}")
+    if "voice" not in capabilities:
+        print("voice      NO  (/v1/voice will return 403 until this key has voice)")
+    else:
+        print("voice      yes")
     print(f"rpm        {args.rpm}")
     print()
     print("Shown once. Store it in the password manager, not in git:")
@@ -217,12 +409,180 @@ async def _list_keys(db: Neon) -> int:
     if not rows:
         print("no keys")
         return 0
+    missing: list[str] = []
     for row in rows:
-        state = "revoked" if row["revoked_at"] else "active"
-        print(
-            f"{row['public_id']}  {state:8}  {row['tenant']:16}  rpm={row['rpm']:<4} "
-            f"{row['name']}"
-        )
+        print(format_key_line(row))
+        if not row["revoked_at"] and "voice" not in capabilities_from_row(row["capabilities"]):
+            missing.append(str(row["public_id"]))
+    if missing:
+        print()
+        print("These active keys have no voice scope, so /v1/voice returns 403:")
+        print("  " + ", ".join(missing))
+        print("Add it without changing the secret Salesforce already has:")
+        print("  python -m app.dbtool set-capabilities --add voice <public_id>")
+        print("  python -m app.dbtool set-capabilities --tenant <slug> --add voice")
+    return 0
+
+
+_VOICE_PROOF = (
+    'curl -s -o /dev/null -w \'%{http_code}\\n\' '
+    '"$API/v1/voice/scripts" -H "Authorization: Bearer $KEY"'
+)
+
+
+async def _set_capabilities(db: Neon, args: argparse.Namespace) -> int:
+    """Change scopes on a key that already exists. The secret stays the same."""
+    if not args.key and not args.tenant:
+        print("Pass a public_id, or --tenant to update every active key on that tenant.")
+        return 2
+    if args.preset and args.capabilities:
+        print("Pass either --preset or --capabilities, not both.")
+        return 2
+    if not any((args.preset, args.capabilities, args.add, args.remove)):
+        print("Pass --preset, --capabilities, --add, or --remove.")
+        return 2
+
+    public_id: str | None = None
+    if args.key:
+        try:
+            public_id, full = parse_key_ref(args.key)
+        except ValueError as exc:
+            print(exc)
+            return 2
+        if full:
+            print(
+                "The full key was on the command line, so it is in your shell history. "
+                "Next time pass only the public id from list-keys. "
+                "The secret was not printed or stored again.",
+                file=sys.stderr,
+            )
+
+    tenant = args.tenant.strip().lower() if args.tenant else None
+    replace = split_capabilities(args.capabilities) if args.capabilities else None
+    add = split_capabilities(args.add)
+    remove = split_capabilities(args.remove)
+
+    class _WriteAbort(Exception):
+        def __init__(self, payload: dict[str, Any]) -> None:
+            self.payload = payload
+
+    async def action(con):
+        if public_id:
+            rows = await con.fetch(
+                """
+                SELECT k.public_id, k.name, k.preset, k.capabilities, k.revoked_at,
+                       t.slug AS tenant
+                FROM api_keys k
+                JOIN tenants t ON t.id = k.tenant_id
+                WHERE k.public_id = $1
+                  AND ($2::text IS NULL OR lower(t.slug) = $2)
+                """,
+                public_id,
+                tenant,
+            )
+        else:
+            rows = await con.fetch(
+                """
+                SELECT k.public_id, k.name, k.preset, k.capabilities, k.revoked_at,
+                       t.slug AS tenant
+                FROM api_keys k
+                JOIN tenants t ON t.id = k.tenant_id
+                WHERE lower(t.slug) = $1
+                  AND t.deleted_at IS NULL
+                  AND k.revoked_at IS NULL
+                ORDER BY k.created_at
+                """,
+                tenant,
+            )
+        if not rows:
+            return {"error": "missing"}
+        planned: list[dict[str, Any]] = []
+        for row in rows:
+            if row["revoked_at"]:
+                return {"error": "revoked", "public_id": row["public_id"]}
+            current = capabilities_from_row(row["capabilities"])
+            try:
+                updated = resolve_capabilities(
+                    current,
+                    preset=args.preset,
+                    replace=replace,
+                    add=add,
+                    remove=remove,
+                )
+            except ValueError as exc:
+                return {"error": "bad", "public_id": row["public_id"], "message": str(exc)}
+            label = preset_label(updated, args.preset or row["preset"])
+            planned.append(
+                {
+                    "public_id": row["public_id"],
+                    "capabilities": updated,
+                    "preset": label,
+                    "unchanged": updated == current and label == row["preset"],
+                }
+            )
+        written = []
+        for item in planned:
+            saved = await con.fetchrow(
+                """
+                UPDATE api_keys
+                SET capabilities = $1::jsonb,
+                    preset = $2
+                WHERE public_id = $3
+                  AND revoked_at IS NULL
+                RETURNING public_id, name, preset, capabilities
+                """,
+                json.dumps(item["capabilities"]),
+                item["preset"],
+                item["public_id"],
+            )
+            if saved is None:
+                raise _WriteAbort({"error": "revoked", "public_id": item["public_id"]})
+            written.append({**dict(saved), "unchanged": item["unchanged"]})
+        return {"error": None, "written": written}
+
+    try:
+        result = await db.run(action, statement_timeout_seconds=15.0)
+    except _WriteAbort as exc:
+        result = exc.payload
+    except ValueError as exc:
+        print(exc)
+        return 2
+
+    if result["error"] == "missing":
+        if public_id and tenant:
+            print(f"no key {public_id} on tenant {tenant}")
+        elif public_id:
+            print(f"no key with public_id {public_id}")
+        else:
+            print(f"no active keys on tenant {tenant}")
+        return 1
+    if result["error"] == "revoked":
+        print(f"{result['public_id']} is revoked. Mint a new key; revoked secrets cannot be re-scoped.")
+        return 1
+    if result["error"] == "bad":
+        print(f"{result['public_id']}: {result['message']}")
+        return 2
+
+    for row in result["written"]:
+        capabilities = capabilities_from_row(row["capabilities"])
+        voice = "voice=yes" if "voice" in capabilities else "voice=NO"
+        note = " (unchanged)" if row["unchanged"] else ""
+        preset = row["preset"] or "custom"
+        print(f"{row['public_id']}  {row['name']}  preset={preset}  {voice}{note}")
+        print(f"    {', '.join(capabilities)}")
+    print()
+    print(
+        "The secret did not change. The key already stored in Salesforce "
+        "(Setup → CloudiatorPrincipal → ApiKey) is still the right one."
+    )
+    print(flush_local_key_cache())
+    print()
+    print("Prove voice. Expect 200. Take KEY from the password manager; do not paste it into chat.")
+    print("  export API=https://api.cloudiator.org")
+    print(f"  {_VOICE_PROOF}")
+    if any("voice" not in capabilities_from_row(row["capabilities"]) for row in result["written"]):
+        print("voice is still off on at least one key. /v1/voice will keep returning 403.")
+        return 1
     return 0
 
 
@@ -254,7 +614,22 @@ def build_parser() -> argparse.ArgumentParser:
     revoke = sub.add_parser("revoke-key", help="revoke by public_id")
     revoke.add_argument("public_id")
 
-    sub.add_parser("list-keys", help="list keys without secrets")
+    sub.add_parser("list-keys", help="list keys without secrets, and flag any that lack voice")
+
+    edit = sub.add_parser(
+        "set-capabilities",
+        help="add or replace scopes on an existing key; the secret stays the same",
+    )
+    edit.add_argument(
+        "key",
+        nargs="?",
+        help="public_id, or a full sk-cld- key (the secret is not printed or stored again)",
+    )
+    edit.add_argument("--tenant", help="update every active key on this tenant slug, for example merck")
+    edit.add_argument("--preset", help="replace scopes with this preset from packages/schema/scopes.json")
+    edit.add_argument("--capabilities", help="comma separated replacement list")
+    edit.add_argument("--add", help="comma separated scopes to add, for example voice")
+    edit.add_argument("--remove", help="comma separated scopes to remove")
     return parser
 
 
@@ -288,6 +663,8 @@ async def _run(args: argparse.Namespace) -> int:
             return await _revoke_key(db, args.public_id)
         if args.command == "list-keys":
             return await _list_keys(db)
+        if args.command == "set-capabilities":
+            return await _set_capabilities(db, args)
     except DatabaseUnavailable as exc:
         print(f"Neon is unreachable: {exc}", file=sys.stderr)
         return 3

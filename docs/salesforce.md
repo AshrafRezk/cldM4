@@ -171,7 +171,7 @@ Reference: https://salesforce.stackexchange.com/questions/27668
 
 ## Preset
 
-Use dashboard preset **Salesforce engineer**: default Gemma E4B QAT only, `max_tokens=512`, `force_no_stream=true`, `max_response_bytes=1MB`, tools ocr/maps/charts/stats/data/docs/text/time/image_ops, no FLUX, no Google, `log_prompts=false`, `GEMMA_THINKING=false`. Arabic and English.
+Use dashboard preset **Salesforce engineer**: default Gemma E4B QAT only, `max_tokens=512`, `force_no_stream=true`, `max_response_bytes=1MB`, tools ocr/maps/charts/stats/data/docs/text/time/image_ops, and `voice`. No FLUX, no Google, `log_prompts=false`, `GEMMA_THINKING=false`. Arabic and English. Phone routes 403 until `voice` is on the key. From the Mini, `python -m app.dbtool set-capabilities <public_id> --add voice` adds it without changing the secret. **Voice intake** is chat + voice only.
 
 ## Data leaving the org
 
