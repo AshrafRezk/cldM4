@@ -59,6 +59,7 @@ from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_l
 from .tool_routes import register_tool_routes
 from .voice.audio import VoiceAudio
 from .voice.engine import VoiceEngine
+from .voice.line import CallLine
 from .voice.routes import register_voice_routes
 from .voice.web import register_web_routes
 from .voice.store import VoiceStore
@@ -130,6 +131,9 @@ voice = VoiceEngine(
     ttl_days=settings.voice_session_ttl_days,
 )
 voice_audio = VoiceAudio(settings)
+voice_line = CallLine(
+    capacity=max(1, settings.voice_max_active_calls), idle_seconds=settings.voice_call_idle_seconds
+)
 
 
 class HealthLimiter:
@@ -742,7 +746,9 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
 register_voice_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
-register_web_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
+register_web_routes(
+    app, engine=voice, audio=voice_audio, line=voice_line, settings=settings, require_key=require_key
+)
 
 
 @app.post("/v1/jobs")

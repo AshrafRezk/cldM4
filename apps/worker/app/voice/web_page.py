@@ -59,12 +59,48 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   const callBtns = [...document.querySelectorAll(".call")];
   const TEXT = {
     ar: { listening: "بسمعك…", speaking: "بيتكلم…", thinking: "لحظة واحدة…", connecting: "بنوصّلك…",
-          ended: "المكالمة خلصت. شكراً ليك.", hung: "إنت قفلت المكالمة.", failed: "المكالمة ما اشتغلتش: ", hang: "إنهاء المكالمة" },
+          ended: "المكالمة خلصت. شكراً ليك.", hung: "إنت قفلت المكالمة.", failed: "المكالمة ما اشتغلتش: ", hang: "إنهاء المكالمة",
+          queued: (n) => "كل الخطوط مشغولة. إنت رقم " + n + " في الدور، خليك معانا." },
     en: { listening: "Listening…", speaking: "Speaking…", thinking: "One moment…", connecting: "Connecting…",
-          ended: "Call ended. Thank you.", hung: "You hung up.", failed: "Call failed: ", hang: "Hang up" },
+          ended: "Call ended. Thank you.", hung: "You hung up.", failed: "Call failed: ", hang: "Hang up",
+          queued: (n) => "All lines are busy. You are number " + n + " in line; please stay with us." },
   };
   let t$ = TEXT.en;
   let ctx = null, stream = null, source = null, live = false;
+  let callId = null, ticket = null;
+
+  // Tell the Mini this caller is gone, even while the page is closing.
+  function release() {
+    const path = ticket ? "/leave?ticket=" + encodeURIComponent(ticket)
+      : callId ? "/hangup?call_id=" + encodeURIComponent(callId) : null;
+    ticket = null; callId = null;
+    if (path) navigator.sendBeacon(base + path, new Blob([]));
+  }
+  window.addEventListener("pagehide", release);
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Queued: show the position, play the hold message now and every 45 s,
+  // and ask every few seconds whether it is our turn.
+  async function waitInLine(q) {
+    ticket = q.ticket;
+    const holdClip = q.clips[0];
+    let lastHold = -Infinity;
+    if (holdClip) say("agent", holdClip.text);
+    while (live) {
+      status(t$.queued(q.position));
+      if (holdClip && holdClip.audio && performance.now() - lastHold > 45000) {
+        lastHold = performance.now();
+        play(holdClip.audio).catch(() => {});
+      }
+      await sleep((q.poll_seconds || 3) * 1000);
+      if (!live) break;
+      const next = await post("/wait?ticket=" + encodeURIComponent(ticket));
+      if (!next.queued) { ticket = null; return next; }
+      q = { ...next, clips: q.clips };
+    }
+    return null;
+  }
 
   const say = (who, text) => {
     const div = document.createElement("div");
@@ -156,6 +192,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   }
 
   async function handle(t) {
+    callId = t.call_id;
     while (live) {
       if (t.heard) say("you", t.heard);
       for (const clip of t.clips) {
@@ -169,10 +206,12 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt });
       t = await post("/turn?" + q, audio);
     }
+    if (live) callId = null;  // the Mini already freed the line when the call finished
     end(live ? t$.ended : t$.hung);
   }
 
   function end(message) {
+    release();
     live = false;
     if (stream) stream.getTracks().forEach((tr) => tr.stop());
     callBtns.forEach((b) => { b.style.display = ""; b.disabled = false; }); hangBtn.style.display = "none";
@@ -190,7 +229,9 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       source = ctx.createMediaStreamSource(stream);
       live = true; logEl.textContent = "";
       callBtns.forEach((b) => { b.style.display = "none"; }); hangBtn.style.display = "";
-      await handle(await post("/start?lang=" + encodeURIComponent(lang)));
+      let first = await post("/start?lang=" + encodeURIComponent(lang));
+      if (first.queued) first = await waitInLine(first);
+      if (first) await handle(first);
     } catch (err) {
       end(t$.failed + err.message);
     }

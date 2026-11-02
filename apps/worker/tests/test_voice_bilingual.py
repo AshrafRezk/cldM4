@@ -60,8 +60,8 @@ def test_bad_language_lists(bad):
 
 def test_lines_cover_every_step_and_fail_message_per_language():
     lines = script_lines(validate_script(bilingual()))
-    assert len(lines) == 2 * (4 + 1)
-    assert {l["key"] for l in lines} >= {"greeting", "__fail__"}
+    assert len(lines) == 2 * (4 + 2)
+    assert {l["key"] for l in lines} >= {"greeting", "__fail__", "__hold__"}
     assert all(l["speaker"] == "Hadeer" for l in lines)
 
 
@@ -89,6 +89,8 @@ async def test_english_button_hears_english_and_listens_in_english(make_client, 
         turn = (await anon.post(f"{path}/turn", params=q, content=b"RIFF")).json()
         assert turn["clips"][0]["text"] == "Briefly, what is the problem?"
         assert fake_speech["languages"] == ["en-US"]
+        hung = await anon.post(f"{path}/hangup", params={"call_id": turn["call_id"]})
+        assert hung.json() == {"ended": True}
 
         arabic = (await anon.post(f"{path}/start", params={"lang": "ar-EG"})).json()
         assert arabic["clips"][1]["text"] == "ممكن تقولي اسمك بالكامل؟"
@@ -129,7 +131,7 @@ async def test_rendered_clip_beats_fallback(make_client, install_key, fake_speec
     async with make_client(headers) as client:
         path = await link_for(client, script)
         status = (await client.get(f"/v1/voice/scripts/{script['id']}/audio")).json()
-    assert status["total"] == 10 and status["ready"] >= 1
+    assert status["total"] == 12 and status["ready"] >= 1
     assert status["engine"] == "voicetut"
     async with make_client() as anon:
         turn = (await anon.post(f"{path}/start", params={"lang": "en-US"})).json()
@@ -214,7 +216,7 @@ async def test_azure_render_writes_mp3_clips_and_calls_play_them(
     script = bilingual(id="ci-" + uuid.uuid4().hex[:8])
     clean = validate_script(script)
     await audio._render(audio.lines(clean))
-    assert len(sent) == 10
+    assert len(sent) == 12
     assert ("ar-EG-SalmaNeural", "أهلاً بيك في خدمة العملاء.") in sent
 
     _r, headers = install_key(capabilities=["voice"])

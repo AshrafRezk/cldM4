@@ -29,6 +29,11 @@ RESERVED_KEYS = {"transcript", "from", "to", "call_sid"}
 MAX_STEPS = 50
 INBOUND_STEP = "__inbound__"
 
+HOLD_MESSAGES = {
+    "ar": "شكراً لانتظارك. كل الخطوط مشغولة دلوقتي، وهنرد عليك أول ما الدور ييجي عليك.",
+    "en": "Thanks for holding. All our lines are busy right now; we will be with you as soon as it is your turn.",
+}
+
 FAIL_MESSAGES = {
     "ar": "عذراً، لم نتمكن من سماعك. سنعاود الاتصال بك لاحقاً.",
     "en": "Sorry, we could not hear you. We will call you back later.",
@@ -159,6 +164,7 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
         "fail_say": _localized(fail_say, languages, "fail_say") if fail_say else None,
+        "hold_say": _localized(body["hold_say"], languages, "hold_say") if body.get("hold_say") else None,
         "steps": steps,
         "commit": {"records": clean_records},
     }
@@ -428,6 +434,12 @@ def _reply(
         "local_voice": (script.get("voices") or {}).get(language) or script.get("local_voice"),
         "verbs": verbs,
     }
+
+
+def hold_text(script: Mapping[str, Any], language: str) -> str:
+    if script.get("hold_say"):
+        return text_for(script["hold_say"], language)
+    return HOLD_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
 
 
 def languages_of(script: Mapping[str, Any]) -> list[str]:

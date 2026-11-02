@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import speech
-from .engine import FAIL_MESSAGES, languages_of, text_for
+from .engine import FAIL_MESSAGES, hold_text, languages_of, text_for
 
 log = logging.getLogger("cloudiator.voice.audio")
 
@@ -62,6 +62,8 @@ def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, 
             else FAIL_MESSAGES["ar" if _lang(language) == "ar" else "en"]
         )
         lines.append({"key": "__fail__", "language": language, "speaker": speaker, "text": fail})
+        lines.append({"key": "__hold__", "language": language, "speaker": speaker,
+                      "text": hold_text(script, language)})
     return lines
 
 

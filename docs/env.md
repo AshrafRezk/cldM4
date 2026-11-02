@@ -138,6 +138,8 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `WHISPER_MODEL` | `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin` | ggml weights; missing → each answer is `503 speech_unavailable` |
 | `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
+| `VOICE_MAX_ACTIVE_CALLS` | `1` | browser calls at once; more callers wait in a FIFO line with a hold message |
+| `VOICE_CALL_IDLE_SECONDS` | `90` | an active call whose page goes silent this long frees the line |
 | `VOICE_WEB_MAX_AUDIO_BYTES` | `6000000` | cap on one recorded answer (the page sends 16-bit WAV at the mic's own rate, ~96 KB/s at 48 kHz, ≈ 60 s) |
 | `VOICE_TTS_ENGINE` | `auto` | `auto`: Azure if its key is set, else VoiceTut if installed, else macOS `say` only. Or force `azure`, `voicetut`, `say` |
 | `AZURE_SPEECH_KEY` | unset | secret. Azure Speech resource key; only fixed script text is sent, at publish time |
