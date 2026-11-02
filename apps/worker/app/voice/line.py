@@ -26,6 +26,7 @@ class Ticket:
     language: str | None
     joined: float
     seen: float
+    persona: str | None = None
 
 
 @dataclass

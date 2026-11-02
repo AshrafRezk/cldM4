@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS voice_sessions (
     attempt INTEGER NOT NULL DEFAULT 1,
     language TEXT,
     turn INTEGER NOT NULL DEFAULT 0,
+    persona TEXT,
     answers TEXT NOT NULL DEFAULT '{}',
     turns TEXT NOT NULL DEFAULT '[]',
     recording_url TEXT,
@@ -208,14 +209,15 @@ class VoiceStore:
         script_version: int,
         first_step: str,
         language: str | None = None,
+        persona: str | None = None,
     ) -> dict[str, Any]:
         now = time.time()
         session_id = str(uuid.uuid4())
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO voice_sessions (id, tenant_id, call_sid, from_number, to_number, "
-                "script_id, script_version, definition, status, current_step, attempt, language, "
-                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, 1, ?, ?, ?)",
+                "script_id, script_version, definition, status, current_step, attempt, language, persona, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, 1, ?, ?, ?, ?)",
                 (
                     session_id,
                     tenant_id,
@@ -227,6 +229,7 @@ class VoiceStore:
                     json.dumps(script, ensure_ascii=False),
                     first_step,
                     language,
+                    persona,
                     now,
                     now,
                 ),
@@ -361,6 +364,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE voice_sessions ADD COLUMN language TEXT")
     if "turn" not in columns:
         conn.execute("ALTER TABLE voice_sessions ADD COLUMN turn INTEGER NOT NULL DEFAULT 0")
+    if "persona" not in columns:
+        conn.execute("ALTER TABLE voice_sessions ADD COLUMN persona TEXT")
 
 
 def _hash(token: str) -> str:

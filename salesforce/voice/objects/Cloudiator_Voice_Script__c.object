@@ -140,4 +140,26 @@
         <length>4000</length>
         <visibleLines>4</visibleLines>
     </fields>
+    <fields>
+        <fullName>Personas__c</fullName>
+        <label>Personas</label>
+        <description>Agents the caller can choose, one per line: English name | Arabic name | voice (optional 4th: English voice). Example: Mariam | مريم | Mariam. Lines can say {{agent}}.</description>
+        <type>LongTextArea</type>
+        <length>2000</length>
+        <visibleLines>4</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Beep__c</fullName>
+        <label>Beep Before Answer</label>
+        <description>Play a short tone after each question so the caller knows when to speak.</description>
+        <type>Checkbox</type>
+        <defaultValue>true</defaultValue>
+    </fields>
+    <fields>
+        <fullName>Hold_Music__c</fullName>
+        <label>Hold Music</label>
+        <description>Soft music for callers waiting in line, under the repeating "I'm just finishing a call" message.</description>
+        <type>Checkbox</type>
+        <defaultValue>true</defaultValue>
+    </fields>
 </CustomObject>

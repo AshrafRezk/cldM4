@@ -27,13 +27,29 @@ SOBJECT = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
 LANGUAGE = re.compile(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$")
 VOICE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9 ()._-]{0,40}$")
 E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
-RESERVED_KEYS = {"transcript", "from", "to", "call_sid"}
+RESERVED_KEYS = {"transcript", "from", "to", "call_sid", "agent"}
 MAX_STEPS = 50
 INBOUND_STEP = "__inbound__"
 
+# Said to a caller waiting in line, repeated over the hold music. The opening
+# adapts to the script: the persona's name ({{agent}}) and the company variable.
+HOLD_OPENINGS = {
+    "ar": {
+        (True, True): "أهلاً بيك، معاك {{agent}} من {company}.",
+        (True, False): "أهلاً بيك، معاك {{agent}}.",
+        (False, True): "أهلاً بيك في {company}.",
+        (False, False): "أهلاً بيك.",
+    },
+    "en": {
+        (True, True): "Hi, this is {{agent}} from {company}.",
+        (True, False): "Hi, this is {{agent}}.",
+        (False, True): "Thanks for calling {company}.",
+        (False, False): "Thanks for calling.",
+    },
+}
 HOLD_MESSAGES = {
-    "ar": "شكراً لانتظارك. كل الخطوط مشغولة دلوقتي، وهنرد عليك أول ما الدور ييجي عليك.",
-    "en": "Thanks for holding. All our lines are busy right now; we will be with you as soon as it is your turn.",
+    "ar": "أنا بخلّص مكالمة دلوقتي وهبدأ معاك على طول. متقفلش من فضلك، وشكراً على صبرك!",
+    "en": "I'm just finishing a call and will be with you right away. Please don't hang up, and thank you for your patience!",
 }
 
 FAIL_MESSAGES = {
@@ -75,6 +91,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         raise ScriptInvalid("languages must list 1-4 language tags like ar-EG, en-US.", "languages")
 
     variables = _variables(body.get("variables"), languages)
+    personas = _personas(body.get("personas"), languages)
+    passthrough = {"agent"} if personas else set()
 
     raw_steps = body.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
@@ -96,7 +114,7 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         if key in keys:
             raise ScriptInvalid(f"Duplicate step key {key!r}.", f"{where}.key")
         keys.add(key)
-        say = _fill(_localized(raw.get("say"), languages, f"{where}.say"), variables, f"{where}.say")
+        say = _fill(_localized(raw.get("say"), languages, f"{where}.say"), variables, f"{where}.say", passthrough)
         nxt = raw.get("next")
         if nxt is not None and not isinstance(nxt, str):
             raise ScriptInvalid(f"{where}.next must be a step key or null.", f"{where}.next")
@@ -183,9 +201,15 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
         "variables": variables,
-        "fail_say": _fill(_localized(fail_say, languages, "fail_say"), variables, "fail_say") if fail_say else None,
+        # Agents a caller can choose ("Hello, this is {{agent}} from {{company}}").
+        "personas": personas,
+        # A short tone after each question tells the caller when to speak.
+        "beep": bool(body.get("beep", True)),
+        # Soft generated music under the repeating hold message while waiting in line.
+        "hold_music": bool(body.get("hold_music", True)),
+        "fail_say": _fill(_localized(fail_say, languages, "fail_say"), variables, "fail_say", passthrough) if fail_say else None,
         "hold_say": (
-            _fill(_localized(body["hold_say"], languages, "hold_say"), variables, "hold_say")
+            _fill(_localized(body["hold_say"], languages, "hold_say"), variables, "hold_say", passthrough)
             if body.get("hold_say") else None
         ),
         "steps": steps,
@@ -236,16 +260,69 @@ def _fill_text(text: str, variables: Mapping[str, Mapping[str, str]], language: 
     return VARIABLE.sub(replace, text)
 
 
-def _fill(texts: dict[str, str], variables: Mapping[str, Mapping[str, str]], param: str) -> dict[str, str]:
+def _fill(
+    texts: dict[str, str],
+    variables: Mapping[str, Mapping[str, str]],
+    param: str,
+    passthrough: set[str] = frozenset(),
+) -> dict[str, str]:
     """Spoken lines may only use declared variables; a typo is a publish error,
-    not a caller hearing "{{compnay}}"."""
+    not a caller hearing "{{compnay}}". `{{agent}}` stays until a caller picks
+    a persona."""
     out = {}
     for language, text in texts.items():
         for name in VARIABLE.findall(text):
-            if name not in variables:
+            if name not in variables and name not in passthrough:
                 raise ScriptInvalid(f"{param} uses {{{{{name}}}}}, which is not in variables.", param)
         out[language] = _fill_text(text, variables, language)
     return out
+
+
+def _personas(raw: Any, languages: list[str]) -> list[dict[str, Any]]:
+    """[{"id": "mariam", "name": {"ar-EG": "مريم", "en-US": "Mariam"}, "voice": "Mariam"}]
+
+    `voice` is a speaker name, or one per language. The caller picks a persona
+    on the call page; `{{agent}}` becomes their name in every line."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > 6:
+        raise ScriptInvalid("personas must be a list of up to 6.", "personas")
+    out, ids = [], set()
+    for index, persona in enumerate(raw):
+        where = f"personas[{index}]"
+        if not isinstance(persona, Mapping):
+            raise ScriptInvalid(f"{where} must be an object.", where)
+        pid = persona.get("id")
+        if not isinstance(pid, str) or not STEP_KEY.match(pid) or pid in ids:
+            raise ScriptInvalid(f"{where}.id must be a unique identifier.", f"{where}.id")
+        ids.add(pid)
+        voice = persona.get("voice")
+        voices = {lang: voice for lang in languages} if isinstance(voice, str) else voice
+        if not isinstance(voices, Mapping) or not all(
+            lang in languages and isinstance(v, str) and VOICE_NAME.match(v) for lang, v in voices.items()
+        ):
+            raise ScriptInvalid(f"{where}.voice must be a voice name, or one per language.", f"{where}.voice")
+        out.append({"id": pid, "name": _localized(persona.get("name"), languages, f"{where}.name"),
+                    "voices": dict(voices)})
+    return out
+
+
+def find_persona(script: Mapping[str, Any], persona_id: str | None) -> dict[str, Any] | None:
+    personas = script.get("personas") or []
+    if not personas:
+        return None
+    if persona_id is None:
+        return personas[0]
+    return next((p for p in personas if p["id"] == persona_id), None)
+
+
+def speak(value: Any, language: str, persona: Mapping[str, Any] | None) -> str:
+    """A line as one caller hears it: their language, their agent's name."""
+    text = text_for(value, language)
+    if persona is None:
+        return text
+    name = persona["name"].get(language) or next(iter(persona["name"].values()))
+    return VARIABLE.sub(lambda m: name if m.group(1) == "agent" else m.group(0), text)
 
 
 def crm_language(languages: list[str]) -> str:
@@ -388,6 +465,7 @@ class VoiceEngine:
         call_sid: str,
         from_label: str,
         language: str | None = None,
+        persona: str | None = None,
     ) -> Reply | None:
         """Browser call: the call link already names tenant and script."""
         cached = self.store.reply_for(call_sid, INBOUND_STEP, 0)
@@ -401,11 +479,17 @@ class VoiceEngine:
         language = language or script["language"]
         if language not in languages_of(script):
             raise ScriptInvalid(f"This script does not speak {language}.", "lang")
+        chosen = find_persona(script, persona)
+        if persona is not None and chosen is None:
+            raise ScriptInvalid(f"This script has no persona {persona!r}.", "persona")
         return self._start(
-            tenant_id, version, script, call_sid, from_label, f"web:{script_id}", language
+            tenant_id, version, script, call_sid, from_label, f"web:{script_id}", language,
+            chosen["id"] if chosen else None,
         )
 
-    def _start(self, tenant_id, version, script, call_sid, from_number, to_number, language) -> Reply:
+    def _start(
+        self, tenant_id, version, script, call_sid, from_number, to_number, language, persona=None
+    ) -> Reply:
         session = self.store.create_session(
             tenant_id=tenant_id,
             call_sid=call_sid,
@@ -415,6 +499,7 @@ class VoiceEngine:
             script_version=version,
             first_step=script["steps"][0]["key"],
             language=language,
+            persona=persona,
         )
         log.info("voice session %s started on script %s (%s)", session["id"], script["id"], language)
         reply = self._advance(session, script["steps"][0]["key"])
@@ -462,6 +547,7 @@ class VoiceEngine:
                 script,
                 [self._gather_verb({**session, "attempt": attempt + 1, "turn": next_turn}, current)],
                 session_language(session),
+                session_persona(session),
             )
         elif current["on_fail"] == "continue":
             answers[step] = ""
@@ -470,7 +556,7 @@ class VoiceEngine:
         else:
             language = session_language(session)
             message = (
-                text_for(script["fail_say"], language)
+                speak(script["fail_say"], language, session_persona(session))
                 if script.get("fail_say")
                 else FAIL_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
             )
@@ -479,7 +565,8 @@ class VoiceEngine:
                 session["id"], status="abandoned", current_step=None, turns=turns
             )
             log.info("voice session %s abandoned at %s", session["id"], step)
-            reply = _reply(script, [{"say": message, "key": "__fail__"}, {"hangup": True}], language)
+            reply = _reply(script, [{"say": message, "key": "__fail__"}, {"hangup": True}], language,
+                           session_persona(session))
 
         self.store.save_reply(call_sid, cache_step, attempt, reply)
         return reply
@@ -515,6 +602,7 @@ class VoiceEngine:
         """Speak non-gather steps from `key` until a gather or the end."""
         script = session["definition"]
         language = session_language(session)
+        persona = session_persona(session)
         turns = list(session["turns"])
         verbs: list[dict[str, Any]] = []
         while key is not None:
@@ -525,8 +613,8 @@ class VoiceEngine:
                 verbs.append(
                     self._gather_verb({**session, "turns": turns, "attempt": 1, "turn": next_turn}, step)
                 )
-                return _reply(script, verbs, language)
-            text = text_for(step["say"], language)
+                return _reply(script, verbs, language, persona)
+            text = speak(step["say"], language, persona)
             turns.append({"role": "agent", "text": text})
             verbs.append({"say": text, "key": step["key"]})
             key = step["next"]
@@ -536,6 +624,7 @@ class VoiceEngine:
             answers=session["answers"],
             transcript=transcript_text(turns),
             call={
+                "agent": speak("{{agent}}", crm_language(languages_of(script)), persona) if persona else "",
                 "from": session.get("from_number") or "",
                 "to": session.get("to_number") or "",
                 "call_sid": session["call_sid"],
@@ -550,11 +639,12 @@ class VoiceEngine:
         )
         log.info("voice session %s ready to commit", session["id"])
         verbs.append({"hangup": True})
-        return _reply(script, verbs, language)
+        return _reply(script, verbs, language, persona)
 
     def _gather_verb(self, session: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
         """The gather prompt is a turn too; it is recorded with any says before it."""
-        prompt = text_for(step["say"], session_language(session))
+        script = session["definition"]
+        prompt = speak(step["say"], session_language(session), session_persona(session))
         turns = list(session["turns"]) + [{"role": "agent", "text": prompt}]
         self.store.update_session(session["id"], turns=turns)
         return {
@@ -562,6 +652,7 @@ class VoiceEngine:
                 "step": step["key"],
                 "attempt": session["attempt"],
                 "turn": session.get("turn"),
+                "beep": bool(script.get("beep", True)),
                 "prompt": prompt,
                 "timeout": step["timeout"],
                 "speech_timeout": step["speech_timeout"],
@@ -573,23 +664,39 @@ Reply = dict[str, Any]
 
 
 def _reply(
-    script: Mapping[str, Any] | None, verbs: list[dict[str, Any]], language: str | None = None
+    script: Mapping[str, Any] | None,
+    verbs: list[dict[str, Any]],
+    language: str | None = None,
+    persona: Mapping[str, Any] | None = None,
 ) -> Reply:
     script = script or {}
     language = language or script.get("language")
+    voices = (persona or {}).get("voices") or script.get("voices") or {}
     return {
         "script_id": script.get("id"),
         "language": language,
+        "persona": (persona or {}).get("id"),
         "voice": script.get("voice"),
-        "local_voice": (script.get("voices") or {}).get(language) or script.get("local_voice"),
+        "local_voice": voices.get(language) or script.get("local_voice"),
         "verbs": verbs,
     }
 
 
+def session_persona(session: Mapping[str, Any]) -> dict[str, Any] | None:
+    script = session.get("definition") or {}
+    if not script.get("personas"):
+        return None
+    return find_persona(script, session.get("persona"))
+
+
 def hold_text(script: Mapping[str, Any], language: str) -> str:
+    """May contain {{agent}}; `speak` fills it with the caller's persona."""
     if script.get("hold_say"):
         return text_for(script["hold_say"], language)
-    return HOLD_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
+    lang = "ar" if language.lower().startswith("ar") else "en"
+    company = ((script.get("variables") or {}).get("company") or {}).get(language)
+    opening = HOLD_OPENINGS[lang][(bool(script.get("personas")), bool(company))]
+    return opening.replace("{company}", company or "") + " " + HOLD_MESSAGES[lang]
 
 
 def languages_of(script: Mapping[str, Any]) -> list[str]:

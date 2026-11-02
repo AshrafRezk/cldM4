@@ -54,9 +54,9 @@ def register_studio_routes(app: FastAPI, *, engine, audio, require_key) -> None:
             raise CloudiatorError(404, "script_not_found", "The script for this studio link is gone.")
         return tenant_id, script[1]
 
-    def line_for(script: dict[str, Any], step: str, language: str) -> dict[str, str]:
+    def line_for(script: dict[str, Any], step: str, language: str, persona: str | None) -> dict[str, str]:
         for line in audio.lines(script):
-            if line["key"] == step and line["language"] == language:
+            if line["key"] == step and line["language"] == language and line.get("persona") == persona:
                 return line
         raise CloudiatorError(404, "line_not_found", "That script has no such line.")
 
@@ -72,33 +72,39 @@ def register_studio_routes(app: FastAPI, *, engine, audio, require_key) -> None:
     @app.get("/v1/voice/studio/{token}/lines")
     async def studio_lines(token: str, request: Request) -> JSONResponse:
         tenant_id, script = studio(request, token)
-        status = {(row["key"], row["language"]): row["source"] for row in audio.status(tenant_id, script)}
+        status = {
+            (row["key"], row["language"], row.get("persona")): row["source"]
+            for row in audio.status(tenant_id, script)
+        }
         lines = [
             {**line, "label": LINE_LABELS.get(line["key"], line["key"]),
-             "source": status.get((line["key"], line["language"]), "fallback")}
+             "source": status.get((line["key"], line["language"], line.get("persona")), "fallback")}
             for line in audio.lines(script)
         ]
+        personas = [{"id": p["id"], "name": p["name"]} for p in script.get("personas") or []]
         return JSONResponse(content={"script_id": script["id"], "languages": languages_of(script),
-                                     "engine": audio.engine, "lines": lines})
+                                     "personas": personas, "engine": audio.engine, "lines": lines})
 
     @app.get("/v1/voice/studio/{token}/audio/{step}/{language}")
     async def studio_audio(token: str, step: str, language: str, request: Request) -> JSONResponse:
         tenant_id, script = studio(request, token)
-        line = line_for(script, step, language)
+        persona = request.query_params.get("persona") or None
+        line = line_for(script, step, language, persona)
         data_url, source = await audio.clip(
-            tenant_id=tenant_id, script=script, key=step, language=language, text=line["text"]
+            tenant_id=tenant_id, script=script, key=step, language=language, text=line["text"], persona=persona
         )
         return JSONResponse(content={"audio": data_url, "source": source})
 
     @app.put("/v1/voice/studio/{token}/recordings/{step}/{language}")
     async def studio_save(token: str, step: str, language: str, request: Request) -> JSONResponse:
         tenant_id, script = studio(request, token)
-        line_for(script, step, language)
+        persona = request.query_params.get("persona") or None
+        line_for(script, step, language, persona)
         body = await request.body()
         if not body or len(body) > 5_000_000:
             raise CloudiatorError(400, "invalid_request_error", "Send 1 byte to 5 MB of audio.")
         try:
-            await audio.save_recording(tenant_id, script["id"], step, language, body)
+            await audio.save_recording(tenant_id, script["id"], step, language, body, persona)
         except Exception as exc:  # noqa: BLE001
             raise CloudiatorError(400, "invalid_audio", "That audio could not be read.") from exc
         request.state.usage.tool = "voice_recording"
@@ -107,8 +113,9 @@ def register_studio_routes(app: FastAPI, *, engine, audio, require_key) -> None:
     @app.delete("/v1/voice/studio/{token}/recordings/{step}/{language}")
     async def studio_delete(token: str, step: str, language: str, request: Request) -> JSONResponse:
         tenant_id, script = studio(request, token)
-        line_for(script, step, language)
-        return JSONResponse(content={"deleted": audio.delete_recording(tenant_id, script["id"], step, language)})
+        persona = request.query_params.get("persona") or None
+        line_for(script, step, language, persona)
+        return JSONResponse(content={"deleted": audio.delete_recording(tenant_id, script["id"], step, language, persona)})
 
 
 def render_studio(title: str) -> str:
@@ -184,7 +191,8 @@ button:disabled{opacity:.45;cursor:default}
     const play = btn("▶ Play current"), rec = btn("● Record", "rec"), listen = btn("▶ Listen"), save = btn("Save", "primary"), drop = btn("Discard"), del = btn("Use generated voice");
     const msg = document.createElement("span"); msg.className = "msg"; row.append(msg);
     let take = null, chunks = [];
-    const path = "/" + encodeURIComponent(line.key) + "/" + encodeURIComponent(line.language);
+    const path = "/" + encodeURIComponent(line.key) + "/" + encodeURIComponent(line.language)
+      + (line.persona ? "?persona=" + encodeURIComponent(line.persona) : "");
     const sync = () => {
       listen.disabled = save.disabled = drop.disabled = !take;
       del.style.display = line.source === "recording" ? "" : "none";
@@ -230,11 +238,15 @@ button:disabled{opacity:.45;cursor:default}
 
   json("/lines").then((data) => {
     root.textContent = "";
-    for (const lang of data.languages) {
-      const h = document.createElement("h2");
-      h.textContent = lang.startsWith("ar") ? "العربي (" + lang + ")" : "English (" + lang + ")";
-      root.append(h);
-      data.lines.filter((l) => l.language === lang).forEach((l) => root.append(card(l)));
+    const people = data.personas.length ? data.personas : [{ id: null, name: {} }];
+    for (const p of people) {
+      for (const lang of data.languages) {
+        const h = document.createElement("h2");
+        const who = p.id ? (p.name[lang] || p.id) + " — " : "";
+        h.textContent = who + (lang.startsWith("ar") ? "العربي (" + lang + ")" : "English (" + lang + ")");
+        root.append(h);
+        data.lines.filter((l) => l.language === lang && (l.persona || null) === p.id).forEach((l) => root.append(card(l)));
+      }
     }
   }).catch((e) => { root.textContent = e.message; });
 })();

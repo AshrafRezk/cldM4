@@ -48,4 +48,7 @@
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Announcement__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Next_Key__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Routes__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Personas__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Beep__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Hold_Music__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
 </PermissionSet>
