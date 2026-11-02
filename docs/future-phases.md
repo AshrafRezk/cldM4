@@ -2,7 +2,7 @@
 
 Not a commitment to build order. These are the next “make Cloudiator amazing” bets that respect the appliance rules: **one Metal generative slot**, no Docker inference, no Netlify models, no 70B/120B.
 
-v1 finish line (ops + Phase F) lives in [next-steps.md](next-steps.md). Phase G (SIM phone agent) is separate. This file is **what comes after** those are green.
+v1 finish line (ops + Phase F) lives in [next-steps.md](next-steps.md). The first shippable phone product is the Twilio + Salesforce script slice in [claude-code-handoff.md](claude-code-handoff.md) (Claude Code, ≤120 minutes). This file is **what comes after** that API is green.
 
 ---
 
@@ -16,21 +16,23 @@ v1 finish line (ops + Phase F) lives in [next-steps.md](next-steps.md). Phase G 
 | Charts, stats, DuckDB | D2 |
 | Image ops, docs, SF Ids | D3 |
 | Image **generation** (FLUX 4-bit jobs) | E |
-| Salesforce Apex pack + stream downgrade + 1 MB cap | F |
-| SIM phone agent (Whisper + TTS + Android bridge) | G |
+| Salesforce stream downgrade + 1 MB cap (worker) | F |
 
 ---
 
 ## Near-term product (highest leverage)
 
+### Voice API + CRM commit (do this first)
+Implement [claude-code-handoff.md](claude-code-handoff.md): Twilio `<Say>`/`<Gather>`, Salesforce-authored scripts, Mini renders commit documents, Apex inserts + ack. No Gemma/Whisper on the live call path. Supersedes the old SIM/Android “Phase G” sketch for v1 phone.
+
 ### H — Live voice ops console
-Dashboard UI for lines, scripts (en / ar-EG / fr), call transcripts, recordings, hangup. Same scopes as Phase G; no new models.
+Dashboard UI for lines, scripts (en / ar-EG / fr), call transcripts, recordings, hangup. Consumes the voice API above; no new models.
 
 ### I — Outbound call campaigns
-Job queue of E.164 numbers + one script. Mini places calls **one after another** on the SIM line (fits single Metal slot). Salesforce or CSV upload to start a campaign.
+Job queue of E.164 numbers + one script. Mini (or Twilio REST) places calls **one after another**. Salesforce or CSV upload to start a campaign. Stub only in the first voice slice.
 
-### J — CRM write-back from calls
-After a call: create/update Salesforce Case / Lead from transcript (Named Credential already in F). Optional summary via hot Gemma (no exclusive swap).
+### J — CRM write-back hardening
+Apex commit path ships with the voice handoff. Optional later: Mini-side Salesforce JWT behind the same commit payload; optional summary via hot Gemma (no exclusive swap).
 
 ### K — Messaging agents (no Metal fight)
 WhatsApp Business / Telegram text bots using the **same script API** as voice. STT/TTS unused; chat + tools only. Great for Egyptian Arabic support without a phone bridge.
@@ -87,4 +89,4 @@ Inbound email or webhook → OCR → Gemma extract → fill CRM fields / return 
 3. Does a company pay for it next to Salesforce chat + phone support?  
 4. Can it ship without a second Mini?
 
-Default suggestion after F + G are live on the desk: **H (voice console) → J (CRM write-back) → K (WhatsApp/Telegram)** before any new weight download.
+Default suggestion after the voice handoff API is live: **H (voice console) → outbound campaigns → K (WhatsApp/Telegram)** before any new weight download.

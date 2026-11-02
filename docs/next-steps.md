@@ -35,9 +35,9 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 - [x] **5. Phase F worker code** — `force_no_stream` accepts `stream: true` with `x-cloudiator-stream-downgraded: true`; `max_response_bytes` returns artifact + truncated preview. Tests: `test_sf_stream_downgrade.py`, `test_response_size_cap.py`. **Still open on a Salesforce org:** External Services import + real Apex callout ([salesforce.md](salesforce.md)).
 - [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert. *(Mini operator.)*
 
-After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**.
+**Next product slice (does not block the v1 finish line):** scripted Twilio phone answering + Salesforce-configurable scripts + CRM commit records. Full business brief, API contract, Apex shape, and 120-minute Claude Code instructions: **[claude-code-handoff.md](claude-code-handoff.md)**. Later ideas (voice ops console UI, WhatsApp, RAG, rembg, …) remain in **[future-phases.md](future-phases.md)**.
 
-Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal, a Cloudflare Worker, `apps/gateway/`. Phase G (SIM phone) is a separate product phase, not a v1 finish-line checkbox.
+Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal, a Cloudflare Worker, `apps/gateway/`, or the voice handoff. The old “Phase G SIM phone” idea is superseded for the first shippable line by the Twilio slice in `claude-code-handoff.md`.
 
 ---
 

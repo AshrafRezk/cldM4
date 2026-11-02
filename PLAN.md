@@ -3,7 +3,7 @@
 **Product name:** Cloudiator (repo `cldM4`)  
 **Hardware:** Apple Mac Mini M4, 24GB unified memory  
 **Git:** https://github.com/AshrafRezk/cldM4.git  
-**Status:** Plan only. Implement on the Mini, one phase at a time.  
+**Status:** Phases A–E proven on the Mini; Phase F worker code landed. Live API `https://api.cloudiator.org`, dashboard `https://app.cloudiator.org`. Scripted phone + CRM handoff for Claude Code: [docs/claude-code-handoff.md](docs/claude-code-handoff.md). Remaining v1 ops: [docs/next-steps.md](docs/next-steps.md).  
 **Video:** out of v1.
 
 This file is the source of truth. If Cursor on the Mini disagrees with a blog post, **this file wins**.
