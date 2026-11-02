@@ -11,6 +11,12 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 ENV_FILE="${CLOUDIATOR_ENV_FILE:-$HOME/Cloudiator/.env}"
 load_env_file "$ENV_FILE"
+# The worker keeps a 3s connect timeout so a request never waits on Neon. At
+# 03:15 the compute is suspended and its cold start can take longer than that,
+# which made every run since 2026-11-01 fail with TimeoutError. This job can wait.
+export DB_CONNECT_TIMEOUT_SECONDS="${RETENTION_CONNECT_TIMEOUT_SECONDS:-30}"
+RETENTION_ATTEMPTS="${RETENTION_ATTEMPTS:-3}"
+export RETENTION_ATTEMPTS
 
 SQL_PATH="${NEON_RETENTION_SQL:-$ROOT/infra/neon-retention.sql}"
 WORKER="$ROOT/apps/worker"
@@ -28,11 +34,12 @@ fi
 cd "$WORKER"
 exec "$PYTHON" - "$SQL_PATH" <<'PY'
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 from app.config import get_settings
-from app.db import Neon
+from app.db import DatabaseUnavailable, Neon
 
 SQL_PATH = Path(sys.argv[1])
 
@@ -66,5 +73,17 @@ async def main() -> None:
     finally:
         await db.close()
 
-asyncio.run(main())
+async def with_retries() -> None:
+    attempts = max(1, int(os.environ.get("RETENTION_ATTEMPTS", "3")))
+    for attempt in range(1, attempts + 1):
+        try:
+            await main()
+            return
+        except DatabaseUnavailable as exc:
+            if attempt == attempts:
+                raise
+            print(f"retention attempt {attempt} failed ({exc}); retrying", file=sys.stderr, flush=True)
+            await asyncio.sleep(10 * attempt)
+
+asyncio.run(with_retries())
 PY

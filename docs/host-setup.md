@@ -311,11 +311,18 @@ Cloudflare Access on `app.<domain>` and `api.<domain>/v1/admin*`. Record the tea
 
 ## 10. Health ping
 
-Every 2 minutes:
+`scripts/health-ping.sh` runs every 2 minutes from the `ai.cloudiator.health-ping` LaunchAgent. It probes `127.0.0.1:8080/v1/health` and the same route through the tunnel (`PUBLIC_BASE_URL`), and alerts only on a state change: two consecutive failures → one DOWN message, `ok: false` → one degraded message, back to ok → one recovery message.
+
+Set at least one channel in `~/Cloudiator/.env`: `SLACK_WEBHOOK_URL`, or `NTFY_URL=https://ntfy.sh/<long-random-topic>` and subscribe to that topic in the ntfy phone app. Then:
 
 ```bash
-curl -sf http://127.0.0.1:8080/v1/health || curl -sS -X POST "$SLACK_WEBHOOK_URL" -d '{"text":"Cloudiator Mini health failed"}'
+scripts/install-health-launchagent.sh
+launchctl bootout gui/$UID/ai.cloudiator.worker      # stop the worker; expect DOWN within ~4 minutes
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/ai.cloudiator.worker.plist   # expect "recovered"
+tail ~/Cloudiator/logs/health-ping.log
 ```
+
+`HEALTH_PING_DRY_RUN=1 HEALTH_LOCAL_URL=http://127.0.0.1:9/v1/health scripts/health-ping.sh` (twice) exercises the DOWN path without stopping anything.
 
 `/v1/health` is deliberately local-only and does **not** touch Neon (`PLAN.md` §10). If you "improve" it with a `SELECT 1`, a suspended Neon compute will page you at 3am about a perfectly healthy Mini.
 
