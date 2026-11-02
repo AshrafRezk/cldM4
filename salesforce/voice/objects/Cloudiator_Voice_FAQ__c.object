@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cloudiator Voice FAQ</label>
+    <pluralLabel>Cloudiator Voice FAQs</pluralLabel>
+    <description>A pre-written answer the agent gives, in its own voice, when a caller asks something instead of answering. Afterwards the agent asks its question again. Nothing is improvised on a call.</description>
+    <nameField>
+        <label>FAQ Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>FAQ-{0000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableReports>true</enableReports>
+    <enableSearch>false</enableSearch>
+    <fields>
+        <fullName>Script__c</fullName>
+        <label>Script</label>
+        <type>MasterDetail</type>
+        <referenceTo>Cloudiator_Voice_Script__c</referenceTo>
+        <relationshipName>FAQs</relationshipName>
+        <relationshipLabel>FAQs</relationshipLabel>
+        <relationshipOrder>0</relationshipOrder>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>FAQ_Key__c</fullName>
+        <label>FAQ Key</label>
+        <description>Optional short name (letters, digits, _). Defaults to faq + the record number.</description>
+        <type>Text</type>
+        <length>40</length>
+    </fields>
+    <fields>
+        <fullName>Keywords__c</fullName>
+        <label>Keywords</label>
+        <description>Comma separated, any language: words a caller would use, e.g. food, meal, أكل, جعان. The local model also matches questions worded differently.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Arabic_Answer__c</fullName>
+        <label>Arabic Answer</label>
+        <description>The answer as spoken in Egyptian Arabic.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Answer__c</fullName>
+        <label>English Answer</label>
+        <description>The answer as spoken in English.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+</CustomObject>

@@ -229,6 +229,7 @@ def reset_worker_state():
     main.rate_limiter._buckets.clear()
     main.voice_line.active.clear()
     main.voice_line.waiting.clear()
+    main.app.state.voice_ip_limiter.hits.clear()
     yield
     main.key_cache.flush()
     main.rate_limiter._buckets.clear()

@@ -303,4 +303,26 @@ private class CloudiatorVoiceTest {
             System.assert(e.getMessage().contains('voice'), e.getMessage());
         }
     }
+
+    @IsTest
+    static void faqBuilds() {
+        List<String> langs = new List<String>{ 'ar-EG', 'en-US' };
+        List<Object> out = CloudiatorVoiceScriptBuilder.faq(new List<Cloudiator_Voice_FAQ__c>{
+            new Cloudiator_Voice_FAQ__c(FAQ_Key__c = 'food', Keywords__c = 'food, meal, أكل, جعان',
+                Arabic_Answer__c = 'الدوا ده بيتاخد بعد الأكل.', English_Answer__c = 'Take it after a meal.'),
+            new Cloudiator_Voice_FAQ__c(Keywords__c = 'hours',
+                Arabic_Answer__c = 'من ٩ لـ ٥.', English_Answer__c = 'Nine to five.')
+        }, langs);
+        Map<String, Object> food = (Map<String, Object>) out[0];
+        System.assertEquals('food', food.get('key'));
+        System.assertEquals(4, ((List<String>) food.get('when')).size());
+        System.assertEquals('faq2', ((Map<String, Object>) out[1]).get('key'));
+        try {
+            CloudiatorVoiceScriptBuilder.faq(new List<Cloudiator_Voice_FAQ__c>{
+                new Cloudiator_Voice_FAQ__c(Arabic_Answer__c = 'x', English_Answer__c = 'y') }, langs);
+            System.assert(false, 'expected a missing-keyword error');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('keyword'), e.getMessage());
+        }
+    }
 }

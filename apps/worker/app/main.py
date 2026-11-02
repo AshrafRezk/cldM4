@@ -57,6 +57,7 @@ from .ssrf import prepare_messages_for_ollama, validate_image_inputs
 from .jobs import JobRunner, public_job
 from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
 from .tool_routes import register_tool_routes
+from .voice.assistant import VoiceAssistant
 from .voice.audio import VoiceAudio
 from .voice.engine import VoiceEngine
 from .voice.line import CallLine
@@ -132,6 +133,7 @@ voice = VoiceEngine(
     ttl_days=settings.voice_session_ttl_days,
 )
 voice_audio = VoiceAudio(settings)
+voice_assistant = VoiceAssistant(settings, ollama=ollama, scheduler=scheduler)
 voice_line = CallLine(
     capacity=max(1, settings.voice_max_active_calls), idle_seconds=settings.voice_call_idle_seconds
 )
@@ -746,10 +748,13 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
-register_voice_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
+register_voice_routes(
+    app, engine=voice, audio=voice_audio, assistant=voice_assistant, settings=settings, require_key=require_key
+)
 register_studio_routes(app, engine=voice, audio=voice_audio, require_key=require_key)
 register_web_routes(
-    app, engine=voice, audio=voice_audio, line=voice_line, settings=settings, require_key=require_key
+    app, engine=voice, audio=voice_audio, line=voice_line, assistant=voice_assistant,
+    settings=settings, require_key=require_key,
 )
 
 

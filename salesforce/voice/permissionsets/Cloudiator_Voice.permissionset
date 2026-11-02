@@ -23,6 +23,15 @@
         <viewAllRecords>false</viewAllRecords>
         <modifyAllRecords>false</modifyAllRecords>
     </objectPermissions>
+    <objectPermissions>
+        <object>Cloudiator_Voice_FAQ__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Definition__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Inbound_Numbers__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Active__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
@@ -51,4 +60,10 @@
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Personas__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Beep__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Hold_Music__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_FAQ__c.FAQ_Key__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_FAQ__c.Keywords__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_FAQ__c.Arabic_Answer__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_FAQ__c.English_Answer__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Off_Script__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Off_Script__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
 </PermissionSet>

@@ -17,6 +17,7 @@ This guide is for the person setting up a new client: a pharma patient-support p
 | **Routes** | Send the caller to a different next question depending on what they said | new patient vs existing case |
 | **CRM mapping** | Which Salesforce field each answer fills, plus fixed values and links | `Contact.MobilePhone`, `Case.Origin=Phone` |
 | **Personas** | Agents the caller can pick; `{{agent}}` is their name | Mariam, Ahmed |
+| **FAQs** | Pre-written answers to questions callers ask mid-call; then back to the question | "Take it after a meal." |
 | **Hold / no-answer lines** | Spoken while waiting in line (over hold music) / when someone never answers | built in, can be replaced |
 | **Voice** | Generated on the Mini, or a person's recording from the studio | studio recording per line |
 | **Call link** | The URL callers open | `https://api.cloudiator.org/v1/voice/web/cl_…` |
@@ -65,6 +66,31 @@ Ahmed | أحمد | Ahmed | Karim
   - *"Hi, this is Mariam from Acme Pharma. I'm just finishing a call and will be with you right away. Please don't hang up, and thank you for your patience!"*
   
   The opening uses the persona they picked and the `company` variable when the script has them ("Thanks for calling Acme Pharma." without personas). The page also shows their place in line. A script can replace the whole message with `hold_say` (JSON). The hold line can be recorded in the studio like any other.
+
+## When a caller asks something instead of answering
+
+Callers ask things mid-call: "هو الدوا ده بيتاخد قبل الأكل؟", "when do you close?". The agent answers from **FAQs you write**, in its own voice, then goes straight back to the question it asked:
+
+> *Caller:* هو أنا ممكن آخد الحباية وأنا جعان؟
+> *Mariam:* الدوا ده بيتاخد بعد الأكل. نرجع لسؤالنا. ممكن تقولي اسمك بالكامل؟
+
+Add **Cloudiator Voice FAQ** records under the Voice Script:
+
+| Field | Meaning |
+| --- | --- |
+| Keywords | words a caller would use, comma separated, any language: `food, meal, أكل, جعان, قبل الأكل` |
+| Arabic Answer / English Answer | the answer as spoken |
+| FAQ Key | optional short name |
+
+How a question is recognised: it starts like a question (هو/هي/هل/ليه/إمتى/إزاي/فين/كام…, what/how/when/can…) or is a sentence ending in "؟/?". Its keywords are matched first. If none match, the Mini's own language model (Gemma, already running locally) picks the FAQ that is *about* the same thing ("أنا جعان" → the food answer) or none. It only ever chooses one of your answers; it never writes one, so nothing improvised reaches a patient. If no FAQ fits, the agent says *"سؤال مهم، سجلته وحد من فريقنا هيرد عليك فيه. نرجع لسؤالنا."* (change it with **Arabic/English Off-Script Reply**) and asks again.
+
+Every question a caller asked is kept: use `{{questions}}` in a Fixed Value, e.g. `Case.Description={{transcript}}` already contains them, or a dedicated field `Case.Comments__c={{questions}}`. Asking a question never counts as a failed answer. Answers that match a route (e.g. "is it new? yes, new") are still answers.
+
+FAQ answers are voiced like every other line (and can be recorded in the studio). Measured on the Mini: matching takes 0.7–0.9 s when the keywords miss; nothing extra when they match.
+
+## When a new or changed script is ready to take calls
+
+Every line is voiced once, in the background, when you publish (about 20 seconds per line). A persona and language **opens for calls only when all of its lines are ready**, so a caller never gets a half-robotic or silent call. Until then the call page shows *"تحضير صوت مريم… 7/12 · Preparing Mariam's voice… 7/12"* on that button. The Mini finishes one persona and language completely before starting the next, and lines whose text did not change keep their audio, so a small edit is ready again in seconds.
 
 ## Questions, announcements, and routes
 

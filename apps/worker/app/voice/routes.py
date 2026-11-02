@@ -23,7 +23,7 @@ SESSION_STATUSES = {"in_progress", "ready_to_commit", "committed", "abandoned"}
 TWIML = "application/xml"
 
 
-def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, require_key) -> None:
+def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, assistant, settings, require_key) -> None:
     store = engine.store
 
     @app.post("/v1/voice/scripts")
@@ -184,12 +184,24 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings,
         except ValueError as exc:
             raise CloudiatorError(400, "invalid_request_error", "attempt must be an integer.") from exc
         turn_raw = request.query_params.get("turn")
+        call_sid = _required(form, "CallSid")
+        speech_text = form.get("SpeechResult", "")
+        session = store.session_by_call(call_sid)
+        intent = None
+        if session is not None and session["status"] == "in_progress":
+            current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
+            if current is not None:
+                intent = await assistant.intent(
+                    session["definition"], current, speech_text,
+                    session.get("language") or session["definition"]["language"],
+                )
         reply = engine.on_gather(
-            call_sid=_required(form, "CallSid"),
+            call_sid=call_sid,
             step=step,
             attempt=attempt,
-            speech=form.get("SpeechResult", ""),
+            speech=speech_text,
             turn=int(turn_raw) if turn_raw and turn_raw.isdigit() else None,
+            intent=intent,
         )
         return Response(content=engine.render_twiml(reply), media_type=TWIML)
 

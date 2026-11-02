@@ -60,7 +60,7 @@ def test_bad_language_lists(bad):
 
 def test_lines_cover_every_step_and_fail_message_per_language():
     lines = script_lines(validate_script(bilingual()))
-    assert len(lines) == 2 * (4 + 2)
+    assert len(lines) == 2 * (4 + 3)  # steps + no-answer, hold, off-script
     assert {l["key"] for l in lines} >= {"greeting", "__fail__", "__hold__"}
     assert all(l["speaker"] == "Hadeer" for l in lines)
 
@@ -118,24 +118,37 @@ def engine(monkeypatch):
     return _use
 
 
-async def test_rendered_clip_beats_fallback(make_client, install_key, fake_speech, engine, tmp_path):
+async def test_calls_wait_until_a_voice_is_fully_rendered(make_client, install_key, fake_speech, engine, tmp_path):
+    """A caller never gets a half-natural, half-robotic (or silent) call."""
     engine("voicetut", voicetut_python=str(tmp_path / "python"))
     (tmp_path / "python").write_text("")
     _r, headers = install_key(capabilities=["voice"])
     script = bilingual(id="ci-" + uuid.uuid4().hex[:8])
     clean = validate_script(script)
-    line = next(l for l in main.voice_audio.lines(clean) if l["key"] == "greeting" and l["language"] == "en-US")
-    rendered = main.voice_audio.rendered_path(line["speaker"], line["language"], line["text"])
-    rendered.parent.mkdir(parents=True, exist_ok=True)
-    rendered.write_bytes(b"rendered-audio")
+    english = [l for l in main.voice_audio.lines(clean) if l["language"] == "en-US"]
+
+    def render(lines):
+        for line in lines:
+            path = main.voice_audio.rendered_path(line["speaker"], line["language"], line["text"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"rendered-audio")
+
+    render(english[:1])
     async with make_client(headers) as client:
         path = await link_for(client, script)
         status = (await client.get(f"/v1/voice/scripts/{script['id']}/audio")).json()
-    assert status["total"] == 12 and status["ready"] >= 1
-    assert status["engine"] == "voicetut"
+    assert status["total"] == 14 and status["ready"] == 1 and status["engine"] == "voicetut"
     async with make_client() as anon:
+        ready = (await anon.get(f"{path}/ready")).json()
+        en = next(o for o in ready["options"] if o["language"] == "en-US")
+        assert (en["ready"], en["total"], en["ok"]) == (1, 7, False)
+        early = await anon.post(f"{path}/start", params={"lang": "en-US"})
+        assert early.status_code == 409 and early.json()["error"]["code"] == "warming_up"
+
+        render(english)
         turn = (await anon.post(f"{path}/start", params={"lang": "en-US"})).json()
-    assert [c["source"] for c in turn["clips"]] == ["rendered", "fallback"]
+        assert [c["source"] for c in turn["clips"]] == ["rendered", "rendered"]
+        assert (await anon.post(f"{path}/start", params={"lang": "ar-EG"})).status_code == 409
 
 
 @pytest.mark.skipif(not shutil.which("ffmpeg") and not os.path.exists("/opt/homebrew/bin/ffmpeg"),
@@ -216,7 +229,7 @@ async def test_azure_render_writes_mp3_clips_and_calls_play_them(
     script = bilingual(id="ci-" + uuid.uuid4().hex[:8])
     clean = validate_script(script)
     await audio._render(audio.lines(clean))
-    assert len(sent) == 12
+    assert len(sent) == 14
     assert ("ar-EG-SalmaNeural", "أهلاً بيك في خدمة العملاء.") in sent
 
     _r, headers = install_key(capabilities=["voice"])

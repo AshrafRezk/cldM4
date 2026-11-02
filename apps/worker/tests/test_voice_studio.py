@@ -48,7 +48,7 @@ async def test_studio_lists_every_line_in_both_languages(make_client, install_ke
         assert page.status_code == 200 and "Recording studio" in page.text
         lines = (await anon.get(f"{studio}/lines")).json()
     assert lines["languages"] == ["ar-EG", "en-US"]
-    assert len(lines["lines"]) == 12
+    assert len(lines["lines"]) == 14
     greeting = next(l for l in lines["lines"] if l["key"] == "greeting" and l["language"] == "ar-EG")
     assert greeting["label"] == "Greeting" and greeting["source"] == "fallback"
     assert {l["key"] for l in lines["lines"]} >= {"__hold__", "__fail__"}

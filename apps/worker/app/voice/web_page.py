@@ -279,6 +279,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
     callBtns.forEach((b) => { b.style.display = ""; b.disabled = false; }); hangBtn.style.display = "none";
     document.querySelectorAll('input[name="persona"]').forEach((i) => { i.disabled = false; });
     status(message);
+    setTimeout(refreshReady, 4000);
   }
 
   async function call(lang) {
@@ -301,6 +302,35 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
     }
   }
   callBtns.forEach((b) => { b.onclick = () => call(b.dataset.lang); });
+
+  // A voice opens for calls only when every line of it is natural. Until then
+  // its button waits and shows progress, refreshed every 10 s.
+  let readyTimer = null;
+  async function refreshReady() {
+    clearTimeout(readyTimer);
+    if (live) return;
+    let data;
+    try { data = await (await fetch(base + "/ready", { cache: "no-store" })).json(); } catch (e) { return; }
+    const who = persona();
+    const names = {};
+    document.querySelectorAll('input[name="persona"]').forEach((i) => { names[i.value] = i.nextElementSibling.textContent; });
+    let waiting = [];
+    callBtns.forEach((b) => {
+      const o = (data.options || []).find((x) => (x.persona || null) === who && x.language === b.dataset.lang);
+      const ok = !o || o.ok;
+      b.disabled = !ok;
+      if (!ok) waiting.push(o);
+    });
+    if (waiting.length) {
+      const o = waiting[0], name = who ? names[who] + " " : "";
+      status("تحضير صوت " + name + "… " + o.ready + "/" + o.total + " · Preparing " + name + "voice… " + o.ready + "/" + o.total);
+      readyTimer = setTimeout(refreshReady, 10000);
+    } else if (!live) {
+      status("");
+    }
+  }
+  document.querySelectorAll('input[name="persona"]').forEach((i) => i.addEventListener("change", refreshReady));
+  refreshReady();
   hangBtn.onclick = () => end(t$.hung);
 })();
 </script>

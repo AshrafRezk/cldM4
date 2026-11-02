@@ -66,7 +66,7 @@ def test_bad_personas_are_rejected(bad):
 def test_each_persona_has_its_own_lines_and_voice():
     clean = validate_script(acme())
     lines = main.voice_audio.lines(clean)
-    assert len(lines) == 2 * 2 * (3 + 2)
+    assert len(lines) == 2 * 2 * (3 + 3)
     greet = {(l["persona"], l["language"]): l for l in lines if l["key"] == "greeting"}
     assert greet[("mariam", "ar-EG")]["text"] == "أهلاً، معاك مريم من أكمي."
     assert greet[("ahmed", "en-US")]["text"] == "Hello, this is Ahmed from Acme."
@@ -163,7 +163,7 @@ async def test_each_persona_records_their_own_lines(make_client, install_key, fa
     async with make_client() as anon:
         data = (await anon.get(f"{studio}/lines")).json()
         assert [p["id"] for p in data["personas"]] == ["mariam", "ahmed"]
-        assert len(data["lines"]) == 20
+        assert len(data["lines"]) == 24
         saved = await anon.put(f"{studio}/recordings/greeting/ar-EG", params={"persona": "mariam"},
                                content=wav.read_bytes())
         assert saved.status_code == 200, saved.text
@@ -230,8 +230,9 @@ def test_renders_are_queued_in_call_order(monkeypatch, tmp_path):
                                            voicetut_python=str(tmp_path / "python"),
                                            voice_audio_dir=str(tmp_path / "audio")))
     monkeypatch.setattr(audio, "_ensure_worker", lambda: None)
-    assert audio.schedule(validate_script(acme())) == 20
+    assert audio.schedule(validate_script(acme())) == 24
     batch = audio.queue.get_nowait()
-    keys = [line["key"] for line in batch]
-    assert keys[:4] == ["greeting"] * 4, "every persona and language greets naturally first"
-    assert keys.index("__hold__") < keys.index("goodbye") and keys[-4:] == ["__fail__"] * 4
+    first = [(l["persona"], l["language"], l["key"]) for l in batch[:6]]
+    assert first == [("mariam", "ar-EG", k) for k in ("greeting", "ask_name", "__hold__", "goodbye", "__fail__", "__offscript__")], \
+        "one persona+language is finished before the next starts, in call order"
+    assert {(l["persona"], l["language"]) for l in batch[6:12]} == {("mariam", "en-US")}

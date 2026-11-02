@@ -27,7 +27,7 @@ SOBJECT = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
 LANGUAGE = re.compile(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$")
 VOICE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9 ()._-]{0,40}$")
 E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
-RESERVED_KEYS = {"transcript", "from", "to", "call_sid", "agent"}
+RESERVED_KEYS = {"transcript", "from", "to", "call_sid", "agent", "questions"}
 MAX_STEPS = 50
 INBOUND_STEP = "__inbound__"
 
@@ -47,6 +47,14 @@ HOLD_OPENINGS = {
         (False, False): "Thanks for calling.",
     },
 }
+# When a caller asks something instead of answering: no FAQ fits (OFF_SCRIPT),
+# or after an FAQ answer (BACK). Both are followed by the same question again.
+OFF_SCRIPT_MESSAGES = {
+    "ar": "سؤال مهم، سجلته وحد من فريقنا هيرد عليك فيه. نرجع لسؤالنا.",
+    "en": "Good question. I've noted it and someone from our team will get back to you on it. Now, back to my question.",
+}
+BACK_MESSAGES = {"ar": "نرجع لسؤالنا.", "en": "Now, back to my question."}
+
 HOLD_MESSAGES = {
     "ar": "أنا بخلّص مكالمة دلوقتي وهبدأ معاك على طول. متقفلش من فضلك، وشكراً على صبرك!",
     "en": "I'm just finishing a call and will be with you right away. Please don't hang up, and thank you for your patience!",
@@ -147,6 +155,9 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
                 raise ScriptInvalid(
                     f"Step {step['key']!r} routes to unknown step {route['next']!r}.", "steps"
                 )
+    faq = _faq(body.get("faq"), languages, variables, passthrough)
+    if set(f["key"] for f in faq) & keys:
+        raise ScriptInvalid("An FAQ key has the same name as a step.", "faq")
     clash = set(variables) & keys
     if clash:
         raise ScriptInvalid(f"Variable {sorted(clash)[0]!r} has the same name as a step.", "variables")
@@ -207,6 +218,12 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "beep": bool(body.get("beep", True)),
         # Soft generated music under the repeating hold message while waiting in line.
         "hold_music": bool(body.get("hold_music", True)),
+        # Answers to questions callers ask instead of answering (see `faq`).
+        "faq": faq,
+        "off_script_say": (
+            _fill(_localized(body["off_script_say"], languages, "off_script_say"), variables, "off_script_say", passthrough)
+            if body.get("off_script_say") else None
+        ),
         "fail_say": _fill(_localized(fail_say, languages, "fail_say"), variables, "fail_say", passthrough) if fail_say else None,
         "hold_say": (
             _fill(_localized(body["hold_say"], languages, "hold_say"), variables, "hold_say", passthrough)
@@ -305,6 +322,81 @@ def _personas(raw: Any, languages: list[str]) -> list[dict[str, Any]]:
         out.append({"id": pid, "name": _localized(persona.get("name"), languages, f"{where}.name"),
                     "voices": dict(voices)})
     return out
+
+
+MAX_FAQ = 30
+
+
+def _faq(raw: Any, languages: list[str], variables, passthrough) -> list[dict[str, Any]]:
+    """[{"key": "dose_timing", "when": ["قبل الأكل", "before food"], "say": {...}}]
+
+    Pre-written answers the agent gives, in its own voice, when a caller asks
+    something instead of answering. Nothing is improvised on a call."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_FAQ:
+        raise ScriptInvalid(f"faq must be a list of up to {MAX_FAQ}.", "faq")
+    out, keys = [], set()
+    for index, item in enumerate(raw):
+        where = f"faq[{index}]"
+        if not isinstance(item, Mapping):
+            raise ScriptInvalid(f"{where} must be an object.", where)
+        key = item.get("key")
+        if not isinstance(key, str) or not STEP_KEY.match(key) or key in keys:
+            raise ScriptInvalid(f"{where}.key must be a unique identifier.", f"{where}.key")
+        keys.add(key)
+        when = item.get("when")
+        if isinstance(when, list):
+            when = {lang: when for lang in languages}
+        if not isinstance(when, Mapping) or not when or not all(
+            lang in languages and isinstance(words, list) and words
+            and all(isinstance(w, str) and w.strip() for w in words)
+            for lang, words in when.items()
+        ):
+            raise ScriptInvalid(f"{where}.when must list keywords.", f"{where}.when")
+        say = _fill(_localized(item.get("say"), languages, f"{where}.say"), variables, f"{where}.say", passthrough)
+        out.append({"key": key, "when": {lang: [normalize_answer(w) for w in words] for lang, words in when.items()},
+                    "say": say})
+    return out
+
+
+_QUESTION_WORDS = {
+    # Egyptian yes/no questions usually open with هو/هي ("هو الدوا ده بيتاخد قبل الأكل").
+    "ar": ["هل", "هو", "هي", "ليه", "ليش", "امتي", "امتى", "ازاي", "فين", "مين", "كام", "ايه هو", "ايه هي",
+           "يعني ايه", "عندي سؤال", "عايز اسال", "عاوز اسال", "ممكن اسال", "سؤال", "ينفع", "ينفعش", "لازم"],
+    "en": ["what", "why", "how", "when", "where", "who", "which", "can i", "can you", "could", "is it", "is there",
+           "are there", "do i", "do you", "does", "should", "will", "i have a question", "question"],
+}
+
+
+def looks_like_question(text: str, language: str) -> bool:
+    """Whisper rarely writes "؟" for Egyptian Arabic, so opening words count too.
+    A question mark alone needs a sentence: whisper also puts one on a short
+    answer said with rising intonation ("Sarah?")."""
+    heard = normalize_answer(text)
+    if ("?" in text or "؟" in text) and len(heard.split()) >= 4:
+        return True
+    words = _QUESTION_WORDS["ar" if language.lower().startswith("ar") else "en"]
+    return any(heard.startswith(" " + normalize_answer(w).strip() + " ") for w in words)
+
+
+def match_faq(script: Mapping[str, Any], text: str, language: str) -> str | None:
+    heard = normalize_answer(text)
+    for item in script.get("faq") or []:
+        for keyword in item["when"].get(language) or []:
+            if keyword.strip() and keyword.strip() in heard:
+                return item["key"]
+    return None
+
+
+def off_script_text(script: Mapping[str, Any], language: str) -> str:
+    if script.get("off_script_say"):
+        return text_for(script["off_script_say"], language)
+    return OFF_SCRIPT_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
+
+
+def back_text(language: str) -> str:
+    return BACK_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
 
 
 def find_persona(script: Mapping[str, Any], persona_id: str | None) -> dict[str, Any] | None:
@@ -507,8 +599,18 @@ class VoiceEngine:
         return reply
 
     def on_gather(
-        self, *, call_sid: str, step: str, attempt: int, speech: str, turn: int | None = None
+        self,
+        *,
+        call_sid: str,
+        step: str,
+        attempt: int,
+        speech: str,
+        turn: int | None = None,
+        intent: Mapping[str, Any] | None = None,
     ) -> Reply:
+        """`intent` (from the voice assistant) marks the caller's words as a
+        question rather than an answer: {"kind": "faq", "key": ...} or
+        {"kind": "off_script"}. The agent answers, then asks the same question again."""
         cache_step = f"{step}#{turn}" if turn is not None else step
         cached = self.store.reply_for(call_sid, cache_step, attempt)
         if cached is not None:
@@ -533,7 +635,29 @@ class VoiceEngine:
         if sum(1 for t in turns if t["role"] == "caller") >= MAX_CALLER_TURNS:
             # A route loop that never resolves must not keep a caller (and the line) forever.
             text, current = "", {**current, "max_attempts": attempt, "on_fail": "hangup"}
-        if text:
+        if text and intent and intent.get("kind") in ("faq", "off_script"):
+            language = session_language(session)
+            persona = session_persona(session)
+            turns.append({"role": "caller", "text": text})
+            asked = [q for q in (answers.get("questions") or "").split("\n") if q] + [clean_answer(text)]
+            answers["questions"] = "\n".join(asked)
+            faq = next((f for f in script.get("faq") or [] if f["key"] == intent.get("key")), None)
+            verbs: list[dict[str, Any]] = []
+            if intent["kind"] == "faq" and faq:
+                answer = speak(faq["say"], language, persona)
+                bridge = speak(back_text(language), language, persona)
+                verbs += [{"say": answer, "key": f"__faq_{faq['key']}"}, {"say": bridge, "key": "__back__"}]
+            else:
+                answer = speak(off_script_text(script, language), language, persona)
+                verbs.append({"say": answer, "key": "__offscript__"})
+            for verb in verbs:
+                turns.append({"role": "agent", "text": verb["say"]})
+            next_turn = (session.get("turn") or 0) + 1
+            self.store.update_session(session["id"], turns=turns, answers=answers, turn=next_turn)
+            # Same question, same attempt: asking something is not a failed answer.
+            verbs.append(self._gather_verb({**session, "turns": turns, "turn": next_turn}, current))
+            reply = _reply(script, verbs, language, persona)
+        elif text:
             turns.append({"role": "caller", "text": text})
             route = pick_route(current, text, session_language(session))
             answers[step] = route["value"] if route and route.get("value") else clean_answer(text)
