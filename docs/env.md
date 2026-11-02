@@ -140,6 +140,7 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
 | `VOICE_LLM_FAQ` | `true` | when a caller's question matches no FAQ keyword, ask the loaded chat model which FAQ it is about (a key or none, never text; `think: false`) |
 | `VOICE_LLM_TIMEOUT_SECONDS` | `6` | after this, the question is treated as "noted" instead |
+| `VOICE_DEBUG_AUDIO` | `false` | tuning only: the call page uploads each answer's full listening window plus its speech-detector stats, saved in `VOICE_DEBUG_DIR` (`~/Cloudiator/voice-debug`, mode 700/600) with what whisper heard; files older than 24 h are deleted. Callers' voices are personal data: switch it off when done |
 | `VOICE_MAX_ACTIVE_CALLS` | `1` | browser calls at once; more callers wait in a FIFO line with a hold message |
 | `VOICE_CALL_IDLE_SECONDS` | `90` | an active call whose page goes silent this long frees the line |
 | `VOICE_WEB_MAX_AUDIO_BYTES` | `6000000` | cap on one recorded answer (the page sends 16-bit WAV at the mic's own rate, ~96 KB/s at 48 kHz, ≈ 60 s) |

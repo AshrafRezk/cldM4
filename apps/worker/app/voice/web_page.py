@@ -169,10 +169,10 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   };
   const status = (html) => { statusEl.innerHTML = html; };
 
-  async function post(path, body) {
+  async function post(path, body, extra) {
     const res = await fetch(base + path, {
       method: "POST", body: body || null,
-      headers: body ? { "Content-Type": "audio/wav" } : {},
+      headers: { ...(body ? { "Content-Type": "audio/wav" } : {}), ...(extra || {}) },
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error((data.error && data.error.message) || ("HTTP " + res.status));
@@ -195,36 +195,46 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   function listen(spec) {
     return new Promise((resolve) => {
       const proc = ctx.createScriptProcessor(4096, 1, 1);
-      const chunks = [], preroll = []; const started = performance.now();
+      const chunks = [], preroll = [], all = []; const started = performance.now();
       const prerollChunks = Math.ceil((0.5 * ctx.sampleRate) / 4096);
       const pauseMs = spec.speech_timeout === "auto" ? 1300 : Math.max(500, Number(spec.speech_timeout) * 1000 || 1300);
-      let noise = 0.004, speaking = false, lastVoice = 0, voiced = 0;
+      let noise = 0.004, speaking = false, lastVoice = 0, voiced = 0, peak = 0, firstVoice = null, why = "";
       proc.onaudioprocess = (e) => {
-        if (!live) { finish(false); return; }
+        if (!live) { why = "hung_up"; finish(false); return; }
         const data = new Float32Array(e.inputBuffer.getChannelData(0));
+        if (spec.debug && all.length * 4096 < ctx.sampleRate * 30) all.push(data);
         let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length); const now = performance.now();
+        peak = Math.max(peak, rms);
         const threshold = Math.max(0.01, noise * 3);
         if (!speaking) {
           if (rms > threshold) {
-            speaking = true; lastVoice = now; chunks.push(...preroll, data); voiced++;
+            speaking = true; lastVoice = now; firstVoice = now - started; chunks.push(...preroll, data); voiced++;
           } else {
             noise = noise * 0.9 + rms * 0.1;
             preroll.push(data); if (preroll.length > prerollChunks) preroll.shift();
-            if (now - started > spec.timeout * 1000) finish(false);
+            if (now - started > spec.timeout * 1000) { why = "no_speech_before_timeout"; finish(false); }
           }
           return;
         }
         chunks.push(data);
         if (rms > threshold) { lastVoice = now; voiced++; }
-        if (now - lastVoice > pauseMs) finish(voiced > 1);
-        else if (now - started > 30000) finish(true);
+        if (now - lastVoice > pauseMs) { why = voiced > 1 ? "pause" : "too_short"; finish(voiced > 1); }
+        else if (now - started > 30000) { why = "max_length"; finish(true); }
       };
       let done = false;
       function finish(heard) {
         if (done) return; done = true;
         proc.disconnect(); source.disconnect(proc);
-        resolve(heard ? wav(chunks, ctx.sampleRate) : new Blob([]));
+        // What the speech detector saw, for tuning (sent only with debug on).
+        const diag = {
+          sample_rate: ctx.sampleRate, ended: why, detected: heard,
+          noise_floor: +noise.toFixed(5), threshold: +Math.max(0.01, noise * 3).toFixed(5),
+          peak: +peak.toFixed(5), voiced_chunks: voiced, first_voice_ms: firstVoice && Math.round(firstVoice),
+          window_ms: Math.round(performance.now() - started),
+        };
+        const blob = spec.debug ? wav(all, ctx.sampleRate) : heard ? wav(chunks, ctx.sampleRate) : new Blob([]);
+        resolve({ blob, heard, diag });
       }
       source.connect(proc); proc.connect(ctx.destination);
       status('<span class="dot"></span>' + t$.listening);
@@ -261,12 +271,13 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       }
       if (t.done || !t.listen || !live) break;
       if (t.listen.beep !== false) await beep();
-      const audio = await listen(t.listen);
+      const answer = await listen(t.listen);
       if (!live) break;
       status(t$.thinking);
       const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt, turn: t.listen.turn });
       document.querySelectorAll('input[name="persona"]').forEach((i) => { i.disabled = true; });
-      t = await post("/turn?" + q, audio);
+      t = await post("/turn?" + q, answer.blob, t.listen.debug
+        ? { "X-Voice-Detected": answer.heard ? "1" : "0", "X-Voice-Diag": JSON.stringify(answer.diag) } : {});
     }
     if (live) callId = null;  // the Mini already freed the line when the call finished
     end(live ? t$.ended : t$.hung);

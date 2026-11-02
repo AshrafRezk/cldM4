@@ -12,6 +12,7 @@ script and nothing else; it never carries an sk-cld- key.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -22,7 +23,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..errors import CloudiatorError
-from . import speech
+from . import debug, speech
 from .engine import ScriptInvalid, VoiceEngine, find_persona, hold_text, languages_of, session_language, speak
 from .web_page import render_page
 
@@ -248,6 +249,19 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assis
         answer = await request.body()
         if len(answer) > settings.voice_web_max_audio_bytes:
             raise CloudiatorError(413, "request_too_large", "Audio is too long for one answer.")
+        note = None
+        if settings.voice_debug_audio and answer:
+            try:
+                diag = json.loads(request.headers.get("x-voice-diag") or "{}")
+            except ValueError:
+                diag = {"unparseable": True}
+            note = debug.save(settings, call_sid=call_sid, step=step, attempt=attempt, turn=turn_no,
+                              language=session_language(session), audio=answer,
+                              diag=diag if isinstance(diag, dict) else {})
+            if request.headers.get("x-voice-detected") == "0":
+                # The page's detector heard no speech: keep the call's behaviour
+                # (an empty answer), but the window is saved for tuning.
+                answer = b""
         request.state.usage.tool = "voice_web_turn"
         # A retry of an answered turn replays without transcribing again.
         cached = store.reply_for(call_sid, f"{step}#{turn_no}" if turn_no is not None else step, attempt)
@@ -257,6 +271,8 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assis
             heard = await speech.transcribe(
                 answer, language=session_language(session), settings=settings
             )
+            if note is not None:
+                debug.record_heard(note, heard, transcribed=bool(answer))
         except speech.SpeechUnavailable as exc:
             log.error("speech recognition unavailable: %s", exc)
             raise CloudiatorError(
@@ -275,10 +291,13 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assis
         return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=heard))
 
 
-async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], store, *, heard: str | None) -> dict[str, Any]:
+async def _turn(
+    audio, tenant_id: str, call_sid: str, reply: dict[str, Any], store, *, heard: str | None
+) -> dict[str, Any]:
     """Reply → what the page plays: ordered clips, then listen or hang up."""
     session = store.session_by_call(call_sid)
     script = session["definition"] if session else {"id": reply.get("script_id") or ""}
+    debug_on = bool(getattr(audio.settings, "voice_debug_audio", False))
     language = reply.get("language") or "en-US"
     clips = []
     listen = None
@@ -298,6 +317,7 @@ async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], sto
                 "attempt": gather["attempt"],
                 "turn": gather.get("turn"),
                 "beep": gather.get("beep", True),
+                "debug": debug_on,
                 "timeout": gather["timeout"],
                 "speech_timeout": gather["speech_timeout"],
             }
