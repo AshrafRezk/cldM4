@@ -19,13 +19,17 @@ What the caller hears, per line, in order of preference:
 
 1. **A person's recording** uploaded for that line and language (`PUT /v1/voice/scripts/{id}/recordings/{step}/{lang}`, or a File attached in Salesforce, below).
 2. **A rendered clip**, made when the script is published (script lines are fixed, so each is generated once, never during a call). `VOICE_TTS_ENGINE=auto` picks:
-   - **Azure neural voices** when `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` are set. Default speakers are genuinely Egyptian and British: `ar-EG-SalmaNeural` (or `ar-EG-ShakirNeural`, male) and `en-GB-SoniaNeural` (or `en-GB-RyanNeural`). Only the fixed question text is sent, once per publish. **Callers' voices and answers never leave the Mini.** A script is a few hundred characters; Azure's free tier is far larger than that.
+   - **Azure neural voices**, only if an operator chooses to set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` (off by default; this deployment does not use any third party). Default speakers are genuinely Egyptian and British: `ar-EG-SalmaNeural` (or `ar-EG-ShakirNeural`, male) and `en-GB-SoniaNeural` (or `en-GB-RyanNeural`). Only the fixed question text is sent, once per publish. **Callers' voices and answers never leave the Mini.** A script is a few hundred characters; Azure's free tier is far larger than that.
    - **VoiceTut-TTS** otherwise ([VoiceTut-TTS](https://huggingface.co/mohammedaly22/VoiceTut-TTS), Apache-2.0, on k2-fsa OmniVoice, Apache-2.0): local, on the CPU in `~/Cloudiator/tts-venv`, about 20 s per line, then the process exits. It never touches the Metal GPU. In a 2026-11-02 listening test it sounded clearly less natural than a person, so it is the no-cloud fallback, not the default.
    
    Clips are keyed by engine + speaker + language + text: a republish renders only changed lines, and switching engines never replays the other engine's clip. The worker also queues renders for every active script at boot. Pick speakers per language with `voices` (`{"ar-EG": "ar-EG-ShakirNeural"}`); a name that does not fit the active engine falls back to its default.
 3. **macOS `say`** (Majed / Samantha) while a render has not landed yet, so a call never waits.
 
 `GET /v1/voice/scripts/{id}/audio` lists every line with its source (`recording`, `rendered`, `fallback`), `ready`/`total`, and the last render error.
+
+## Recording studio (people's voices, nothing leaves the Mini)
+
+The most natural voice is a person's. `POST /v1/voice/scripts/{id}/studio-link` (Bearer + `voice`) returns a private studio URL, valid for 7 days, shown once. The page lists every line callers can hear, in every language: greeting, each question, closing, the "no answer" line, and the hold message. Each line shows what plays today (your recording / generated voice / basic voice) and has **Play current**, **Record**, **Listen**, **Save**, **Discard**, and **Use generated voice**. Saved takes are cleaned on the Mini (80 Hz high-pass, leading silence trimmed, loudness normalized to −16 LUFS) and play on the very next call. Calling `…/web-link/revoke` also revokes studio links.
 
 ## Writing scripts in Salesforce
 

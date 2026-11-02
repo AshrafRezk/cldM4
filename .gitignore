@@ -26,3 +26,4 @@ cloudflared-credentials.json
 apps/dashboard/netlify/functions/_lib/sf-package/
 apps/dashboard/public/salesforce/*.zip
 apps/dashboard/.sf-package-stage/
+auditions/

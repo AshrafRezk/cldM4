@@ -61,6 +61,7 @@ from .voice.audio import VoiceAudio
 from .voice.engine import VoiceEngine
 from .voice.line import CallLine
 from .voice.routes import register_voice_routes
+from .voice.studio import register_studio_routes
 from .voice.web import register_web_routes
 from .voice.store import VoiceStore
 from .translation import (
@@ -746,6 +747,7 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
 register_voice_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
+register_studio_routes(app, engine=voice, audio=voice_audio, require_key=require_key)
 register_web_routes(
     app, engine=voice, audio=voice_audio, line=voice_line, settings=settings, require_key=require_key
 )

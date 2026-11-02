@@ -280,9 +280,10 @@ class VoiceStore:
 
     # Browser call links ------------------------------------------------------
 
-    def create_web_link(self, tenant_id: str, script_id: str) -> str:
-        """The token is shown once; only its hash is stored."""
-        token = "cl_" + secrets.token_urlsafe(24)
+    def create_web_link(self, tenant_id: str, script_id: str, prefix: str = "cl_") -> str:
+        """The token is shown once; only its hash is stored. `cl_` starts calls,
+        `st_` opens the recording studio for the same script."""
+        token = prefix + secrets.token_urlsafe(24)
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO voice_web_links (token_hash, tenant_id, script_id, created_at) "
@@ -300,16 +301,20 @@ class VoiceStore:
             )
         return cur.rowcount
 
-    def web_link(self, token: str) -> tuple[str, str] | None:
-        if not token.startswith("cl_") or len(token) > 80:
+    def web_link(self, token: str, prefix: str = "cl_", max_age_seconds: float | None = None) -> tuple[str, str] | None:
+        if not token.startswith(prefix) or len(token) > 80:
             return None
         with self._db() as conn:
             row = conn.execute(
-                "SELECT tenant_id, script_id FROM voice_web_links "
+                "SELECT tenant_id, script_id, created_at FROM voice_web_links "
                 "WHERE token_hash = ? AND revoked_at IS NULL",
                 (_hash(token),),
             ).fetchone()
-        return (row["tenant_id"], row["script_id"]) if row else None
+        if row is None:
+            return None
+        if max_age_seconds is not None and time.time() - row["created_at"] > max_age_seconds:
+            return None
+        return row["tenant_id"], row["script_id"]
 
     # Twilio retry cache ------------------------------------------------------
 
