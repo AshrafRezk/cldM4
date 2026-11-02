@@ -4,7 +4,13 @@ import { httpError } from "./http.mjs";
 
 let cached;
 
+/** Tests hand in a fake tagged template instead of Neon. */
+export function useSqlForTests(fake) {
+  cached = fake;
+}
+
 export function sql() {
+  if (cached) return cached;
   const url = process.env.DATABASE_URL || "";
   if (!url) {
     throw httpError(

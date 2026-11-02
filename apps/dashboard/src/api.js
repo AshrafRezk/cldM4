@@ -29,9 +29,12 @@ export const api = {
   scopes: () => request("/scopes"),
   tenants: () => request("/tenants"),
   createTenant: (body) => request("/tenants", { method: "POST", body: JSON.stringify(body) }),
+  deleteTenant: (tenantId, confirm) =>
+    request(`/tenants/${tenantId}`, { method: "DELETE", body: JSON.stringify({ confirm }) }),
   keys: (tenantId) => request(`/tenants/${tenantId}/keys`),
   mintKey: (tenantId, body) =>
     request(`/tenants/${tenantId}/keys`, { method: "POST", body: JSON.stringify(body) }),
+  updateKey: (keyId, body) => request(`/keys/${keyId}`, { method: "PATCH", body: JSON.stringify(body) }),
   revokeKey: (keyId) => request(`/keys/${keyId}/revoke`, { method: "POST", body: "{}" }),
   usage: (keyId) => request(`/keys/${keyId}/usage`),
   salesforce: () => request("/salesforce-snippet"),
