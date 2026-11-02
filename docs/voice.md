@@ -18,7 +18,11 @@ A script lists its `languages` (e.g. `["ar-EG", "en-US"]`); every line has text 
 What the caller hears, per line, in order of preference:
 
 1. **A person's recording** uploaded for that line and language (`PUT /v1/voice/scripts/{id}/recordings/{step}/{lang}`, or a File attached in Salesforce, below).
-2. **VoiceTut-TTS** — natural Egyptian Arabic and English ([VoiceTut-TTS](https://huggingface.co/mohammedaly22/VoiceTut-TTS), Apache-2.0, fine-tuned from k2-fsa OmniVoice, Apache-2.0, on ~380 h of Egyptian speech; 19 speakers). Script lines are fixed, so every line is rendered **once, when the script is published**, in the background, on the CPU, in its own venv (`~/Cloudiator/tts-venv`), then the process exits. It never runs during a call and never touches the Metal GPU. Clips are keyed by speaker+language+text, so republishing only renders changed lines. Pick speakers per language with `voices` (`{"ar-EG": "Hadeer", "en-US": "Hadeer"}`; female: Hadeer, Hanan, Mariam, Rana, Sarah, Yasmin, Yara; male: Ahmed, Ali, Hassan, Karim, Mahmoud, Mohammed, Mostafa, Ramy, Shaker, Tareq, Yehia, Youssef).
+2. **A rendered clip**, made when the script is published (script lines are fixed, so each is generated once, never during a call). `VOICE_TTS_ENGINE=auto` picks:
+   - **Azure neural voices** when `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` are set. Default speakers are genuinely Egyptian and British: `ar-EG-SalmaNeural` (or `ar-EG-ShakirNeural`, male) and `en-GB-SoniaNeural` (or `en-GB-RyanNeural`). Only the fixed question text is sent, once per publish. **Callers' voices and answers never leave the Mini.** A script is a few hundred characters; Azure's free tier is far larger than that.
+   - **VoiceTut-TTS** otherwise ([VoiceTut-TTS](https://huggingface.co/mohammedaly22/VoiceTut-TTS), Apache-2.0, on k2-fsa OmniVoice, Apache-2.0): local, on the CPU in `~/Cloudiator/tts-venv`, about 20 s per line, then the process exits. It never touches the Metal GPU. In a 2026-11-02 listening test it sounded clearly less natural than a person, so it is the no-cloud fallback, not the default.
+   
+   Clips are keyed by engine + speaker + language + text: a republish renders only changed lines, and switching engines never replays the other engine's clip. The worker also queues renders for every active script at boot. Pick speakers per language with `voices` (`{"ar-EG": "ar-EG-ShakirNeural"}`); a name that does not fit the active engine falls back to its default.
 3. **macOS `say`** (Majed / Samantha) while a render has not landed yet, so a call never waits.
 
 `GET /v1/voice/scripts/{id}/audio` lists every line with its source (`recording`, `rendered`, `fallback`), `ready`/`total`, and the last render error.
@@ -181,3 +185,13 @@ Transcripts are treated as prompts. The worker never writes them to its log (onl
 - Worker: hermetic pytest (`apps/worker/tests/test_voice_*.py`) covers publish → signed inbound → gathers → `ready_to_commit` → ack, Twilio retry idempotency, silence replay, `on_fail`, bad signature, tenant isolation, and the Salesforce OAS composition check.
 - Apex in `salesforce/voice/` has a mock-callout test class but has **not** been compiled or run in an org yet. First deploy to a sandbox with `--test-level RunSpecifiedTests --tests CloudiatorVoiceTest`.
 - No live Twilio call has been placed yet.
+
+## Setting up the Azure voices
+
+1. In the Azure portal, create a **Speech service** resource (Free F0 pricing tier is enough), in a region close to you such as `westeurope`.
+2. Copy **Key 1** and the region into `~/Cloudiator/.env` (never into git):
+   ```
+   AZURE_SPEECH_KEY=…
+   AZURE_SPEECH_REGION=westeurope
+   ```
+3. `scripts/restart-worker.sh`. At boot the worker queues every active script; `GET /v1/voice/scripts/{id}/audio` shows `"engine": "azure"` and each line turning `rendered` within seconds.

@@ -43,8 +43,7 @@ public with sharing class CloudiatorVoiceTemplates {
 
     public static Id createOne(String template, String name, String scriptId) {
         Cloudiator_Voice_Script__c script = new Cloudiator_Voice_Script__c(
-            Languages__c = 'ar-EG;en-US', Active__c = true,
-            Arabic_Voice__c = 'Hadeer', English_Voice__c = 'Hadeer'
+            Languages__c = 'ar-EG;en-US', Active__c = true
         );
         List<Q> questions;
         String title;

@@ -183,9 +183,14 @@ class Settings:
     )
     whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 8))
     ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
-    # Natural voices (docs/voice.md): VoiceTut-TTS renders fixed script lines
-    # at publish time in its own venv, CPU only. "say" disables rendering.
-    voice_tts_engine: str = field(default_factory=lambda: _str("VOICE_TTS_ENGINE", "voicetut"))
+    # Natural voices (docs/voice.md): script lines are rendered at publish time.
+    # auto = Azure when AZURE_SPEECH_KEY is set, else VoiceTut, else macOS say.
+    voice_tts_engine: str = field(default_factory=lambda: _str("VOICE_TTS_ENGINE", "auto"))
+    # Azure neural TTS for script lines (only fixed text is sent, at publish).
+    azure_speech_key: str | None = field(default_factory=lambda: _opt("AZURE_SPEECH_KEY"))
+    azure_speech_region: str | None = field(default_factory=lambda: _opt("AZURE_SPEECH_REGION"))
+    azure_voice_ar: str = field(default_factory=lambda: _str("AZURE_VOICE_AR", "ar-EG-SalmaNeural"))
+    azure_voice_en: str = field(default_factory=lambda: _str("AZURE_VOICE_EN", "en-GB-SoniaNeural"))
     voicetut_python: str = field(
         default_factory=lambda: os.path.expanduser(
             _str("VOICETUT_PYTHON", "~/Cloudiator/tts-venv/bin/python")

@@ -99,18 +99,16 @@
     <fields>
         <fullName>Arabic_Voice__c</fullName>
         <label>Arabic Voice</label>
-        <description>VoiceTut speaker for Arabic: Hadeer, Hanan, Mariam, Rana, Sarah, Yasmin, Yara, Ahmed, Ali, Hassan, Karim, Mahmoud, Mohammed, Mostafa, Ramy, Shaker, Tareq, Yehia, Youssef.</description>
+        <description>Blank = the appliance default (Azure: ar-EG-SalmaNeural). Azure Egyptian voices: ar-EG-SalmaNeural (female), ar-EG-ShakirNeural (male).</description>
         <type>Text</type>
         <length>40</length>
-        <defaultValue>&quot;Hadeer&quot;</defaultValue>
     </fields>
     <fields>
         <fullName>English_Voice__c</fullName>
         <label>English Voice</label>
-        <description>VoiceTut speaker for English (same names).</description>
+        <description>Blank = the appliance default (Azure: en-GB-SoniaNeural). British: en-GB-SoniaNeural (female), en-GB-RyanNeural (male).</description>
         <type>Text</type>
         <length>40</length>
-        <defaultValue>&quot;Hadeer&quot;</defaultValue>
     </fields>
     <fields>
         <fullName>Transcript_Field__c</fullName>

@@ -65,6 +65,7 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings,
         return JSONResponse(
             content={
                 "script_id": script_id,
+                "engine": audio.engine,
                 "lines": lines,
                 "ready": sum(1 for l in lines if l["source"] != "fallback"),
                 "total": len(lines),

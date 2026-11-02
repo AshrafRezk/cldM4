@@ -102,11 +102,27 @@ async def test_english_button_hears_english_and_listens_in_english(make_client, 
     assert langs[arabic["call_id"]] == "ar-EG"
 
 
-async def test_rendered_clip_beats_fallback(make_client, install_key, fake_speech):
+@pytest.fixture()
+def engine(monkeypatch):
+    """Pick a render engine for one test without spawning or calling it."""
+    import dataclasses
+
+    def _use(name, **extra):
+        settings = dataclasses.replace(main.settings, voice_tts_engine=name, **extra)
+        monkeypatch.setattr(main.voice_audio, "settings", settings)
+        monkeypatch.setattr(main.voice_audio, "schedule", lambda script: 0)
+        return main.voice_audio
+
+    return _use
+
+
+async def test_rendered_clip_beats_fallback(make_client, install_key, fake_speech, engine, tmp_path):
+    engine("voicetut", voicetut_python=str(tmp_path / "python"))
+    (tmp_path / "python").write_text("")
     _r, headers = install_key(capabilities=["voice"])
     script = bilingual(id="ci-" + uuid.uuid4().hex[:8])
     clean = validate_script(script)
-    line = next(l for l in script_lines(clean) if l["key"] == "greeting" and l["language"] == "en-US")
+    line = next(l for l in main.voice_audio.lines(clean) if l["key"] == "greeting" and l["language"] == "en-US")
     rendered = main.voice_audio.rendered_path(line["speaker"], line["language"], line["text"])
     rendered.parent.mkdir(parents=True, exist_ok=True)
     rendered.write_bytes(b"rendered-audio")
@@ -114,6 +130,7 @@ async def test_rendered_clip_beats_fallback(make_client, install_key, fake_speec
         path = await link_for(client, script)
         status = (await client.get(f"/v1/voice/scripts/{script['id']}/audio")).json()
     assert status["total"] == 10 and status["ready"] >= 1
+    assert status["engine"] == "voicetut"
     async with make_client() as anon:
         turn = (await anon.post(f"{path}/start", params={"lang": "en-US"})).json()
     assert [c["source"] for c in turn["clips"]] == ["rendered", "fallback"]
@@ -159,3 +176,62 @@ async def test_recordings_are_tenant_scoped(make_client, install_key, fake_speec
 
 def test_render_is_off_in_tests():
     assert main.voice_audio.schedule(validate_script(bilingual())) == 0
+
+
+def test_engine_auto_prefers_azure_then_voicetut(engine, tmp_path):
+    venv = tmp_path / "python"
+    venv.write_text("")
+    assert engine("auto", voicetut_python=str(tmp_path / "missing")).engine == "say"
+    assert engine("auto", voicetut_python=str(venv)).engine == "voicetut"
+    audio = engine("auto", voicetut_python=str(venv), azure_speech_key="k", azure_speech_region="westeurope")
+    assert audio.engine == "azure"
+    assert engine("azure").engine == "say"  # no key: off, not broken
+
+
+def test_azure_voices_default_to_egyptian_and_british(engine):
+    audio = engine("azure", azure_speech_key="k", azure_speech_region="westeurope")
+    clean = validate_script(bilingual())  # voices say "Hadeer", a VoiceTut name
+    assert audio.speaker_for(clean, "ar-EG") == "ar-EG-SalmaNeural"
+    assert audio.speaker_for(clean, "en-US") == "en-GB-SoniaNeural"
+    picked = validate_script(bilingual(voices={"ar-EG": "ar-EG-ShakirNeural", "en-US": "en-GB-RyanNeural"}))
+    assert audio.speaker_for(picked, "ar-EG") == "ar-EG-ShakirNeural"
+    assert audio.speaker_for(picked, "en-US") == "en-GB-RyanNeural"
+
+
+async def test_azure_render_writes_mp3_clips_and_calls_play_them(
+    make_client, install_key, fake_speech, engine, monkeypatch
+):
+    from app.voice import audio as audio_mod
+
+    sent = []
+
+    async def fake_azure(text, voice, settings):
+        sent.append((voice, text))
+        return b"ID3fake-mp3"
+
+    monkeypatch.setattr(audio_mod, "azure_tts", fake_azure)
+    audio = engine("azure", azure_speech_key="k", azure_speech_region="westeurope")
+    script = bilingual(id="ci-" + uuid.uuid4().hex[:8])
+    clean = validate_script(script)
+    await audio._render(audio.lines(clean))
+    assert len(sent) == 10
+    assert ("ar-EG-SalmaNeural", "أهلاً بيك في خدمة العملاء.") in sent
+
+    _r, headers = install_key(capabilities=["voice"])
+    async with make_client(headers) as client:
+        path = await link_for(client, script)
+    async with make_client() as anon:
+        turn = (await anon.post(f"{path}/start", params={"lang": "ar-EG"})).json()
+    assert [c["source"] for c in turn["clips"]] == ["rendered", "rendered"]
+    assert turn["clips"][0]["audio"].startswith("data:audio/mpeg;base64,")
+
+
+async def test_azure_tts_refuses_bad_region_and_voice():
+    from types import SimpleNamespace
+
+    from app.voice.audio import azure_tts
+
+    with pytest.raises(speech.SpeechUnavailable):
+        await azure_tts("hi", "en-GB-SoniaNeural", SimpleNamespace(azure_speech_region="evil.com/x", azure_speech_key="k"))
+    with pytest.raises(speech.SpeechUnavailable):
+        await azure_tts("hi", "Hadeer", SimpleNamespace(azure_speech_region="westeurope", azure_speech_key="k"))
