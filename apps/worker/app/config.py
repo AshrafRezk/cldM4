@@ -200,6 +200,11 @@ class Settings:
     voice_audio_dir: str = field(
         default_factory=lambda: os.path.expanduser(_str("VOICE_AUDIO_DIR", "~/Cloudiator/voice-audio"))
     )
+    # One line for the whole Mini: further browser callers wait in a queue.
+    voice_max_active_calls: int = field(default_factory=lambda: _int("VOICE_MAX_ACTIVE_CALLS", 1))
+    voice_call_idle_seconds: float = field(
+        default_factory=lambda: _float("VOICE_CALL_IDLE_SECONDS", 90.0)
+    )
     voice_web_max_audio_bytes: int = field(
         default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 6_000_000)
     )

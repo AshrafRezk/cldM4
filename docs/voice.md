@@ -52,6 +52,8 @@ What the caller hears, per line, in order of preference:
 
 ## Browser call
 
+**One call at a time, everyone else waits.** The Mini takes `VOICE_MAX_ACTIVE_CALLS` browser calls at once (default 1, since it transcribes one answer at a time) and queues the rest first-in, first-out across all tenants and scripts. A caller who has to wait hears a hold message in their language (rendered like every other line; override per script with `hold_say`), sees their position ("إنت رقم 2 في الدور" / "You are number 2 in line"), and connects automatically when their turn comes. The line frees up when a call finishes, when the caller presses Hang up or closes the page (sendBeacon), or after `VOICE_CALL_IDLE_SECONDS` (90) of silence from a page that disappeared. A waiting page that stops polling for 30 s loses its place. `GET /v1/voice/web/{token}/line` shows `{capacity, active, waiting}`. Twilio calls are not counted against this line.
+
 1. Publish a script (`POST /v1/voice/scripts`, below). `inbound_numbers` may be empty.
 2. Mint a link: `POST /v1/voice/scripts/{id}/web-link` with a `voice` key. The response `url` (`https://api.cloudiator.org/v1/voice/web/cl_…`) is shown once; only its hash is stored. `POST …/web-link/revoke` kills every link for that script.
 3. Anyone with the link opens it, picks a language, allows the microphone, and talks. Each answer is recorded in the browser (silence detection, 16 kHz WAV), transcribed on the Mini, and answered with locally synthesized audio. The finished call is `ready_to_commit` exactly like a Twilio call; `from` is `web`.

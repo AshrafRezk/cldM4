@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..errors import CloudiatorError
 from . import speech
-from .engine import ScriptInvalid, VoiceEngine, languages_of, session_language
+from .engine import ScriptInvalid, VoiceEngine, hold_text, languages_of, session_language
 from .web_page import render_page
 
 log = logging.getLogger("cloudiator.voice.web")
@@ -50,7 +50,7 @@ class _IpLimiter:
         hits.append(now)
 
 
-def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, require_key) -> None:
+def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, settings, require_key) -> None:
     store = engine.store
     limiter = _IpLimiter(PER_IP_PER_MINUTE)
 
@@ -98,25 +98,92 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, r
             },
         )
 
-    @app.post("/v1/voice/web/{token}/start")
-    async def start(token: str, request: Request) -> JSONResponse:
-        limiter.check(_client_ip(request))
-        tenant_id, script_id = link(request, token)
+    def begin(tenant_id: str, script_id: str, language: str | None) -> tuple[str, dict[str, Any]]:
         call_sid = "WB" + uuid.uuid4().hex
-        request.state.usage.tool = "voice_web_start"
         try:
             reply = engine.start_call(
-                tenant_id=tenant_id,
-                script_id=script_id,
-                call_sid=call_sid,
-                from_label="web",
-                language=request.query_params.get("lang") or None,
+                tenant_id=tenant_id, script_id=script_id, call_sid=call_sid,
+                from_label="web", language=language,
             )
         except ScriptInvalid as exc:
             raise CloudiatorError(400, "invalid_request_error", str(exc), param="lang") from exc
         if reply is None:
             raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
-        return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
+        line.started(call_sid)
+        return call_sid, reply
+
+    async def hold(tenant_id: str, script_id: str, ticket, position: int, with_audio: bool) -> dict[str, Any]:
+        found = store.script_by_id(tenant_id, script_id)
+        script = found[1] if found else {"id": script_id}
+        language = ticket.language or (script.get("language") or "en-US")
+        clips = []
+        if with_audio and found:
+            text = hold_text(script, language)
+            data_url, source = await audio.clip(
+                tenant_id=tenant_id, script=script, key="__hold__", language=language, text=text
+            )
+            clips.append({"text": text, "audio": data_url, "source": source})
+        return {"queued": True, "ticket": ticket.id, "position": position, "language": language,
+                "clips": clips, "poll_seconds": 3}
+
+    @app.post("/v1/voice/web/{token}/start")
+    async def start(token: str, request: Request) -> JSONResponse:
+        """Connect now if the line is free and nobody is waiting; otherwise join the line."""
+        limiter.check(_client_ip(request))
+        tenant_id, script_id = link(request, token)
+        language = request.query_params.get("lang") or None
+        found = store.script_by_id(tenant_id, script_id)
+        if found is None:
+            raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
+        if language is not None and language not in languages_of(found[1]):
+            raise CloudiatorError(400, "invalid_request_error", f"This script does not speak {language}.", param="lang")
+        request.state.usage.tool = "voice_web_start"
+        if line.can_start_now():
+            call_sid, reply = begin(tenant_id, script_id, language)
+            return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
+        ticket = line.join(token, language)
+        return JSONResponse(content=await hold(tenant_id, script_id, ticket, line.position(ticket.id), True))
+
+    @app.post("/v1/voice/web/{token}/wait")
+    async def wait(token: str, request: Request) -> JSONResponse:
+        """Polled every few seconds while queued. Starts the call when it is this caller's turn."""
+        tenant_id, script_id = link(request, token)
+        ticket_id = request.query_params.get("ticket") or ""
+        ticket = line.waiting.get(ticket_id)
+        if ticket is None or ticket.link != token:
+            raise CloudiatorError(404, "ticket_expired", "Your place in line expired. Please call again.")
+        turn_ticket = line.take_turn(ticket_id)
+        if turn_ticket is not None:
+            request.state.usage.tool = "voice_web_start"
+            call_sid, reply = begin(tenant_id, script_id, turn_ticket.language)
+            return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
+        return JSONResponse(content=await hold(tenant_id, script_id, ticket, line.position(ticket_id), False))
+
+    @app.post("/v1/voice/web/{token}/leave")
+    async def leave(token: str, request: Request) -> JSONResponse:
+        link(request, token)
+        ticket = line.waiting.get(request.query_params.get("ticket") or "")
+        if ticket is not None and ticket.link == token:
+            line.leave(ticket.id)
+        return JSONResponse(content={"left": True})
+
+    @app.post("/v1/voice/web/{token}/hangup")
+    async def hangup(token: str, request: Request) -> JSONResponse:
+        """The caller hung up or closed the page: free the line for the next person."""
+        tenant_id, script_id = link(request, token)
+        call_sid = request.query_params.get("call_id") or ""
+        session = store.session_by_call(call_sid) if call_sid.startswith("WB") else None
+        if session is None or session["tenant_id"] != tenant_id or session["to_number"] != f"web:{script_id}":
+            raise CloudiatorError(404, "call_not_found", "Call not found.")
+        line.ended(call_sid)
+        if session["status"] == "in_progress":
+            store.update_session(session["id"], status="abandoned", current_step=None)
+        return JSONResponse(content={"ended": True})
+
+    @app.get("/v1/voice/web/{token}/line")
+    async def line_status(token: str, request: Request) -> JSONResponse:
+        link(request, token)
+        return JSONResponse(content=line.snapshot())
 
     @app.post("/v1/voice/web/{token}/turn")
     async def turn(token: str, request: Request) -> JSONResponse:
@@ -136,6 +203,12 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, r
         except ValueError as exc:
             raise CloudiatorError(400, "invalid_request_error", "attempt must be an integer.") from exc
         step = params.get("step") or ""
+        if call_sid in line.active:
+            line.touch(call_sid)
+        elif line.free():
+            line.started(call_sid)  # the page went quiet long enough to lose the slot; it is back
+        else:
+            raise CloudiatorError(409, "call_expired", "This call timed out and the line is now busy. Please call again.")
 
         answer = await request.body()
         if len(answer) > settings.voice_web_max_audio_bytes:
@@ -156,6 +229,8 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings, r
                 error_type="server_error",
             ) from exc
         reply = engine.on_gather(call_sid=call_sid, step=step, attempt=attempt, speech=heard)
+        if any(verb.get("hangup") for verb in reply["verbs"]):
+            line.ended(call_sid)
         return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=heard))
 
 
