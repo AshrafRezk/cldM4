@@ -1,0 +1,122 @@
+{
+  "id": "client-psp",
+  "display_name": "Patient Support",
+  "languages": [
+    "ar-EG",
+    "en-US"
+  ],
+  "variables": {
+    "company": {
+      "ar-EG": "اسم الشركة",
+      "en-US": "Your Company"
+    },
+    "program": {
+      "ar-EG": "برنامج دعم المرضى",
+      "en-US": "the patient support program"
+    }
+  },
+  "personas": [
+    {
+      "id": "mariam",
+      "name": {
+        "ar-EG": "مريم",
+        "en-US": "Mariam"
+      },
+      "voice": "Mariam"
+    },
+    {
+      "id": "ahmed",
+      "name": {
+        "ar-EG": "أحمد",
+        "en-US": "Ahmed"
+      },
+      "voice": "Ahmed"
+    }
+  ],
+  "beep": true,
+  "hold_music": true,
+  "steps": [
+    {
+      "key": "greeting",
+      "next": "full_name",
+      "say": {
+        "ar-EG": "أهلاً بيك، معاك {{agent}} من {{company}}. أهلاً بيك في {{program}}. المكالمة دي متسجلة، وبياناتك هتفضل سرية.",
+        "en-US": "Hello, this is {{agent}} from {{company}}. Welcome to {{program}}. This call is recorded and your information is kept confidential."
+      }
+    },
+    {
+      "key": "full_name",
+      "gather": true,
+      "on_fail": "hangup",
+      "max_attempts": 2,
+      "next": "mobile",
+      "say": {
+        "ar-EG": "ممكن تقولي اسمك بالكامل بعد الصُّفّارة؟",
+        "en-US": "After the beep, may I have your full name, please?"
+      }
+    },
+    {
+      "key": "mobile",
+      "gather": true,
+      "confirm": true,
+      "on_fail": "hangup",
+      "max_attempts": 3,
+      "next": "treatment",
+      "say": {
+        "ar-EG": "إيه رقم موبايلك؟",
+        "en-US": "What is your mobile number?"
+      }
+    },
+    {
+      "key": "treatment",
+      "gather": true,
+      "max_attempts": 2,
+      "next": "symptoms",
+      "say": {
+        "ar-EG": "إنت بتتصل بخصوص أنهي دوا أو علاج؟",
+        "en-US": "Which medication or treatment are you calling about?"
+      }
+    },
+    {
+      "key": "symptoms",
+      "gather": true,
+      "max_attempts": 2,
+      "next": "goodbye",
+      "say": {
+        "ar-EG": "عندك أي أعراض أو آثار جانبية حابب تبلغنا بيها؟",
+        "en-US": "Are you having any symptoms or side effects you would like to report?"
+      }
+    },
+    {
+      "key": "goodbye",
+      "say": {
+        "ar-EG": "شكراً ليك. ممرضة من {{program}} هتتواصل معاك في أقرب وقت. لو حالتك طارئة، كلم الإسعاف على طول.",
+        "en-US": "Thank you. A nurse from {{program}} will contact you shortly. If this is an emergency, call an ambulance right away."
+      }
+    }
+  ],
+  "commit": {
+    "records": [
+      {
+        "sobject": "Contact",
+        "fields": {
+          "LastName": "{{full_name}}",
+          "MobilePhone": "{{mobile}}"
+        }
+      },
+      {
+        "sobject": "Case",
+        "after": [
+          "Contact"
+        ],
+        "fields": {
+          "ContactId": "{{Contact.Id}}",
+          "Origin": "Phone",
+          "Status": "New",
+          "Subject": "{{program}} call",
+          "Description": "Treatment: {{treatment}}\nSymptoms reported: {{symptoms}}\n\nCaller questions:\n{{questions}}\n\n{{transcript}}"
+        }
+      }
+    ]
+  }
+}

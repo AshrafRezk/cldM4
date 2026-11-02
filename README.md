@@ -63,6 +63,7 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
 | [docs/using-console.md](docs/using-console.md) | **Use it.** Mint a key, send a playground chat, call every live tool |
 | [docs/claude-code-handoff.md](docs/claude-code-handoff.md) | **Claude Code (Opus).** Business brief + scripted phone → CRM contract; 120-minute implementation window |
+| [docs/salesforce-voice-setup.md](docs/salesforce-voice-setup.md) | Salesforce developer setup for voice: Named Credential, deploy, script, Visualforce call button, scheduled commit |
 | [docs/configuring-voice.md](docs/configuring-voice.md) | Set up a client's voice line: company name variables, questions, announcements, routes, CRM mapping, worked example |
 | [docs/voice.md](docs/voice.md) | Voice intake runbook: Twilio webhooks, script format, Salesforce deploy, retention |
 | [docs/next-steps.md](docs/next-steps.md) | **Current.** What remains to finish v1. Do not put secrets here |

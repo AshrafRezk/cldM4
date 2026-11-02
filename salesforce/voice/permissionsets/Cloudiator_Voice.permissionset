@@ -5,6 +5,7 @@
     <classAccesses><apexClass>CloudiatorVoicePublish</apexClass><enabled>true</enabled></classAccesses>
     <classAccesses><apexClass>CloudiatorVoiceCommit</apexClass><enabled>true</enabled></classAccesses>
     <classAccesses><apexClass>CloudiatorVoiceTemplates</apexClass><enabled>true</enabled></classAccesses>
+    <pageAccesses><apexPage>CloudiatorCall</apexPage><enabled>true</enabled></pageAccesses>
     <objectPermissions>
         <object>Cloudiator_Voice_Script__c</object>
         <allowCreate>true</allowCreate>

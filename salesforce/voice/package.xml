@@ -10,11 +10,21 @@
         <members>CloudiatorVoice</members>
         <members>CloudiatorVoicePublish</members>
         <members>CloudiatorVoiceCommit</members>
+        <members>CloudiatorVoiceCommitJob</members>
+        <members>CloudiatorVoiceCommitJobTest</members>
         <members>CloudiatorVoiceRecordings</members>
         <members>CloudiatorVoiceScriptBuilder</members>
         <members>CloudiatorVoiceTemplates</members>
         <members>CloudiatorVoiceTest</members>
         <name>ApexClass</name>
+    </types>
+    <types>
+        <members>CloudiatorCall</members>
+        <name>ApexPage</name>
+    </types>
+    <types>
+        <members>Cloudiator_Call_Link</members>
+        <name>CustomLabel</name>
     </types>
     <types>
         <members>Cloudiator_Voice</members>
