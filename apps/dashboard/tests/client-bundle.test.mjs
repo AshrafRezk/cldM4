@@ -30,6 +30,14 @@ test("the app has no login form and no Netlify Identity", () => {
   assert.equal(app.includes("shared password") || app.includes("no shared password"), true);
 });
 
+test("the mint form names voice intake and the Mini command that adds voice", () => {
+  const form = readFileSync(join(srcDir, "KeyForm.jsx"), "utf8");
+  const scopes = readFileSync(join(srcDir, "KeyScopes.jsx"), "utf8");
+  assert.match(form, /voice_intake: "Voice intake/);
+  assert.match(form, /set-capabilities --add voice/);
+  assert.match(scopes, /Voice is off/);
+});
+
 test("the landing page positions Cloudiator as Agentforce-native private AI", () => {
   const landing = readFileSync(join(srcDir, "Landing.jsx"), "utf8");
   assert.match(landing, /Agentforce/);

@@ -169,7 +169,23 @@ Templates: `{{step_key}}` → the trimmed answer (empty if none). `{{transcript}
 1. `~/Cloudiator/.env`: set `TWILIO_AUTH_TOKEN` (Twilio Console → Account → Auth Token). Optional: `VOICE_DB`, `VOICE_SESSION_TTL_DAYS`. `chmod 600`, restart the worker LaunchAgent. Never commit the token.
 2. Twilio number → Voice configuration → "A call comes in": Webhook, `POST https://api.cloudiator.org/v1/voice/twilio/inbound`. The gather URL comes back inside TwiML; nothing else to configure.
 3. Cloudflare: Bot Fight Mode / Browser Integrity Check must not challenge `api.cloudiator.org` — Twilio, like Apex, fails on an HTML interstitial ([operator-checklist.md](operator-checklist.md) §2).
-4. Mint a key with `voice` (preset `voice_intake` = `chat` + `voice`; `salesforce_engineer` now includes `voice`).
+4. The key Salesforce sends must include `voice` (`voice_intake` is `chat` + `voice`; `salesforce_engineer` includes `voice` too). A 403 whose message names the missing `voice` scope is the saved key, not Apex. From the Mini, after `git pull`:
+
+```bash
+cd /Users/ashrafrezk/cldM4/apps/worker
+.venv/bin/python -m app.dbtool list-keys
+.venv/bin/python -m app.dbtool set-capabilities --tenant merck --add voice
+```
+
+The secret does not change, so **Setup → CloudiatorPrincipal → ApiKey** can stay as it is. `list-keys` must show `voice=yes` before you retry the call. Expect HTTP 200 (do not paste the key into chat):
+
+```bash
+export API=https://api.cloudiator.org
+curl -s -o /dev/null -w '%{http_code}\n' "$API/v1/voice/scripts" \
+  -H "Authorization: Bearer $KEY"
+```
+
+If that key was pasted into a chat, mint a fresh one (`--preset voice_intake`), put that secret in **ApiKey**, and `revoke-key` the leaked public ids. The Console checkbox only helps after Netlify has deployed this repo; an older Console has no `voice` box and will mint another key without it.
 5. Deploy [`salesforce/voice`](../salesforce/voice/README.md), publish a script, place a call, check `GET /v1/voice/sessions?status=ready_to_commit`, run the Commit action, confirm the Lead and Task, confirm the session shows `committed`.
 
 Smoke test without a phone, from the Mini (signature computed with the same token):

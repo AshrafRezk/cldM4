@@ -161,7 +161,10 @@ async def test_voice_routes_need_the_voice_scope(make_client, install_key):
     async with make_client(headers) as client:
         response = await client.get("/v1/voice/sessions")
     assert response.status_code == 403
-    assert response.json()["error"]["code"] == "scope_denied"
+    body = response.json()["error"]
+    assert body["code"] == "scope_denied"
+    assert "set-capabilities" in body["message"]
+    assert "--add voice" in body["message"]
 
 
 async def test_bad_script_is_400_with_param(make_client, voice_key):

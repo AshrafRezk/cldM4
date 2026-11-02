@@ -48,6 +48,7 @@ Or zip deploy:
 | Text → Image | Chart (artifact URL); FLUX jobs if key has `image_generation` |
 | Image → Image | Image ops |
 | Binary → Mixed | Document extract/render |
-| Audio | **Not in v1 engineer preset** (Whisper / Phase G later). Leave Speech scopes off until the Mini exposes `/v1/audio/*`. |
+| Phone voice | Live. The key needs `voice` (`voice_intake`, or Salesforce engineer, which includes it). Without it, `/v1/voice` returns 403. On the Mini: `python -m app.dbtool set-capabilities <public_id> --add voice` (same secret). |
+| Whisper | Not live. Leave `transcriptions` / `tools.audio_ops` off. There is no `/v1/audio` yet. |
 
 Full console guide: Console → **Salesforce** tab after this ships, and [docs/salesforce-app.md](../docs/salesforce-app.md).

@@ -124,11 +124,11 @@ export const SERVICES = [
   },
   {
     id: "audio",
-    name: "Audio / speech",
-    path: "—",
-    flow: "—",
-    modality: "Audio → Text (later)",
-    note: "Not in v1 OpenAPI / engineer preset. Whisper lands with Phase G; do not promise /v1/audio yet.",
+    name: "Phone voice",
+    path: "POST /v1/voice/scripts",
+    flow: "Cloudiator voice (Apex)",
+    modality: "Phone → Salesforce",
+    note: "Needs the voice scope. Salesforce engineer and Voice intake include it. Whisper /v1/audio is not live.",
     body: null,
   },
 ];

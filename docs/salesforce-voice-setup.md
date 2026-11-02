@@ -218,7 +218,7 @@ System.debug(JSON.serializePretty(
 | --- | --- |
 | `401` from Apex, curl works | Principal access missing (1c), or the custom header formula is wrong |
 | JSON parse error, body starts with `<!DOCTYPE html` | Cloudflare challenged the callout; check Security Level and Browser Integrity Check for `api.cloudiator.org` |
-| `403 scope_denied` | The key lacks the `voice` capability; ask for a `voice_intake` key |
+| `403 scope_denied` naming `voice` | The key in **CloudiatorPrincipal → ApiKey** has no `voice` scope. On the Mini: `python -m app.dbtool set-capabilities <public_id> --add voice` (the secret stays). Retry when `GET /v1/voice/scripts` returns 200. |
 | Publish error "needs Arabic text" | Every greeting, closing, question and FAQ needs both texts when Languages lists both |
 | Publish error "must look like Object.Field" | Target Field, Transcript Field, Fixed Values and Record Links use API names, e.g. `Case.Subject` |
 | Call button shows "Preparing voice… n/22" | Normal for a few minutes after a publish |

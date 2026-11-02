@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
 import { haptic } from "./haptic.js";
 
@@ -15,8 +15,17 @@ export function KeyScopes({ keyRow, scopes, busy, setBusy, setError, onSaved }) 
   const original = keyRow.capabilities || [];
   const changed =
     capabilities.length !== original.length || capabilities.some((cap) => !original.includes(cap));
+  const boxes = useMemo(() => {
+    const caps = [...(scopes.capabilities || [])];
+    caps.sort((a, b) => Number(b === "voice") - Number(a === "voice"));
+    return caps;
+  }, [scopes]);
 
   async function save() {
+    if (original.includes("voice") && !capabilities.includes("voice")) {
+      const proceed = window.confirm("Remove voice? /v1/voice will return 403 once the worker cache expires.");
+      if (!proceed) return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -36,7 +45,7 @@ export function KeyScopes({ keyRow, scopes, busy, setBusy, setError, onSaved }) 
     <fieldset className="stack">
       <legend>Scopes</legend>
       <div>
-        {(scopes.capabilities || []).map((cap) => {
+        {boxes.map((cap) => {
           const on = capabilities.includes(cap);
           return (
             <label key={cap} className={on ? "chip on" : "chip"}>
@@ -67,6 +76,11 @@ export function KeyScopes({ keyRow, scopes, busy, setBusy, setError, onSaved }) 
           </button>
         ) : null}
       </div>
+      {capabilities.includes("voice") ? null : (
+        <p className="error">
+          Voice is off, so /v1/voice returns 403. Tick voice and save. The secret already in Salesforce stays valid.
+        </p>
+      )}
       {saved ? <p className="muted">{saved}</p> : null}
     </fieldset>
   );

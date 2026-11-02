@@ -3,11 +3,12 @@ import { api } from "./api.js";
 import { haptic } from "./haptic.js";
 
 const PRESET_LABELS = {
-  salesforce_engineer: "Salesforce engineer",
+  salesforce_engineer: "Salesforce engineer (includes voice)",
+  voice_intake: "Voice intake (chat + voice)",
   creative: "Creative",
   analyst: "Analyst",
   heavy: "Heavy (no 20B until Phase E)",
-  speech: "Speech",
+  speech: "Speech (transcriptions — not phone voice)",
 };
 
 export function KeyForm({ tenantId, scopes, busy, onMinted, setBusy, setError }) {
@@ -28,10 +29,23 @@ export function KeyForm({ tenantId, scopes, busy, onMinted, setBusy, setError })
     haptic("select");
   }
 
-  const boxes = useMemo(() => scopes.capabilities || [], [scopes]);
+  const boxes = useMemo(() => {
+    const caps = [...(scopes.capabilities || [])];
+    caps.sort((a, b) => Number(b === "voice") - Number(a === "voice"));
+    return caps;
+  }, [scopes]);
+  const voiceKnown = boxes.includes("voice");
+  const voiceOn = capabilities.includes("voice");
 
   async function submit(event) {
     event.preventDefault();
+    const presetCaps = scopes.presets[preset]?.capabilities || [];
+    if (presetCaps.includes("voice") && !capabilities.includes("voice")) {
+      const proceed = window.confirm(
+        "Voice is unticked. Phone calls and /v1/voice will return 403. Mint this key without voice?",
+      );
+      if (!proceed) return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -67,6 +81,15 @@ export function KeyForm({ tenantId, scopes, busy, onMinted, setBusy, setError })
           ))}
         </select>
       </label>
+      {voiceKnown && !voiceOn ? (
+        <p className="error">Voice is off. Salesforce voice routes return 403 until it is ticked.</p>
+      ) : null}
+      {voiceKnown ? null : (
+        <p className="error">
+          This console has no voice scope, so it is older than the repo. On the Mini, pull and run{" "}
+          <code>python -m app.dbtool set-capabilities --add voice</code>. The secret stays the same.
+        </p>
+      )}
       <fieldset>
         <legend>Scopes</legend>
         {boxes.map((cap) => {

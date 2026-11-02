@@ -16,11 +16,14 @@ Presets come from `packages/schema/scopes.json`. Tick extra checkboxes when a pr
 
 | Preset | What the key can do |
 | --- | --- |
-| Salesforce engineer | Chat, embeddings, OCR, maps, charts, stats, DuckDB, documents, text, holidays, image ops. Stream is forced off. Response cap is 1 MB. |
-| Creative | Chat, embeddings, FLUX image jobs, diagrams, OCR, image ops. |
-| Analyst | Chat, embeddings, charts, stats, DuckDB, documents, text. |
+| Salesforce engineer | Chat, embeddings, OCR, maps, charts, stats, DuckDB, documents, text, holidays, image ops, and **voice**. Stream is forced off. Response cap is 1 MB. |
+| Voice intake | Chat and **voice** only. Use this for a Salesforce org that places calls. Stream is forced off. |
+| Creative | Chat, embeddings, FLUX image jobs, diagrams, OCR, image ops. No voice unless you tick it. |
+| Analyst | Chat, embeddings, charts, stats, DuckDB, documents, text. No voice unless you tick it. |
 | Heavy | Chat and embeddings only. `gpt-oss:20b` is not installed. |
-| Speech | Checkboxes only. Transcription and audio routes are not in v1. |
+| Speech | Checkboxes only. Transcription and `/v1/audio` are not live. This is not phone voice. |
+
+Phone routes (`/v1/voice/*`) return **403** `scope_denied` until the key's scopes include `voice`. The detail page must list `voice` before you copy the secret into Salesforce. If the preset menu has no Voice intake and the scope list has no `voice` checkbox, the Console is an older deploy than this repo. Fix the key from the Mini (below). The secret does not change.
 
 These mint-form checkboxes have no route yet: `transcriptions`, `tools.audio_ops`, `tools.fx`, `tools.google_places`, `tools.face_detect`.
 
@@ -35,11 +38,36 @@ The **Usage** tab reads `usage_daily`. A chat can take about 15 seconds to appea
 The dashboard is the normal path. The CLI prints the same one-time secret:
 
 ```bash
-cd /Users/ashrafrezk/cldM4/apps/worker
+cd /Users/ashrafrezk/cldM4
+git pull
+cd apps/worker
+.venv/bin/python -m app.dbtool list-keys
 .venv/bin/python -m app.dbtool mint-key \
   --tenant cloudiator --name 'Playground' --preset salesforce_engineer
 .venv/bin/python -m app.dbtool revoke-key <public_id>
 ```
+
+`list-keys` prints `voice=yes` or `voice=NO` and the scopes. A key Salesforce already stores does not need a new secret. Add voice, then flush the worker cache (the command does that when `ADMIN_TOKEN` is in `~/Cloudiator/.env`):
+
+```bash
+cd /Users/ashrafrezk/cldM4/apps/worker
+.venv/bin/python -m app.dbtool set-capabilities --tenant merck --add voice
+# or one key, public id only (list-keys prints it):
+.venv/bin/python -m app.dbtool set-capabilities <public_id> --add voice
+# or replace the scopes with the voice preset:
+.venv/bin/python -m app.dbtool set-capabilities <public_id> --preset voice_intake
+```
+
+Prove it. Expect `200`. Keep the key in the password manager. Do not paste it into chat.
+
+```bash
+export API=https://api.cloudiator.org
+export KEY='sk-cld-…'   # the same value as Setup → CloudiatorPrincipal → ApiKey
+curl -s -o /dev/null -w '%{http_code}\n' "$API/v1/voice/scripts" \
+  -H "Authorization: Bearer $KEY"
+```
+
+`200` means that same key can call voice. Put it in Salesforce only if it is not already there. If a secret was pasted into a chat, mint a new `voice_intake` key, store that one in **ApiKey**, then `revoke-key` the public ids that leaked.
 
 The CLI reads `/Users/ashrafrezk/Cloudiator/.env` itself. Do not `source` that file.
 

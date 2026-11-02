@@ -63,10 +63,14 @@ Browser minting, the playground, and one curl per live tool: `docs/using-console
 ```bash
 cd apps/worker
 .venv/bin/python -m app.dbtool verify-schema
+.venv/bin/python -m app.dbtool list-keys
 .venv/bin/python -m app.dbtool mint-key \
   --tenant cloudiator --name 'Salesforce dev' --preset salesforce_engineer
+.venv/bin/python -m app.dbtool set-capabilities --tenant merck --add voice
 .venv/bin/python -m app.dbtool revoke-key <public_id>
 ```
+
+`set-capabilities` edits scopes on a key Salesforce already holds. The secret does not change. `list-keys` prints `voice=yes` or `voice=NO`. After a change the command flushes the worker key cache on `127.0.0.1` when `ADMIN_TOKEN` is set.
 
 The CLI reads `~/Cloudiator/.env` itself (override with `CLOUDIATOR_ENV_FILE`)
 for anything the shell has not already set, so there is nothing to source first.
