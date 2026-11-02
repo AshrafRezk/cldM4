@@ -376,16 +376,16 @@ def looks_like_question(text: str, language: str) -> bool:
     heard = normalize_answer(text)
     if ("?" in text or "؟" in text) and len(heard.split()) >= 4:
         return True
-    words = _QUESTION_WORDS["ar" if language.lower().startswith("ar") else "en"]
+    # Both lists on either line: "what time do you close" on the Arabic line is a question too.
+    words = _QUESTION_WORDS["ar"] + _QUESTION_WORDS["en"]
     return any(heard.startswith(" " + normalize_answer(w).strip() + " ") for w in words)
 
 
 def match_faq(script: Mapping[str, Any], text: str, language: str) -> str | None:
     heard = normalize_answer(text)
     for item in script.get("faq") or []:
-        for keyword in item["when"].get(language) or []:
-            if keyword.strip() and keyword.strip() in heard:
-                return item["key"]
+        if any(keyword in heard for keyword in _keywords(item["when"], language)):
+            return item["key"]
     return None
 
 
@@ -477,12 +477,21 @@ def clean_answer(text: str) -> str:
     return text.strip().rstrip(".,،؛;:!?؟…").strip()
 
 
+def _keywords(when: Mapping[str, list[str]], language: str) -> list[str]:
+    """The caller's language first, then every other one: Egyptian callers mix
+    Arabic, English and French, so "new" on the Arabic line still counts."""
+    ordered = list(when.get(language) or [])
+    for lang, words in when.items():
+        if lang != language:
+            ordered += [w for w in words if w not in ordered]
+    return [w.strip() for w in ordered if w.strip()]
+
+
 def pick_route(step: Mapping[str, Any], answer: str, language: str) -> dict[str, Any] | None:
     heard = normalize_answer(answer)
     for route in step.get("routes") or []:
-        for keyword in route["when"].get(language) or []:
-            if keyword.strip() and keyword.strip() in heard:
-                return route
+        if any(keyword in heard for keyword in _keywords(route["when"], language)):
+            return route
     return None
 
 

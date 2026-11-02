@@ -134,6 +134,8 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
             await _run(
                 [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
                  "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
+                 # No initial prompt: tested on real Egyptian/English calls, it
+                 # leaks its own words into transcripts ("مش عارف. مفهمتش.").
                  "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
                  "-otxt", "-of", str(base)],
                 STT_TIMEOUT,
@@ -141,7 +143,48 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
             text_path = base.with_suffix(".txt")
             text = text_path.read_text(encoding="utf-8", errors="replace") if text_path.exists() else ""
     # whisper.cpp marks silence and noise as [BLANK_AUDIO], (music), etc.
-    return normalize_digits(" ".join(NOISE_TAGS.sub(" ", text).split()))
+    text = " ".join(NOISE_TAGS.sub(" ", text).split())
+    return normalize_digits(collapse_repeats(drop_hallucinations(text)))
+
+
+# What whisper writes when it hears near-silence: subtitle credits and channel
+# outros from its training data. Measured on real calls ("ترجمة نانسي قنقر",
+# "اشتركوا في القناة"); a line made of these is silence, so the caller is asked again.
+HALLUCINATIONS = [
+    "ترجمة نانسي قنقر", "نانسي قنقر", "اشتركوا في القناة", "اشترك في القناة", "لا تنسوا الاشتراك",
+    "شكرا للمشاهدة", "شكراً للمشاهدة", "شكرا على المشاهدة", "ترجمة", "موسيقى",
+    "thanks for watching", "thank you for watching", "please subscribe", "subscribe to the channel",
+    "subtitles by", "amara.org", "merci d'avoir regardé", "sous-titres",
+]
+_HALLUCINATION_PATTERNS = sorted(HALLUCINATIONS, key=len, reverse=True)
+
+
+def drop_hallucinations(text: str) -> str:
+    lowered = text.lower()
+    for phrase in _HALLUCINATION_PATTERNS:
+        lowered = lowered.replace(phrase, " ")
+    if not re.sub(r"[\W_]+", "", lowered):
+        return ""
+    return text
+
+
+def collapse_repeats(text: str) -> str:
+    """"I don't get your question. I don't get your question." -> once."""
+    words = text.split()
+    changed = True
+    while changed:
+        changed = False
+        for size in range(len(words) // 2, 0, -1):
+            for start in range(0, len(words) - 2 * size + 1):
+                a = [w.strip(".,،!?؟") for w in words[start:start + size]]
+                b = [w.strip(".,،!?؟") for w in words[start + size:start + 2 * size]]
+                if a == b and (size > 1 or len(a[0]) > 2):
+                    del words[start + size:start + 2 * size]
+                    changed = True
+                    break
+            if changed:
+                break
+    return " ".join(words)
 
 
 def normalize_digits(text: str) -> str:

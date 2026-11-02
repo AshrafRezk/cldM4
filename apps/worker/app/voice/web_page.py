@@ -206,7 +206,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
         let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length); const now = performance.now();
         peak = Math.max(peak, rms);
-        const threshold = Math.max(0.01, noise * 3);
+        const threshold = Math.max(0.005, noise * 3);
         if (!speaking) {
           if (rms > threshold) {
             speaking = true; lastVoice = now; firstVoice = now - started; chunks.push(...preroll, data); voiced++;
@@ -229,7 +229,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
         // What the speech detector saw, for tuning (sent only with debug on).
         const diag = {
           sample_rate: ctx.sampleRate, ended: why, detected: heard,
-          noise_floor: +noise.toFixed(5), threshold: +Math.max(0.01, noise * 3).toFixed(5),
+          noise_floor: +noise.toFixed(5), threshold: +Math.max(0.005, noise * 3).toFixed(5),
           peak: +peak.toFixed(5), voiced_chunks: voiced, first_voice_ms: firstVoice && Math.round(firstVoice),
           window_ms: Math.round(performance.now() - started),
         };
