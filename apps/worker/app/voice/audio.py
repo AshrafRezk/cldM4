@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import speech
+from .pronounce import spoken
 from .engine import (
     CONFIRM_AGAIN,
     CONFIRM_RIGHT,
@@ -70,7 +71,9 @@ def _lang(language: str) -> str:
 
 def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, Any]]:
     """Every fixed line a caller can hear, per persona and language. With
-    personas, `{{agent}}` is their name and each speaks in their own voice."""
+    personas, `{{agent}}` is their name and each speaks in their own voice.
+    `text` is what the caller's page shows; `spoken` (with harakat, see
+    pronounce.py) is what the voice renders and what keys the rendered clip."""
     lines = []
     for persona in script.get("personas") or [None]:
         pid = persona["id"] if persona else None
@@ -98,6 +101,8 @@ def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, 
                 lines.append({**base, "key": "__again__", "text": CONFIRM_AGAIN[lang]})
                 for digit, word in enumerate(DIGIT_WORDS[lang]):
                     lines.append({**base, "key": f"__digit_{digit}", "text": word})
+    for line in lines:
+        line["spoken"] = spoken(line["text"], line["language"], script)
     return lines
 
 
@@ -175,7 +180,9 @@ class VoiceAudio:
             if recording.is_file():
                 return _data_url(recording.read_bytes()), "recording"
         if self.engine != "say":
-            rendered = self.rendered_path(self.speaker_for(script, language, chosen), language, text)
+            rendered = self.rendered_path(
+                self.speaker_for(script, language, chosen), language, spoken(text, language, script)
+            )
             if rendered.is_file():
                 return _data_url(rendered.read_bytes(), rendered.suffix), "rendered"
         # Gender only binds when someone chose the voice (a persona, or the
@@ -209,7 +216,8 @@ class VoiceAudio:
         paths = []
         for key, text in pieces:
             recording = self.recording_path(tenant_id, script["id"], key, language, pid)
-            rendered = (self.rendered_path(self.speaker_for(script, language, chosen), language, text)
+            rendered = (self.rendered_path(self.speaker_for(script, language, chosen), language,
+                                           spoken(text, language, script))
                         if self.engine != "say" else None)
             path = recording if recording.is_file() else rendered if rendered and rendered.is_file() else None
             if path is None:
@@ -274,7 +282,7 @@ class VoiceAudio:
             ).is_file():
                 source = "recording"
             elif self.engine != "say" and self.rendered_path(
-                line["speaker"], line["language"], line["text"]
+                line["speaker"], line["language"], line["spoken"]
             ).is_file():
                 source = "rendered"
             else:
@@ -319,7 +327,7 @@ class VoiceAudio:
         langs = {lang: i for i, lang in enumerate(languages_of(script))}
         missing = sorted(
             (line for line in self.lines(script)
-             if not self.rendered_path(line["speaker"], line["language"], line["text"]).is_file()),
+             if not self.rendered_path(line["speaker"], line["language"], line["spoken"]).is_file()),
             key=lambda line: (people.get(line.get("persona"), 0), langs.get(line["language"], 0),
                               order.get(line["key"], 99)),
         )
@@ -335,7 +343,7 @@ class VoiceAudio:
     async def _run(self) -> None:
         while not self.queue.empty():
             batch = self.queue.get_nowait()
-            pending = [l for l in batch if not self.rendered_path(l["speaker"], l["language"], l["text"]).is_file()]
+            pending = [l for l in batch if not self.rendered_path(l["speaker"], l["language"], l["spoken"]).is_file()]
             if pending:
                 try:
                     await self._render(pending)
@@ -360,11 +368,11 @@ class VoiceAudio:
             nonlocal done
             async with gate:
                 try:
-                    audio = await azure_tts(line["text"], line["speaker"], self.settings)
+                    audio = await azure_tts(line["spoken"], line["speaker"], self.settings)
                 except speech.SpeechUnavailable as exc:
                     errors.append(str(exc))
                     return
-            target = self.rendered_path(line["speaker"], line["language"], line["text"], "azure")
+            target = self.rendered_path(line["speaker"], line["language"], line["spoken"], "azure")
             target.parent.mkdir(parents=True, exist_ok=True)
             part = target.with_suffix(".part")
             part.write_bytes(audio)
@@ -383,7 +391,7 @@ class VoiceAudio:
         script = Path(__file__).with_name("voicetut_render.py")
         with tempfile.TemporaryDirectory() as tmp:
             jobs = [
-                {"text": l["text"], "language": _lang(l["language"]), "speaker": l["speaker"],
+                {"text": l["spoken"], "language": _lang(l["language"]), "speaker": l["speaker"],
                  "wav": str(Path(tmp) / f"{i}.wav")}
                 for i, l in enumerate(lines)
             ]
@@ -401,7 +409,7 @@ class VoiceAudio:
                 line, wav = lines[index], Path(jobs[index]["wav"])
                 if not wav.is_file():
                     return
-                target = self.rendered_path(line["speaker"], line["language"], line["text"], "voicetut")
+                target = self.rendered_path(line["speaker"], line["language"], line["spoken"], "voicetut")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tmp_out = target.with_suffix(".part.m4a")
                 await speech._run(

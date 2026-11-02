@@ -268,6 +268,15 @@ class VoiceStore:
             rows = conn.execute(sql, args).fetchall()
         return [_session(row) for row in rows]  # type: ignore[misc]
 
+    def sessions_with_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Across tenants, oldest first: for the Mini's own background work."""
+        with self._db() as conn:
+            rows = conn.execute(
+                "SELECT * FROM voice_sessions WHERE status = ? ORDER BY updated_at ASC LIMIT ?",
+                (status, limit),
+            ).fetchall()
+        return [_session(row) for row in rows]  # type: ignore[misc]
+
     def update_session(self, session_id: str, **fields: Any) -> None:
         if not fields:
             return

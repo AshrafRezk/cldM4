@@ -129,7 +129,7 @@ async def test_calls_wait_until_a_voice_is_fully_rendered(make_client, install_k
 
     def render(lines):
         for line in lines:
-            path = main.voice_audio.rendered_path(line["speaker"], line["language"], line["text"])
+            path = main.voice_audio.rendered_path(line["speaker"], line["language"], line["spoken"])
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"rendered-audio")
 
