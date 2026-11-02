@@ -28,12 +28,12 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 
 ## Finish line
 
-- [ ] **1. Reboot clears leftover swap** so `/v1/health` returns `"ok": true` and `swap_used_mb` is 0. *(Mini operator — cannot do from Cloud Agent.)*
-- [ ] **2. Playground chat** from `https://app.cloudiator.org/console` returns JSON and a `usage_daily` row appears. *(Mini / browser with Access.)*
-- [ ] **3. Neon retention nightly on the Mini.** Repo now has `scripts/run-neon-retention.sh` + `scripts/install-retention-launchagent.sh`. On the Mini: run the installer, then one manual `run-neon-retention.sh`. Do not use `pg_cron`.
-- [ ] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Redirect is already in `apps/dashboard/netlify.toml`. Prove after production deploy: `curl -sI https://cloudiator.netlify.app/ | grep -i location`.
+- [x] **1. Reboot clears leftover swap.** 2026-11-02: local and public `/v1/health` both `"ok": true`, `swap_used_mb` 0, `degraded` [], `db` ok, both models loaded.
+- [x] **2. Playground chat** → `usage_daily`. Neon on 2026-11-02 shows `/v1/chat/completions` 5 calls / 0 errors on 2026-09-27, plus later `/v1/models`, `/v1/embeddings`, `/v1/usage` days.
+- [x] **3. Neon retention nightly on the Mini.** `ai.cloudiator.retention` is installed and ran clean through 2026-10-31. From 2026-11-01 every run hit Neon's cold start against the 3s connect timeout; the script now uses 30s plus 3 retries (`RETENTION_CONNECT_TIMEOUT_SECONDS`, `RETENTION_ATTEMPTS`). Manual run 2026-11-02: `retention ok: usage_events=3 older_than_30d=0 usage_daily_rows=8`.
+- [ ] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Redirect is already in `apps/dashboard/netlify.toml`. Prove after production deploy: `curl -sI https://cloudiator.netlify.app/ | grep -i location`. 2026-11-02: from the Mini's network Netlify's edge IPs (35.157.26.135, 63.176.8.218) time out while netlify.com loads, so check from another network (phone hotspot).
 - [x] **5. Phase F worker code** — `force_no_stream` accepts `stream: true` with `x-cloudiator-stream-downgraded: true`; `max_response_bytes` returns artifact + truncated preview. Tests: `test_sf_stream_downgrade.py`, `test_response_size_cap.py`. **Still open on a Salesforce org:** External Services import + real Apex callout ([salesforce.md](salesforce.md)).
-- [ ] **6. Unattended boot** — one FileVault policy in operator-checklist §6, auto-login, no computer sleep, and a tested health alert. *(Mini operator.)*
+- [ ] **6. Unattended boot** — checked 2026-11-02: FileVault **off**, auto-login `ashrafrezk`, `autorestart 1` (start after power failure), `sleep 0`, `womp 1`. Health alert: `scripts/health-ping.sh` + `scripts/install-health-launchagent.sh` (host-setup §10), transitions tested in dry-run. **Open:** set `SLACK_WEBHOOK_URL` or `NTFY_URL`, install the agent, stop the worker once and see the alert; tick the FileVault-off option in operator-checklist §6.
 
 After v1 is green, next bets (voice console, CRM write-back, WhatsApp, RAG, rembg, …) live in **[future-phases.md](future-phases.md)**.
 

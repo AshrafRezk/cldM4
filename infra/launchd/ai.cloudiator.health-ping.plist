@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. scripts/install-health-launchagent.sh substitutes __HOME__ and __REPO__.
+  Every 120s. Local probe plus one public probe through the tunnel; never touches Neon.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.cloudiator.health-ping</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__REPO__/scripts/health-ping.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Cloudiator/logs/health-ping.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Cloudiator/logs/health-ping.err</string>
+</dict>
+</plist>

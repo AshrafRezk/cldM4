@@ -60,6 +60,7 @@ The Mini holds one process for weeks; Neon computes auto-suspend when idle and d
 | `DB_POOL_MIN` | `0` | one appliance, one process |
 | `DB_POOL_MAX` | `2` | more connections buy nothing and cost Neon quota |
 | `DB_CONNECT_TIMEOUT_SECONDS` | `3` | never block a request on a cold compute |
+| `RETENTION_CONNECT_TIMEOUT_SECONDS` | `30` | nightly retention only (`scripts/run-neon-retention.sh`): the 03:15 run wakes a suspended compute, which can take longer than 3s. `RETENTION_ATTEMPTS` (default 3) retries |
 | `DB_STATEMENT_TIMEOUT_SECONDS` | `5` | a slow query must not eat the request budget |
 | `DB_POOL_RECYCLE_SECONDS` | `300` | shorter than Neon's idle-suspend window |
 
@@ -120,6 +121,7 @@ Public `/v1/admin/*` is Cloudflare Access + JWT validation, not a bearer token. 
 | `RESEARCH_CACHE_TTL_SECONDS` | `3600`. Successful lookups only. A source that failed is not cached |
 | `GOOGLE_MAPS_API_KEY` | optional; requires scope `tools.google_places` **and** accepting Google's ToS |
 | `SLACK_WEBHOOK_URL` | optional but strongly recommended — this is how you learn the Mini is down |
+| `NTFY_URL` | optional alternative/addition to Slack for `scripts/health-ping.sh`: `https://ntfy.sh/<long-random-topic>`; treat the topic like a secret |
 | `HF_TOKEN` | optional; FLUX schnell is Apache 2.0 and does not need one |
 
 ## Mini worker — renderers
