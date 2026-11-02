@@ -93,24 +93,36 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   }
 
   // Record one answer: wait up to `timeout` s for speech, stop after a pause.
+  // Half a second before the detected start is kept, so the first syllable of
+  // a short answer (a name) is not cut off. The noise floor follows the room
+  // while nobody is talking instead of being guessed from the first frames.
   function listen(spec) {
     return new Promise((resolve) => {
       const proc = ctx.createScriptProcessor(4096, 1, 1);
-      const chunks = []; const started = performance.now();
-      const pauseMs = spec.speech_timeout === "auto" ? 1200 : Math.max(500, Number(spec.speech_timeout) * 1000 || 1200);
-      let noise = 0, frames = 0, speaking = false, lastVoice = 0;
+      const chunks = [], preroll = []; const started = performance.now();
+      const prerollChunks = Math.ceil((0.5 * ctx.sampleRate) / 4096);
+      const pauseMs = spec.speech_timeout === "auto" ? 1300 : Math.max(500, Number(spec.speech_timeout) * 1000 || 1300);
+      let noise = 0.004, speaking = false, lastVoice = 0, voiced = 0;
       proc.onaudioprocess = (e) => {
         if (!live) { finish(false); return; }
-        const data = e.inputBuffer.getChannelData(0);
+        const data = new Float32Array(e.inputBuffer.getChannelData(0));
         let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length); const now = performance.now();
-        if (frames < 4) { noise = Math.max(noise, rms); frames++; return; }
-        const threshold = Math.max(0.015, noise * 3);
-        if (rms > threshold) { speaking = true; lastVoice = now; }
-        if (speaking) chunks.push(new Float32Array(data));
-        if (speaking && now - lastVoice > pauseMs) finish(true);
-        else if (!speaking && now - started > spec.timeout * 1000) finish(false);
-        else if (now - started > 25000) finish(speaking);
+        const threshold = Math.max(0.01, noise * 3);
+        if (!speaking) {
+          if (rms > threshold) {
+            speaking = true; lastVoice = now; chunks.push(...preroll, data); voiced++;
+          } else {
+            noise = noise * 0.9 + rms * 0.1;
+            preroll.push(data); if (preroll.length > prerollChunks) preroll.shift();
+            if (now - started > spec.timeout * 1000) finish(false);
+          }
+          return;
+        }
+        chunks.push(data);
+        if (rms > threshold) { lastVoice = now; voiced++; }
+        if (now - lastVoice > pauseMs) finish(voiced > 1);
+        else if (now - started > 30000) finish(true);
       };
       let done = false;
       function finish(heard) {
@@ -123,20 +135,22 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
     });
   }
 
+  // 16-bit mono WAV at the microphone's own rate. The Mini resamples with
+  // ffmpeg; decimating here without a filter aliases and hurts recognition.
   function wav(chunks, rate) {
     const len = chunks.reduce((n, c) => n + c.length, 0);
-    const ratio = rate / 16000, outLen = Math.floor(len / ratio);
-    const all = new Float32Array(len); let o = 0;
-    for (const c of chunks) { all.set(c, o); o += c.length; }
-    const buf = new ArrayBuffer(44 + outLen * 2), v = new DataView(buf);
+    const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
     const str = (p, s) => { for (let i = 0; i < s.length; i++) v.setUint8(p + i, s.charCodeAt(i)); };
-    str(0, "RIFF"); v.setUint32(4, 36 + outLen * 2, true); str(8, "WAVE"); str(12, "fmt ");
+    str(0, "RIFF"); v.setUint32(4, 36 + len * 2, true); str(8, "WAVE"); str(12, "fmt ");
     v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-    v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-    str(36, "data"); v.setUint32(40, outLen * 2, true);
-    for (let i = 0; i < outLen; i++) {
-      const s = Math.max(-1, Math.min(1, all[Math.floor(i * ratio)]));
-      v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, "data"); v.setUint32(40, len * 2, true);
+    let o = 44;
+    for (const c of chunks) {
+      for (let i = 0; i < c.length; i++, o += 2) {
+        const s = Math.max(-1, Math.min(1, c[i]));
+        v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
     }
     return new Blob([buf], { type: "audio/wav" });
   }
@@ -170,7 +184,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
     hangBtn.textContent = t$.hang;
     callBtns.forEach((b) => { b.disabled = true; }); status(t$.connecting);
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       await ctx.resume();
       source = ctx.createMediaStreamSource(stream);

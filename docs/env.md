@@ -138,7 +138,7 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `WHISPER_MODEL` | `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin` | ggml weights; missing → each answer is `503 speech_unavailable` |
 | `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
-| `VOICE_WEB_MAX_AUDIO_BYTES` | `2000000` | cap on one recorded answer |
+| `VOICE_WEB_MAX_AUDIO_BYTES` | `6000000` | cap on one recorded answer (the page sends 16-bit WAV at the mic's own rate, ~96 KB/s at 48 kHz, ≈ 60 s) |
 | `VOICE_TTS_ENGINE` | `voicetut` | `voicetut` renders script lines at publish time; `say` turns rendering off (macOS voices only) |
 | `VOICETUT_PYTHON` | `~/Cloudiator/tts-venv/bin/python` | the isolated venv with torch, OmniVoice, and voicetut-tts |
 | `VOICETUT_THREADS` | `6` | CPU threads for a render (it runs `nice -n 10`) |

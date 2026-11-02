@@ -178,6 +178,11 @@ class VoiceStore:
             return None
         return row["tenant_id"], row["version"], json.loads(row["definition"])
 
+    def active_scripts(self) -> list[dict[str, Any]]:
+        with self._db() as conn:
+            rows = conn.execute("SELECT definition FROM voice_scripts WHERE active = 1").fetchall()
+        return [json.loads(row["definition"]) for row in rows]
+
     def script_by_id(self, tenant_id: str, script_id: str) -> tuple[int, dict[str, Any]] | None:
         with self._db() as conn:
             row = conn.execute(
