@@ -30,6 +30,8 @@ TTS_TIMEOUT = 30.0
 STT_TIMEOUT = 45.0
 MAX_UTTERANCE_SECONDS = 30
 
+ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
+DIGIT_GAP = re.compile(r"(?<=\d)[ \-\u2010-\u2015]+(?=\d)")
 NOISE_TAGS = re.compile(r"\[[^\]]*\]|\([^)]*\)")
 
 _stt_lock = asyncio.Semaphore(1)
@@ -139,4 +141,11 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
             text_path = base.with_suffix(".txt")
             text = text_path.read_text(encoding="utf-8", errors="replace") if text_path.exists() else ""
     # whisper.cpp marks silence and noise as [BLANK_AUDIO], (music), etc.
-    return " ".join(NOISE_TAGS.sub(" ", text).split())
+    return normalize_digits(" ".join(NOISE_TAGS.sub(" ", text).split()))
+
+
+def normalize_digits(text: str) -> str:
+    """Spoken numbers come back grouped ("01-01-2-3-4", "٠١٠ ١٢٣"). A phone or
+    account number is one token in a CRM field, so digits become 0-9 and the
+    dashes/spaces between digits go. Decimal points and other text stay."""
+    return DIGIT_GAP.sub("", text.translate(ARABIC_DIGITS))

@@ -18,9 +18,7 @@ git pull origin main
 pass "main at $(git rev-parse --short HEAD)"
 
 section "Worker"
-launchctl kickstart -k "gui/$UID/ai.cloudiator.worker" 2>/dev/null \
-  || warn "kickstart failed — is ai.cloudiator.worker installed?"
-sleep 3
+"$ROOT/scripts/restart-worker.sh" || warn "restart failed — is ai.cloudiator.worker installed?"
 HEALTH="$(/usr/bin/curl -sS --max-time 10 http://127.0.0.1:8080/v1/health || true)"
 echo "$HEALTH" | /usr/bin/python3 -m json.tool 2>/dev/null || echo "$HEALTH"
 
