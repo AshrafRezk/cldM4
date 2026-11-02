@@ -196,7 +196,7 @@ class Settings:
         default_factory=lambda: os.path.expanduser(_str("VOICE_AUDIO_DIR", "~/Cloudiator/voice-audio"))
     )
     voice_web_max_audio_bytes: int = field(
-        default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 2_000_000)
+        default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 6_000_000)
     )
 
     health_rpm: int = field(default_factory=lambda: _int("HEALTH_RPM", 120))

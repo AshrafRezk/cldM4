@@ -190,6 +190,14 @@ async def lifespan(app: FastAPI):
             jobs.start()
     except Exception as exc:  # noqa: BLE001
         scheduler.mark_degraded("jobs", f"cannot open {settings.queue_db}: {exc}")
+    # Scripts published before a voice engine (or a speaker) existed still get
+    # natural audio; lines that already have a clip are skipped.
+    try:
+        queued = sum(voice_audio.schedule(script) for script in voice.store.active_scripts())
+        if queued:
+            log.info("voice: %d script lines queued for rendering", queued)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("voice: could not queue renders at boot: %s", exc)
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
     artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")

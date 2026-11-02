@@ -133,7 +133,7 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
             seconds = max(0, wav.stat().st_size - 44) / 32000  # 16 kHz, 16-bit mono
             await _run(
                 [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
-                 "--no-gpu", "-t", str(settings.whisper_threads),
+                 "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
                  "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
                  "-otxt", "-of", str(base)],
                 STT_TIMEOUT,
