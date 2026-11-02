@@ -128,7 +128,7 @@ private class CloudiatorVoiceTest {
                    Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
                    Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
+                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c, Read_Back__c FROM Questions__r ORDER BY Order__c)
             FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
         ];
         Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
@@ -151,6 +151,10 @@ private class CloudiatorVoiceTest {
         System.assertEquals('{{transcript}}', caseFields.get('Description'));
         System.assertEquals('Phone', caseFields.get('Origin'));
         System.assertEquals(new List<String>{ 'Contact' }, caseRec.get('after'));
+        Map<String, Object> mobile = (Map<String, Object>) steps[2];
+        System.assertEquals('mobile', mobile.get('key'));
+        System.assertEquals(true, mobile.get('confirm'), 'phone numbers are read back');
+        System.assertEquals(null, ((Map<String, Object>) steps[1]).get('confirm'));
     }
 
     @IsTest
@@ -162,7 +166,7 @@ private class CloudiatorVoiceTest {
                        Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
                        Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
                        (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                               Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
+                               Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c, Read_Back__c FROM Questions__r ORDER BY Order__c)
                 FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
             ];
             Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);

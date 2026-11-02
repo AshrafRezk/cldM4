@@ -27,6 +27,8 @@ public with sharing class CloudiatorVoiceTemplates {
         Q(String key, String ar, String en, String target, Boolean required) {
             this.key = key; this.ar = ar; this.en = en; this.target = target; this.required = required;
         }
+        // Numbers are read back to the caller; names and free text are not.
+        Boolean readBack() { return target != null && (target.endsWith('Phone') || key == 'mobile'); }
     }
 
     @InvocableMethod(label='Create Cloudiator voice script from template'
@@ -105,7 +107,7 @@ public with sharing class CloudiatorVoiceTemplates {
             rows.add(new Cloudiator_Voice_Question__c(
                 Script__c = script.Id, Order__c = (i + 1) * 10, Step_Key__c = q.key,
                 Arabic_Text__c = q.ar, English_Text__c = q.en, Target_Field__c = q.target,
-                Required__c = q.required, Max_Attempts__c = 2
+                Required__c = q.required, Max_Attempts__c = q.readBack() ? 3 : 2, Read_Back__c = q.readBack()
             ));
         }
         insert as user rows;

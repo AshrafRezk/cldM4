@@ -55,6 +55,40 @@ OFF_SCRIPT_MESSAGES = {
 }
 BACK_MESSAGES = {"ar": "نرجع لسؤالنا.", "en": "Now, back to my question."}
 
+# Read-back of number answers: "قلت 0 1 0 1…، صح كده؟". The digits and these
+# frames are pre-rendered per voice and stitched together during the call.
+CONFIRM_SAID = {"ar": "قلت", "en": "You said"}
+CONFIRM_RIGHT = {"ar": "صح كده؟", "en": "Is that right?"}
+CONFIRM_AGAIN = {"ar": "معلش، ممكن تقولها تاني؟", "en": "Sorry, could you say it again?"}
+DIGIT_WORDS = {
+    "ar": ["صفر", "واحد", "اتنين", "تلاتة", "أربعة", "خمسة", "ستة", "سبعة", "تمانية", "تسعة"],
+    "en": ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"],
+}
+_YES = {"ايوه", "ايوا", "ايوة", "اه", "آه", "صح", "صحيح", "مظبوط", "مضبوط", "تمام", "نعم", "بالظبط", "اكيد", "ماشي",
+        "yes", "yeah", "yep", "correct", "right", "exactly", "sure", "ok", "okay", "oui", "exact", "voila"}
+_NO = {"لا", "لأ", "لاء", "غلط", "مش", "no", "nope", "wrong", "incorrect", "non", "pas"}
+
+
+def yes_no(text: str) -> bool | None:
+    """"أيوه صح" -> True, "لأ غلط" / "مش صح" -> False, anything else -> None."""
+    words = normalize_answer(text).split()
+    if any(w in _NO for w in words) or "مش صح" in " ".join(words):
+        return False
+    if any(w in _YES for w in words):
+        return True
+    return None
+
+
+def digits_in(text: str) -> str:
+    return "".join(re.findall(r"\d", text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2))))
+
+
+def confirm_text(digits: str, language: str) -> str:
+    lang = "ar" if language.lower().startswith("ar") else "en"
+    return f"{CONFIRM_SAID[lang]} {' '.join(digits)}، {CONFIRM_RIGHT[lang]}" if lang == "ar" else \
+        f"{CONFIRM_SAID[lang]} {' '.join(digits)}. {CONFIRM_RIGHT[lang]}"
+
+
 HOLD_MESSAGES = {
     "ar": "أنا بخلّص مكالمة دلوقتي وهبدأ معاك على طول. متقفلش من فضلك، وشكراً على صبرك!",
     "en": "I'm just finishing a call and will be with you right away. Please don't hang up, and thank you for your patience!",
@@ -131,6 +165,9 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
             raise ScriptInvalid(f"{where}.on_fail must be continue or hangup.", f"{where}.on_fail")
         gather = bool(raw.get("gather", False))
         routes = _routes(raw.get("routes"), languages, f"{where}.routes")
+        confirm = bool(raw.get("confirm", False))
+        if confirm and not gather:
+            raise ScriptInvalid(f"{where}: only a question can read its answer back.", f"{where}.confirm")
         if routes and not gather:
             raise ScriptInvalid(f"{where}: only a question (gather) can route on the answer.", f"{where}.routes")
         steps.append(
@@ -143,6 +180,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
                 "speech_timeout": str(raw.get("speech_timeout", "auto")),
                 "max_attempts": _bounded_int(raw.get("max_attempts", 2), 1, 5, f"{where}.max_attempts"),
                 "on_fail": on_fail,
+                # Read a number answer back digit by digit and ask "is that right?".
+                "confirm": confirm,
                 "next": nxt,
             }
         )
@@ -666,6 +705,8 @@ class VoiceEngine:
             # Same question, same attempt: asking something is not a failed answer.
             verbs.append(self._gather_verb({**session, "turns": turns, "turn": next_turn}, current))
             reply = _reply(script, verbs, language, persona)
+        elif text and (session.get("confirming") is not None or current.get("confirm")):
+            reply = self._confirm_flow(session, current, attempt, text, turns, answers)
         elif text:
             turns.append({"role": "caller", "text": text})
             route = pick_route(current, text, session_language(session))
@@ -703,6 +744,66 @@ class VoiceEngine:
 
         self.store.save_reply(call_sid, cache_step, attempt, reply)
         return reply
+
+    def _confirm_flow(self, session, current, attempt, text, turns, answers) -> Reply:
+        """A number answer is read back; "yes" keeps it, "no" asks again (an
+        attempt), saying the number again replaces it, anything else re-asks
+        the confirmation (also an attempt)."""
+        script = session["definition"]
+        language = session_language(session)
+        persona = session_persona(session)
+        turns.append({"role": "caller", "text": text})
+        pending = session.get("confirming")
+        heard = digits_in(text)
+        verdict = yes_no(text) if pending is not None else None
+        next_turn = (session.get("turn") or 0) + 1
+
+        if pending is not None and verdict is True:
+            answers[current["key"]] = pending
+            self.store.update_session(session["id"], turns=turns, answers=answers, confirming=None)
+            return self._advance({**session, "turns": turns, "answers": answers, "confirming": None}, current["next"])
+        if len(heard) >= 3 and verdict is not False:
+            # A first answer, or the caller simply said the corrected number.
+            self.store.update_session(session["id"], turns=turns, confirming=heard, turn=next_turn)
+            gather = self._confirm_verb({**session, "turns": turns, "turn": next_turn}, current, heard)
+            return _reply(script, [gather], language, persona)
+        if attempt < current["max_attempts"]:
+            again = speak(CONFIRM_AGAIN["ar" if language.lower().startswith("ar") else "en"], language, persona)
+            turns.append({"role": "agent", "text": again})
+            self.store.update_session(session["id"], turns=turns, confirming=None, attempt=attempt + 1, turn=next_turn)
+            gather = self._gather_verb({**session, "turns": turns, "attempt": attempt + 1, "turn": next_turn}, current)
+            return _reply(script, [{"say": again, "key": "__again__"}, gather], language, persona)
+        # Out of attempts: keep a number only if the caller never said no to it;
+        # a rejected or digit-less last answer stores nothing ("no" is not a phone number).
+        if pending is not None and verdict is None:
+            answers[current["key"]] = pending
+        else:
+            answers[current["key"]] = heard if verdict is not False else ""
+        self.store.update_session(session["id"], turns=turns, answers=answers, confirming=None)
+        if current["on_fail"] == "hangup":
+            message = FAIL_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
+            turns.append({"role": "agent", "text": message})
+            self.store.update_session(session["id"], status="abandoned", current_step=None, turns=turns)
+            return _reply(script, [{"say": message, "key": "__fail__"}, {"hangup": True}], language, persona)
+        return self._advance({**session, "turns": turns, "answers": answers, "confirming": None}, current["next"])
+
+    def _confirm_verb(self, session, step, digits: str) -> dict[str, Any]:
+        language = session_language(session)
+        prompt = confirm_text(digits, language)
+        turns = list(session["turns"]) + [{"role": "agent", "text": prompt}]
+        self.store.update_session(session["id"], turns=turns)
+        return {
+            "gather": {
+                "step": step["key"],
+                "attempt": session["attempt"],
+                "turn": session.get("turn"),
+                "beep": bool(session["definition"].get("beep", True)),
+                "prompt": prompt,
+                "confirm_digits": digits,
+                "timeout": step["timeout"],
+                "speech_timeout": step["speech_timeout"],
+            }
+        }
 
     def on_recording(self, *, call_sid: str, recording_url: str) -> None:
         session = self.store.session_by_call(call_sid)
