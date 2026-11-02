@@ -193,3 +193,45 @@ def test_hold_message_adapts_to_persona_and_company():
                               "steps": [{"key": "q", "gather": True, "say": "Name?"}]})
     assert hold_text(custom, "en-US") == "Please hold."
     assert validate_script({"id": "m", "steps": [{"key": "q", "say": "x"}], "hold_music": False})["hold_music"] is False
+
+
+async def test_fallback_keeps_each_persona_gender(make_client, install_key, monkeypatch):
+    """Before natural clips exist: Ahmed must not sound like a woman, Mariam not like a man."""
+    used = []
+
+    async def synthesize(text, *, language, local_voice, cache_dir):
+        used.append((language, local_voice))
+        return b"fallback-audio"
+
+    monkeypatch.setattr(speech, "synthesize", synthesize)
+    _r, headers = install_key(capabilities=["voice"])
+    script = acme()
+    script["personas"][1]["voice"] = "Ahmed"  # male in both languages
+    call, _studio = await links(make_client, headers, script)
+    async with make_client() as anon:
+        ahmed_en = (await anon.post(f"{call}/start", params={"lang": "en-US", "persona": "ahmed"})).json()
+        await anon.post(f"{call}/hangup", params={"call_id": ahmed_en["call_id"]})
+        mariam_ar = (await anon.post(f"{call}/start", params={"lang": "ar-EG", "persona": "mariam"})).json()
+        await anon.post(f"{call}/hangup", params={"call_id": mariam_ar["call_id"]})
+        ahmed_ar = (await anon.post(f"{call}/start", params={"lang": "ar-EG", "persona": "ahmed"})).json()
+        mariam_en_voice = [v for lang, v in used if lang == "en-US"]
+    assert set(mariam_en_voice) == {"Daniel"}, "English Ahmed uses the male fallback"
+    assert [c["source"] for c in mariam_ar["clips"]] == ["pending", "pending"], "no female Arabic system voice: wait, never Majed"
+    assert ("ar-EG", "Majed") in used and [c["source"] for c in ahmed_ar["clips"]] == ["fallback", "fallback"]
+
+
+def test_renders_are_queued_in_call_order(monkeypatch, tmp_path):
+    import dataclasses
+
+    from app.voice.audio import VoiceAudio
+
+    (tmp_path / "python").write_text("")
+    audio = VoiceAudio(dataclasses.replace(main.settings, voice_tts_engine="voicetut",
+                                           voicetut_python=str(tmp_path / "python"),
+                                           voice_audio_dir=str(tmp_path / "audio")))
+    monkeypatch.setattr(audio, "_ensure_worker", lambda: None)
+    assert audio.schedule(validate_script(acme())) == 20
+    batch = audio.queue.get_nowait()
+    keys = [line["key"] for line in batch]
+    assert keys[:4] == ["greeting"] * 4, "every persona and language greets naturally first"
+    assert keys.index("__hold__") < keys.index("goodbye") and keys[-4:] == ["__fail__"] * 4

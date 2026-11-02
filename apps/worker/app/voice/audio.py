@@ -36,6 +36,16 @@ log = logging.getLogger("cloudiator.voice.audio")
 
 ENGINE_VERSIONS = {"voicetut": "voicetut-v1", "azure": "azure-v1"}
 VOICETUT_DEFAULT = "Hadeer"
+# VoiceTut's built-in speakers, by voice. Used to keep a persona's gender when
+# a line has to fall back to a macOS voice before its natural clip is ready.
+VOICETUT_FEMALE = {"Hadeer", "Hanan", "Mariam", "Rana", "Sarah", "Yasmin", "Yara"}
+VOICETUT_MALE = {"Ahmed", "Ali", "Hassan", "Karim", "Mahmoud", "Mohammed", "Mostafa",
+                 "Ramy", "Shaker", "Tareq", "Yehia", "Youssef"}
+# Installed macOS voices per (language, gender). There is no female Arabic
+# system voice on the Mini, so that slot is empty on purpose: a female persona
+# must never speak as Majed.
+FALLBACK_VOICES = {("ar", "male"): "Majed", ("en", "male"): "Daniel",
+                   ("en", "female"): "Samantha", ("ar", "female"): None}
 AZURE_VOICE = re.compile(r"^([a-z]{2,3}-[A-Z]{2})-[A-Za-z]+(?:Multilingual)?Neural(?:HD)?$")
 AZURE_REGION = re.compile(r"^[a-z0-9]{3,30}$")
 RENDER_TIMEOUT_PER_LINE = 300.0
@@ -144,9 +154,17 @@ class VoiceAudio:
             rendered = self.rendered_path(self.speaker_for(script, language, chosen), language, text)
             if rendered.is_file():
                 return _data_url(rendered.read_bytes(), rendered.suffix), "rendered"
+        # Gender only binds when someone chose the voice (a persona, or the
+        # script's voices); the engine's own default speaker does not.
+        picked = ((chosen or {}).get("voices") or script.get("voices") or {}).get(language)
+        gender = "female" if picked in VOICETUT_FEMALE else "male" if picked in VOICETUT_MALE else None
+        local_voice = FALLBACK_VOICES.get((_lang(language), gender)) if gender else None
+        if gender and local_voice is None:
+            # Better silent (the page still shows the text) than the wrong person's voice.
+            return None, "pending"
         try:
             data = await speech.synthesize(
-                text, language=language, local_voice=None, cache_dir=self.settings.voice_tts_cache
+                text, language=language, local_voice=local_voice, cache_dir=self.settings.voice_tts_cache
             )
             return _data_url(data), "fallback"
         except speech.SpeechUnavailable as exc:
@@ -213,10 +231,15 @@ class VoiceAudio:
         """Queue the lines that have no clip yet. Returns how many."""
         if not self.enabled():
             return 0
-        missing = [
-            line for line in self.lines(script)
-            if not self.rendered_path(line["speaker"], line["language"], line["text"]).is_file()
-        ]
+        # Call order first: every persona's greeting and first question are
+        # natural before anyone reaches question five.
+        order = {step["key"]: i for i, step in enumerate(script["steps"])}
+        order["__hold__"] = 1.5
+        missing = sorted(
+            (line for line in self.lines(script)
+             if not self.rendered_path(line["speaker"], line["language"], line["text"]).is_file()),
+            key=lambda line: order.get(line["key"], 99),
+        )
         if missing:
             self.queue.put_nowait(missing)
             self._ensure_worker()
@@ -288,21 +311,13 @@ class VoiceAudio:
                 stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            try:
-                _out, err = await asyncio.wait_for(
-                    proc.communicate(), RENDER_TIMEOUT_PER_LINE * len(jobs) + 300
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-                raise speech.SpeechUnavailable("VoiceTut render timed out")
-            if proc.returncode != 0:
-                raise speech.SpeechUnavailable(err.decode(errors="replace")[-400:])
             done = 0
-            for line, job in zip(lines, jobs):
-                wav = Path(job["wav"])
+
+            async def publish(index: int) -> None:
+                nonlocal done
+                line, wav = lines[index], Path(jobs[index]["wav"])
                 if not wav.is_file():
-                    continue
+                    return
                 target = self.rendered_path(line["speaker"], line["language"], line["text"], "voicetut")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tmp_out = target.with_suffix(".part.m4a")
@@ -313,6 +328,25 @@ class VoiceAudio:
                 )
                 tmp_out.replace(target)
                 done += 1
+
+            async def follow() -> None:
+                assert proc.stdout is not None
+                async for raw in proc.stdout:
+                    parts = raw.decode(errors="replace").split()
+                    if len(parts) == 2 and parts[0] == "done" and parts[1].isdigit():
+                        await publish(int(parts[1]))
+
+            stderr_task = asyncio.create_task(proc.stderr.read())  # type: ignore[union-attr]
+            try:
+                await asyncio.wait_for(follow(), RENDER_TIMEOUT_PER_LINE * len(jobs) + 300)
+                await proc.wait()
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                raise speech.SpeechUnavailable("VoiceTut render timed out")
+            err = await stderr_task
+            if proc.returncode != 0 and done == 0:
+                raise speech.SpeechUnavailable(err.decode(errors="replace")[-400:])
             log.info("voice render: %d/%d lines", done, len(lines))
 
 

@@ -73,11 +73,13 @@ async def test_a_saved_take_is_what_callers_hear(make_client, install_key, fake_
         assert current["source"] == "recording" and current["audio"].startswith("data:audio/mp4")
 
         turn = (await anon.post(f"{call}/start", params={"lang": "ar-EG"})).json()
-        assert [c["source"] for c in turn["clips"]] == ["recording", "fallback"]
+        # The script picked Hadeer (female) for Arabic and nothing is rendered yet:
+        # the next line waits for her natural voice rather than speaking as Majed.
+        assert [c["source"] for c in turn["clips"]] == ["recording", "pending"]
         await anon.post(f"{call}/hangup", params={"call_id": turn["call_id"]})
 
         assert (await anon.delete(f"{studio}/recordings/greeting/ar-EG")).json() == {"deleted": True}
-        assert (await anon.get(f"{studio}/audio/greeting/ar-EG")).json()["source"] == "fallback"
+        assert (await anon.get(f"{studio}/audio/greeting/ar-EG")).json()["source"] == "pending"
 
     tenant = main.voice.store.web_link(studio.rsplit("/", 1)[1], prefix="st_")[0]
     assert tenant  # the studio link resolves to the publishing tenant
