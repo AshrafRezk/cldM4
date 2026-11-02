@@ -1,0 +1,67 @@
+# Off-box uptime check (finish-line §6). The Mini cannot report its own power
+# cut or a dead home internet line; GitHub can. No secrets and no extra
+# service: a failure opens one issue (GitHub notifies the repo owner), the
+# next success closes it. Scheduled runs are best effort and can lag a few
+# minutes; GitHub pauses schedules after 60 days without repo activity.
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe /v1/health
+        id: probe
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            body=$(curl -sS -m 20 -A 'cloudiator-uptime/1.0' https://api.cloudiator.org/v1/health)
+            code=$?
+            if [ $code -eq 0 ] && echo "$body" | jq -e '.ok == true' >/dev/null 2>&1; then
+              echo "state=ok" >> "$GITHUB_OUTPUT"
+              echo "ok: $body"
+              exit 0
+            fi
+            echo "attempt $attempt failed (curl exit $code): ${body:0:300}"
+            sleep 20
+          done
+          {
+            echo "state=down"
+            echo "detail<<EOF"
+            echo "curl exit $code"
+            echo "${body:0:500}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or close the outage issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STATE: ${{ steps.probe.outputs.state }}
+          DETAIL: ${{ steps.probe.outputs.detail }}
+        run: |
+          open=$(gh issue list --state open --label uptime --json number --jq '.[0].number')
+          if [ "$STATE" = "down" ]; then
+            if [ -z "$open" ]; then
+              gh label create uptime --color B60205 --description "api.cloudiator.org health" 2>/dev/null || true
+              gh issue create --label uptime \
+                --title "Cloudiator API is down" \
+                --body "$(printf 'https://api.cloudiator.org/v1/health failed 3 times at %s UTC.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u +%FT%TZ)" "$DETAIL" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+            fi
+            exit 1
+          elif [ -n "$open" ]; then
+            gh issue close "$open" --comment "Recovered: health ok at $(date -u +%FT%TZ) UTC."
+          fi

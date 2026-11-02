@@ -6,8 +6,10 @@ is having a bad day. Neon is never on the Twilio webhook path.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 import sqlite3
 import threading
 import time
@@ -53,11 +55,18 @@ CREATE TABLE IF NOT EXISTS voice_sessions (
     acked_at REAL
 );
 CREATE INDEX IF NOT EXISTS voice_sessions_tenant ON voice_sessions (tenant_id, created_at);
+CREATE TABLE IF NOT EXISTS voice_web_links (
+    token_hash TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    script_id TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    revoked_at REAL
+);
 CREATE TABLE IF NOT EXISTS voice_replies (
     call_sid TEXT NOT NULL,
     step TEXT NOT NULL,
     attempt INTEGER NOT NULL,
-    twiml TEXT NOT NULL,
+    reply TEXT NOT NULL,
     PRIMARY KEY (call_sid, step, attempt)
 );
 """
@@ -167,6 +176,17 @@ class VoiceStore:
             return None
         return row["tenant_id"], row["version"], json.loads(row["definition"])
 
+    def script_by_id(self, tenant_id: str, script_id: str) -> tuple[int, dict[str, Any]] | None:
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT version, definition FROM voice_scripts "
+                "WHERE tenant_id = ? AND id = ? AND active = 1",
+                (tenant_id, script_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return row["version"], json.loads(row["definition"])
+
     # Sessions ----------------------------------------------------------------
 
     def create_session(
@@ -249,22 +269,55 @@ class VoiceStore:
         with self._db() as conn:
             conn.execute(f"UPDATE voice_sessions SET {', '.join(columns)} WHERE id = ?", values)
 
-    # Twilio retry cache ------------------------------------------------------
+    # Browser call links ------------------------------------------------------
 
-    def reply_for(self, call_sid: str, step: str, attempt: int) -> str | None:
-        with self._db() as conn:
-            row = conn.execute(
-                "SELECT twiml FROM voice_replies WHERE call_sid = ? AND step = ? AND attempt = ?",
-                (call_sid, step, attempt),
-            ).fetchone()
-        return row["twiml"] if row else None
-
-    def save_reply(self, call_sid: str, step: str, attempt: int, twiml: str) -> None:
+    def create_web_link(self, tenant_id: str, script_id: str) -> str:
+        """The token is shown once; only its hash is stored."""
+        token = "cl_" + secrets.token_urlsafe(24)
         with self._db() as conn:
             conn.execute(
-                "INSERT OR IGNORE INTO voice_replies (call_sid, step, attempt, twiml) "
+                "INSERT INTO voice_web_links (token_hash, tenant_id, script_id, created_at) "
                 "VALUES (?, ?, ?, ?)",
-                (call_sid, step, attempt, twiml),
+                (_hash(token), tenant_id, script_id, time.time()),
+            )
+        return token
+
+    def revoke_web_links(self, tenant_id: str, script_id: str) -> int:
+        with self._db() as conn:
+            cur = conn.execute(
+                "UPDATE voice_web_links SET revoked_at = ? "
+                "WHERE tenant_id = ? AND script_id = ? AND revoked_at IS NULL",
+                (time.time(), tenant_id, script_id),
+            )
+        return cur.rowcount
+
+    def web_link(self, token: str) -> tuple[str, str] | None:
+        if not token.startswith("cl_") or len(token) > 80:
+            return None
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT tenant_id, script_id FROM voice_web_links "
+                "WHERE token_hash = ? AND revoked_at IS NULL",
+                (_hash(token),),
+            ).fetchone()
+        return (row["tenant_id"], row["script_id"]) if row else None
+
+    # Twilio retry cache ------------------------------------------------------
+
+    def reply_for(self, call_sid: str, step: str, attempt: int) -> dict[str, Any] | None:
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT reply FROM voice_replies WHERE call_sid = ? AND step = ? AND attempt = ?",
+                (call_sid, step, attempt),
+            ).fetchone()
+        return json.loads(row["reply"]) if row else None
+
+    def save_reply(self, call_sid: str, step: str, attempt: int, reply: dict[str, Any]) -> None:
+        with self._db() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO voice_replies (call_sid, step, attempt, reply) "
+                "VALUES (?, ?, ?, ?)",
+                (call_sid, step, attempt, json.dumps(reply, ensure_ascii=False)),
             )
 
     # Retention ---------------------------------------------------------------
@@ -284,6 +337,10 @@ class VoiceStore:
             conn.executemany("DELETE FROM voice_replies WHERE call_sid = ?", [(s,) for s in sids])
             conn.executemany("DELETE FROM voice_sessions WHERE call_sid = ?", [(s,) for s in sids])
         return len(sids)
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def _session(row: sqlite3.Row | None) -> dict[str, Any] | None:

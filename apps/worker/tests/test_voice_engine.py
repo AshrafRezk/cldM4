@@ -26,13 +26,21 @@ def publish(engine, tenant="t1", **overrides):
     return script
 
 
+def inbound(engine, **kwargs):
+    return engine.render_twiml(engine.on_inbound(**kwargs))
+
+
+def gather(engine, **kwargs):
+    return engine.render_twiml(engine.on_gather(**kwargs))
+
+
 def sid():
     return "CA" + uuid.uuid4().hex
 
 
 def test_inbound_speaks_greeting_then_gathers_name(engine):
     publish(engine)
-    reply = engine.on_inbound(call_sid=sid(), from_number="+2011", to_number=TO)
+    reply = inbound(engine, call_sid=sid(), from_number="+2011", to_number=TO)
     assert reply.index("<Say") < reply.index("<Gather")
     assert 'input="speech"' in reply
     assert 'language="ar-EG"' in reply
@@ -43,10 +51,10 @@ def test_inbound_speaks_greeting_then_gathers_name(engine):
 def test_full_call_reaches_ready_to_commit(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    engine.on_gather(call_sid=call, step="ask_name", attempt=1, speech="سارة أحمد")
-    engine.on_gather(call_sid=call, step="ask_reason", attempt=1, speech="أريد موعداً")
-    reply = engine.on_gather(call_sid=call, step="ask_phone", attempt=1, speech="01012345678")
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    gather(engine, call_sid=call, step="ask_name", attempt=1, speech="سارة أحمد")
+    gather(engine, call_sid=call, step="ask_reason", attempt=1, speech="أريد موعداً")
+    reply = gather(engine, call_sid=call, step="ask_phone", attempt=1, speech="01012345678")
     assert reply.endswith("<Hangup/></Response>")
     assert "شكراً" in reply
 
@@ -65,9 +73,9 @@ def test_full_call_reaches_ready_to_commit(engine):
 def test_twilio_retry_returns_same_twiml_and_one_answer(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    first = engine.on_gather(call_sid=call, step="ask_name", attempt=1, speech="Sara")
-    again = engine.on_gather(call_sid=call, step="ask_name", attempt=1, speech="Sara")
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    first = gather(engine, call_sid=call, step="ask_name", attempt=1, speech="Sara")
+    again = gather(engine, call_sid=call, step="ask_name", attempt=1, speech="Sara")
     assert first == again
     session = engine.store.session_by_call(call)
     assert [t["text"] for t in session["turns"] if t["role"] == "caller"] == ["Sara"]
@@ -77,17 +85,17 @@ def test_twilio_retry_returns_same_twiml_and_one_answer(engine):
 def test_inbound_retry_does_not_open_a_second_session(engine):
     publish(engine)
     call = sid()
-    first = engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    assert engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO) == first
+    first = inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    assert inbound(engine, call_sid=call, from_number="+2011", to_number=TO) == first
 
 
 def test_silence_replays_then_continues_empty(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    replay = engine.on_gather(call_sid=call, step="ask_name", attempt=1, speech="")
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    replay = gather(engine, call_sid=call, step="ask_name", attempt=1, speech="")
     assert "step=ask_name&amp;attempt=2" in replay
-    moved_on = engine.on_gather(call_sid=call, step="ask_name", attempt=2, speech="  ")
+    moved_on = gather(engine, call_sid=call, step="ask_name", attempt=2, speech="  ")
     assert "step=ask_reason&amp;attempt=1" in moved_on
     assert engine.store.session_by_call(call)["answers"]["ask_name"] == ""
 
@@ -98,8 +106,8 @@ def test_on_fail_hangup_abandons(engine):
     script["steps"][1]["max_attempts"] = 1
     engine.store.upsert_script("t1", validate_script(script))
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    reply = engine.on_gather(call_sid=call, step="ask_name", attempt=1, speech="")
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    reply = gather(engine, call_sid=call, step="ask_name", attempt=1, speech="")
     assert "<Hangup/>" in reply and "عذراً" in reply
     assert engine.store.session_by_call(call)["status"] == "abandoned"
 
@@ -107,14 +115,14 @@ def test_on_fail_hangup_abandons(engine):
 def test_out_of_order_gather_hangs_up_without_answer(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
-    reply = engine.on_gather(call_sid=call, step="ask_phone", attempt=1, speech="x")
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
+    reply = gather(engine, call_sid=call, step="ask_phone", attempt=1, speech="x")
     assert reply.endswith("<Response><Hangup/></Response>")
     assert engine.store.session_by_call(call)["answers"] == {}
 
 
 def test_unrouted_number_hangs_up(engine):
-    reply = engine.on_inbound(call_sid=sid(), from_number="+2011", to_number="+19995550000")
+    reply = inbound(engine, call_sid=sid(), from_number="+2011", to_number="+19995550000")
     assert "<Hangup/>" in reply
     assert "<Gather" not in reply
 
@@ -122,15 +130,15 @@ def test_unrouted_number_hangs_up(engine):
 def test_caller_text_is_xml_escaped(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
     script = intake(id="echo", inbound_numbers=["+201000000002"])
     script["steps"][4]["say"] = "<Play>http://evil</Play> & bye"
     engine.store.upsert_script("t1", validate_script(script))
     call2 = sid()
-    engine.on_inbound(call_sid=call2, from_number="+2011", to_number="+201000000002")
+    inbound(engine, call_sid=call2, from_number="+2011", to_number="+201000000002")
     for step in ("ask_name", "ask_reason"):
-        engine.on_gather(call_sid=call2, step=step, attempt=1, speech="x")
-    reply = engine.on_gather(call_sid=call2, step="ask_phone", attempt=1, speech="y")
+        gather(engine, call_sid=call2, step=step, attempt=1, speech="x")
+    reply = gather(engine, call_sid=call2, step="ask_phone", attempt=1, speech="y")
     assert "<Play>" not in reply
     assert "&lt;Play&gt;" in reply and "&amp; bye" in reply
 
@@ -152,12 +160,29 @@ def test_republish_bumps_version_and_moves_numbers(engine):
 def test_purge_drops_old_sessions(engine):
     publish(engine)
     call = sid()
-    engine.on_inbound(call_sid=call, from_number="+2011", to_number=TO)
+    inbound(engine, call_sid=call, from_number="+2011", to_number=TO)
     session = engine.store.session_by_call(call)
     engine.store.update_session(session["id"], acked_at=time.time() - 8 * 86400)
     assert engine.store.purge_expired(7) == 1
     assert engine.store.session_by_call(call) is None
     assert engine.store.reply_for(call, "__inbound__", 0) is None
+
+
+def test_reply_is_channel_neutral(engine):
+    publish(engine)
+    reply = engine.on_inbound(call_sid=sid(), from_number="+2011", to_number=TO)
+    assert reply["language"] == "ar-EG"
+    assert [next(iter(v)) for v in reply["verbs"]] == ["say", "gather"]
+    assert reply["verbs"][1]["gather"]["step"] == "ask_name"
+
+
+def test_start_call_by_script_id(engine):
+    publish(engine)
+    call = sid()
+    reply = engine.start_call(tenant_id="t1", script_id="intake-ar", call_sid=call, from_label="web")
+    assert reply["verbs"][-1]["gather"]["step"] == "ask_name"
+    assert engine.start_call(tenant_id="t1", script_id="intake-ar", call_sid=call, from_label="web") == reply
+    assert engine.start_call(tenant_id="t2", script_id="intake-ar", call_sid=sid(), from_label="web") is None
 
 
 @pytest.mark.parametrize(

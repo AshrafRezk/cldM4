@@ -129,7 +129,7 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, settings, requir
         reply = engine.on_inbound(
             call_sid=call_sid, from_number=form.get("From", ""), to_number=form.get("To", "")
         )
-        return Response(content=reply, media_type=TWIML)
+        return Response(content=engine.render_twiml(reply), media_type=TWIML)
 
     @app.post("/v1/voice/twilio/gather")
     async def twilio_gather(request: Request) -> Response:
@@ -146,7 +146,7 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, settings, requir
             attempt=attempt,
             speech=form.get("SpeechResult", ""),
         )
-        return Response(content=reply, media_type=TWIML)
+        return Response(content=engine.render_twiml(reply), media_type=TWIML)
 
     @app.post("/v1/voice/twilio/recording")
     async def twilio_recording(request: Request) -> Response:

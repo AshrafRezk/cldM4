@@ -130,9 +130,15 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 
 | Name | Default | Notes |
 | --- | --- | --- |
-| `TWILIO_AUTH_TOKEN` | unset | secret. Required for the `/v1/voice/twilio/*` webhooks; without it they return 503. The Salesforce-side `/v1/voice/*` routes work regardless |
+| `TWILIO_AUTH_TOKEN` | unset | secret. Only for the optional Twilio front door: required for the `/v1/voice/twilio/*` webhooks; without it they return 503. The Salesforce-side `/v1/voice/*` routes work regardless |
 | `VOICE_DB` | `~/Cloudiator/voice.db` | SQLite for published scripts and call sessions |
 | `VOICE_SESSION_TTL_DAYS` | `7` | sessions (transcripts included) are deleted this long after ack, or after the last update if never acked |
+| `VOICE_TTS_CACHE` | `~/Cloudiator/voice-tts` | browser call: cached `say` audio, keyed by text+voice |
+| `WHISPER_CPP_BIN` | `/opt/homebrew/bin/whisper-cli` | browser call STT; always run with `--no-gpu` |
+| `WHISPER_MODEL` | `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin` | ggml weights; missing → each answer is `503 speech_unavailable` |
+| `WHISPER_THREADS` | `4` | CPU threads for one transcription |
+| `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
+| `VOICE_WEB_MAX_AUDIO_BYTES` | `2000000` | cap on one recorded answer |
 
 ## Mini worker — renderers
 

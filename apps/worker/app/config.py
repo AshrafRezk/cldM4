@@ -168,6 +168,24 @@ class Settings:
     voice_session_ttl_days: float = field(
         default_factory=lambda: _float("VOICE_SESSION_TTL_DAYS", 7.0)
     )
+    # Browser call (docs/voice.md). Local speech only: macOS `say` for TTS and
+    # whisper.cpp on the CPU for STT, never on the Metal GPU.
+    voice_tts_cache: str = field(
+        default_factory=lambda: os.path.expanduser(_str("VOICE_TTS_CACHE", "~/Cloudiator/voice-tts"))
+    )
+    whisper_cpp_bin: str = field(
+        default_factory=lambda: _str("WHISPER_CPP_BIN", "/opt/homebrew/bin/whisper-cli")
+    )
+    whisper_model: str = field(
+        default_factory=lambda: os.path.expanduser(
+            _str("WHISPER_MODEL", "~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin")
+        )
+    )
+    whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 4))
+    ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
+    voice_web_max_audio_bytes: int = field(
+        default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 2_000_000)
+    )
 
     health_rpm: int = field(default_factory=lambda: _int("HEALTH_RPM", 120))
 
