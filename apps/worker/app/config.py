@@ -208,6 +208,14 @@ class Settings:
     voice_llm_timeout_seconds: float = field(
         default_factory=lambda: _float("VOICE_LLM_TIMEOUT_SECONDS", 6.0)
     )
+    # Opt-in: save each answer's full listening window + detector stats on
+    # the Mini for 24 h, to tune speech pickup (app/voice/debug.py).
+    voice_debug_audio: bool = field(
+        default_factory=lambda: _str("VOICE_DEBUG_AUDIO", "false").lower() in ("1", "true", "yes")
+    )
+    voice_debug_dir: str = field(
+        default_factory=lambda: os.path.expanduser(_str("VOICE_DEBUG_DIR", "~/Cloudiator/voice-debug"))
+    )
     # One line for the whole Mini: further browser callers wait in a queue.
     voice_max_active_calls: int = field(default_factory=lambda: _int("VOICE_MAX_ACTIVE_CALLS", 1))
     voice_call_idle_seconds: float = field(

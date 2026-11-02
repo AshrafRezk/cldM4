@@ -44,6 +44,7 @@ os.environ.update(
         "VOICE_TTS_CACHE": os.path.join(_TEST_STATE_DIR, "voice-tts"),
         # Rendering spawns a 3 GB model; the suite never does that.
         "VOICE_TTS_ENGINE": "say",
+        "VOICE_DEBUG_DIR": os.path.join(_TEST_STATE_DIR, "voice-debug"),
         "TWILIO_AUTH_TOKEN": "test-twilio-auth-token",
         "MFLUX_MODEL_PATH": os.path.join(_TEST_STATE_DIR, "flux-schnell-4bit"),
         "MFLUX_LOW_RAM": "true",
