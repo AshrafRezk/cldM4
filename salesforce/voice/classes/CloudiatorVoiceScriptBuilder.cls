@@ -39,15 +39,28 @@ public with sharing class CloudiatorVoiceScriptBuilder {
         });
         for (Integer i = 0; i < ordered.size(); i++) {
             Cloudiator_Voice_Question__c q = ordered[i];
-            Integer attempts = q.Max_Attempts__c == null ? 2 : Math.max(1, Math.min(5, Integer.valueOf(q.Max_Attempts__c)));
-            steps.add(new Map<String, Object>{
+            String fallthrough = i + 1 < ordered.size() ? keys[i + 1] : 'goodbye';
+            Map<String, Object> step = new Map<String, Object>{
                 'key' => keys[i],
-                'gather' => true,
-                'max_attempts' => attempts,
-                'on_fail' => q.Required__c == true ? 'hangup' : 'continue',
-                'next' => i + 1 < ordered.size() ? keys[i + 1] : 'goodbye',
+                'next' => String.isNotBlank(q.Next_Key__c) ? q.Next_Key__c.trim() : fallthrough,
                 'say' => localized(languages, q.Arabic_Text__c, q.English_Text__c, 'Question ' + q.Order__c)
-            });
+            };
+            if (q.Announcement__c == true) {
+                step.put('gather', false);
+                if (String.isNotBlank(q.Routes__c)) {
+                    throw new BuildException('Question ' + q.Order__c + ': an announcement cannot have routes.');
+                }
+            } else {
+                Integer attempts = q.Max_Attempts__c == null ? 2 : Math.max(1, Math.min(5, Integer.valueOf(q.Max_Attempts__c)));
+                step.put('gather', true);
+                step.put('max_attempts', attempts);
+                step.put('on_fail', q.Required__c == true ? 'hangup' : 'continue');
+                List<Object> routeList = routes(q.Routes__c, 'Question ' + q.Order__c);
+                if (!routeList.isEmpty()) {
+                    step.put('routes', routeList);
+                }
+            }
+            steps.add(step);
         }
         steps.add(new Map<String, Object>{
             'key' => 'goodbye', 'gather' => false, 'next' => null,
@@ -67,6 +80,7 @@ public with sharing class CloudiatorVoiceScriptBuilder {
             'display_name' => script.Name,
             'languages' => languages,
             'voices' => voices,
+            'variables' => variables(script.Variables__c, languages),
             'inbound_numbers' => numbers(script.Inbound_Numbers__c),
             'active' => script.Active__c == true,
             'steps' => steps,
@@ -159,6 +173,89 @@ public with sharing class CloudiatorVoiceScriptBuilder {
                 'fields' => fields.get(obj),
                 'after' => parentsOf.containsKey(obj) ? parentsOf.get(obj) : new List<String>()
             });
+        }
+        return out;
+    }
+
+    /** "new, جديد, أول مرة => new_case = New" per line. */
+    @TestVisible
+    private static List<Object> routes(String raw, String where) {
+        List<Object> out = new List<Object>();
+        if (String.isBlank(raw)) {
+            return out;
+        }
+        for (String line : raw.split('\n')) {
+            line = line.trim();
+            if (String.isBlank(line)) {
+                continue;
+            }
+            Integer arrow = line.indexOf('=>');
+            if (arrow < 1) {
+                throw new BuildException(where + ': route "' + line + '" must be keywords => next key.');
+            }
+            List<String> keywords = new List<String>();
+            for (String k : line.substring(0, arrow).split(',')) {
+                if (String.isNotBlank(k)) {
+                    keywords.add(k.trim());
+                }
+            }
+            String target = line.substring(arrow + 2).trim();
+            String value = null;
+            Integer eq = target.indexOf('=');
+            if (eq > 0) {
+                value = target.substring(eq + 1).trim();
+                target = target.substring(0, eq).trim();
+            }
+            if (keywords.isEmpty() || !KEY.matcher(target).matches()) {
+                throw new BuildException(where + ': route "' + line + '" needs keywords and a next key.');
+            }
+            Map<String, Object> route = new Map<String, Object>{ 'when' => keywords, 'next' => target };
+            if (String.isNotBlank(value)) {
+                route.put('value', value);
+            }
+            out.add(route);
+        }
+        return out;
+    }
+
+    /** "company = Acme" for every language; "company.ar = أكمي" / "company.en = Acme" per language. */
+    @TestVisible
+    private static Map<String, Object> variables(String raw, List<String> languages) {
+        Map<String, Map<String, Object>> values = new Map<String, Map<String, Object>>();
+        if (String.isBlank(raw)) {
+            return new Map<String, Object>();
+        }
+        for (String line : raw.split('\n')) {
+            line = line.trim();
+            if (String.isBlank(line)) {
+                continue;
+            }
+            Integer eq = line.indexOf('=');
+            if (eq < 1) {
+                throw new BuildException('Variable "' + line + '" must be name = value.');
+            }
+            String name = line.substring(0, eq).trim();
+            String value = line.substring(eq + 1).trim();
+            String only = null;
+            if (name.endsWith('.ar') || name.endsWith('.en')) {
+                only = name.right(2);
+                name = name.left(name.length() - 3);
+            }
+            if (!KEY.matcher(name).matches()) {
+                throw new BuildException('Variable name "' + name + '" must be letters, digits or _.');
+            }
+            if (!values.containsKey(name)) {
+                values.put(name, new Map<String, Object>());
+            }
+            for (String lang : languages) {
+                if (only == null ? !values.get(name).containsKey(lang) : lang.startsWith(only)) {
+                    values.get(name).put(lang, value);
+                }
+            }
+        }
+        Map<String, Object> out = new Map<String, Object>();
+        for (String name : values.keySet()) {
+            out.put(name, values.get(name));
         }
         return out;
     }

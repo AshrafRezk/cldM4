@@ -36,9 +36,9 @@ public with sharing class CloudiatorVoicePublish {
             SELECT Id, Name, Definition__c, External_Id__c, Inbound_Numbers__c, Active__c,
                    Languages__c, Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c,
                    English_Closing__c, Arabic_Voice__c, English_Voice__c, Transcript_Field__c,
-                   Record_Links__c, Fixed_Values__c,
+                   Record_Links__c, Fixed_Values__c, Variables__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                           Required__c, Max_Attempts__c
+                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c
                     FROM Questions__r ORDER BY Order__c)
             FROM Cloudiator_Voice_Script__c
             WHERE Id IN :scriptRecordIds

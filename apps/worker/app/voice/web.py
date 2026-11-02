@@ -203,6 +203,10 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
         except ValueError as exc:
             raise CloudiatorError(400, "invalid_request_error", "attempt must be an integer.") from exc
         step = params.get("step") or ""
+        try:
+            turn_no = int(params["turn"]) if params.get("turn") else None
+        except ValueError as exc:
+            raise CloudiatorError(400, "invalid_request_error", "turn must be an integer.") from exc
         if call_sid in line.active:
             line.touch(call_sid)
         elif line.free():
@@ -215,7 +219,7 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
             raise CloudiatorError(413, "request_too_large", "Audio is too long for one answer.")
         request.state.usage.tool = "voice_web_turn"
         # A retry of an answered turn replays without transcribing again.
-        cached = store.reply_for(call_sid, step, attempt)
+        cached = store.reply_for(call_sid, f"{step}#{turn_no}" if turn_no is not None else step, attempt)
         if cached is not None:
             return JSONResponse(content=await _turn(audio, tenant_id, call_sid, cached, store, heard=None))
         try:
@@ -228,7 +232,7 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
                 503, "speech_unavailable", "Speech recognition is not set up on this appliance.",
                 error_type="server_error",
             ) from exc
-        reply = engine.on_gather(call_sid=call_sid, step=step, attempt=attempt, speech=heard)
+        reply = engine.on_gather(call_sid=call_sid, step=step, attempt=attempt, speech=heard, turn=turn_no)
         if any(verb.get("hangup") for verb in reply["verbs"]):
             line.ended(call_sid)
         return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=heard))
@@ -255,6 +259,7 @@ async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], sto
             listen = {
                 "step": gather["step"],
                 "attempt": gather["attempt"],
+                "turn": gather.get("turn"),
                 "timeout": gather["timeout"],
                 "speech_timeout": gather["speech_timeout"],
             }

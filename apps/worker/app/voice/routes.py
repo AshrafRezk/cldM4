@@ -183,11 +183,13 @@ def register_voice_routes(app: FastAPI, *, engine: VoiceEngine, audio, settings,
             attempt = int(request.query_params.get("attempt") or "1")
         except ValueError as exc:
             raise CloudiatorError(400, "invalid_request_error", "attempt must be an integer.") from exc
+        turn_raw = request.query_params.get("turn")
         reply = engine.on_gather(
             call_sid=_required(form, "CallSid"),
             step=step,
             attempt=attempt,
             speech=form.get("SpeechResult", ""),
+            turn=int(turn_raw) if turn_raw and turn_raw.isdigit() else None,
         )
         return Response(content=engine.render_twiml(reply), media_type=TWIML)
 

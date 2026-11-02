@@ -126,9 +126,9 @@ private class CloudiatorVoiceTest {
         Cloudiator_Voice_Script__c script = [
             SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                    Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c,
+                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                           Required__c, Max_Attempts__c FROM Questions__r ORDER BY Order__c)
+                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
             FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
         ];
         Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
@@ -160,9 +160,9 @@ private class CloudiatorVoiceTest {
             Cloudiator_Voice_Script__c script = [
                 SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                        Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c,
+                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c,
                        (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                               Required__c, Max_Attempts__c FROM Questions__r ORDER BY Order__c)
+                               Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
                 FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
             ];
             Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
@@ -234,5 +234,55 @@ private class CloudiatorVoiceTest {
             uploaded = uploaded || call.contains('/recordings/full_name/ar-EG');
         }
         System.assert(uploaded, 'recording not uploaded: ' + mock.calls);
+    }
+
+    @IsTest
+    static void variablesRoutesAndAnnouncementsBuild() {
+        List<String> langs = new List<String>{ 'ar-EG', 'en-US' };
+        Map<String, Object> vars = CloudiatorVoiceScriptBuilder.variables(
+            'company = Acme Pharma\ncompany.ar = أكمي فارما\nprogram = Acme Care', langs);
+        System.assertEquals('أكمي فارما', ((Map<String, Object>) vars.get('company')).get('ar-EG'));
+        System.assertEquals('Acme Pharma', ((Map<String, Object>) vars.get('company')).get('en-US'));
+        System.assertEquals('Acme Care', ((Map<String, Object>) vars.get('program')).get('ar-EG'));
+
+        List<Object> routes = CloudiatorVoiceScriptBuilder.routes('new, جديد, أول مرة => new_name = New\nexisting, متابعة => case_number', 'Q');
+        Map<String, Object> first = (Map<String, Object>) routes[0];
+        System.assertEquals('new_name', first.get('next'));
+        System.assertEquals('New', first.get('value'));
+        System.assertEquals(3, ((List<String>) first.get('when')).size());
+        System.assertEquals(null, ((Map<String, Object>) routes[1]).get('value'));
+        try {
+            CloudiatorVoiceScriptBuilder.routes('just words', 'Q');
+            System.assert(false, 'expected a route format error');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('=>'), e.getMessage());
+        }
+
+        Cloudiator_Voice_Script__c script = new Cloudiator_Voice_Script__c(
+            Name = 'Acme PSP', External_Id__c = 'acme-psp', Languages__c = 'ar-EG;en-US',
+            Arabic_Greeting__c = 'أهلاً، معاك {{company}}.', English_Greeting__c = 'Hello, this is {{company}}.',
+            Arabic_Closing__c = 'شكراً.', English_Closing__c = 'Thank you.',
+            Variables__c = 'company = Acme Pharma\ncompany.ar = أكمي فارما'
+        );
+        List<Cloudiator_Voice_Question__c> qs = new List<Cloudiator_Voice_Question__c>{
+            new Cloudiator_Voice_Question__c(Order__c = 10, Step_Key__c = 'hours', Announcement__c = true,
+                Arabic_Text__c = 'مواعيدنا من ٩ لـ ٥.', English_Text__c = 'We are open nine to five.'),
+            new Cloudiator_Voice_Question__c(Order__c = 20, Step_Key__c = 'menu', Next_Key__c = 'new_name',
+                Arabic_Text__c = 'جديد ولا متابعة؟', English_Text__c = 'New or existing?',
+                Routes__c = 'existing, متابعة => case_number = Follow-up'),
+            new Cloudiator_Voice_Question__c(Order__c = 30, Step_Key__c = 'new_name', Next_Key__c = 'goodbye',
+                Arabic_Text__c = 'اسمك؟', English_Text__c = 'Your name?'),
+            new Cloudiator_Voice_Question__c(Order__c = 40, Step_Key__c = 'case_number',
+                Arabic_Text__c = 'رقم الحالة؟', English_Text__c = 'Case number?')
+        };
+        Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, qs);
+        List<Object> steps = (List<Object>) def.get('steps');
+        Map<String, Object> hours = (Map<String, Object>) steps[1];
+        Map<String, Object> menu = (Map<String, Object>) steps[2];
+        System.assertEquals(false, hours.get('gather'));
+        System.assertEquals('menu', hours.get('next'));
+        System.assertEquals('new_name', menu.get('next'), 'Next overrides order; also the no-match path');
+        System.assertEquals(1, ((List<Object>) menu.get('routes')).size());
+        System.assert(def.containsKey('variables'));
     }
 }

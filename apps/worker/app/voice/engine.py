@@ -2,7 +2,9 @@
 
 Twilio posts one webhook per turn; each reply is TwiML that speaks every
 non-gather step up to the next gather (or the end), so a script with no
-gathers is one response. Replies are cached per (CallSid, step, attempt) so a
+gathers is one response. Every prompt gets a per-call `turn` number (a route
+can ask the same question twice, attempt 1 both times), and replies are cached
+per (CallSid, step#turn, attempt) so a
 Twilio retry gets the same TwiML and never appends a second answer.
 """
 
@@ -72,6 +74,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
     ):
         raise ScriptInvalid("languages must list 1-4 language tags like ar-EG, en-US.", "languages")
 
+    variables = _variables(body.get("variables"), languages)
+
     raw_steps = body.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
         raise ScriptInvalid("steps must be a non-empty list.", "steps")
@@ -92,18 +96,23 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         if key in keys:
             raise ScriptInvalid(f"Duplicate step key {key!r}.", f"{where}.key")
         keys.add(key)
-        say = _localized(raw.get("say"), languages, f"{where}.say")
+        say = _fill(_localized(raw.get("say"), languages, f"{where}.say"), variables, f"{where}.say")
         nxt = raw.get("next")
         if nxt is not None and not isinstance(nxt, str):
             raise ScriptInvalid(f"{where}.next must be a step key or null.", f"{where}.next")
         on_fail = raw.get("on_fail", "continue")
         if on_fail not in ("continue", "hangup"):
             raise ScriptInvalid(f"{where}.on_fail must be continue or hangup.", f"{where}.on_fail")
+        gather = bool(raw.get("gather", False))
+        routes = _routes(raw.get("routes"), languages, f"{where}.routes")
+        if routes and not gather:
+            raise ScriptInvalid(f"{where}: only a question (gather) can route on the answer.", f"{where}.routes")
         steps.append(
             {
                 "key": key,
                 "say": say,
-                "gather": bool(raw.get("gather", False)),
+                "gather": gather,
+                "routes": routes,
                 "timeout": _bounded_int(raw.get("timeout", 5), 1, 60, f"{where}.timeout"),
                 "speech_timeout": str(raw.get("speech_timeout", "auto")),
                 "max_attempts": _bounded_int(raw.get("max_attempts", 2), 1, 5, f"{where}.max_attempts"),
@@ -115,6 +124,14 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
     for step in steps:
         if step["next"] is not None and step["next"] not in keys:
             raise ScriptInvalid(f"Step {step['key']!r} points at unknown step {step['next']!r}.", "steps")
+        for route in step["routes"]:
+            if route["next"] is not None and route["next"] not in keys:
+                raise ScriptInvalid(
+                    f"Step {step['key']!r} routes to unknown step {route['next']!r}.", "steps"
+                )
+    clash = set(variables) & keys
+    if clash:
+        raise ScriptInvalid(f"Variable {sorted(clash)[0]!r} has the same name as a step.", "variables")
     _reject_cycles(steps)
 
     commit = body.get("commit") or {"records": []}
@@ -137,6 +154,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
             isinstance(k, str) and SOBJECT.match(k) and isinstance(v, str) for k, v in fields.items()
         ):
             raise ScriptInvalid(f"{where}.fields must map field API names to text.", f"{where}.fields")
+        # Variables are fixed per script: resolve them now, in the CRM language.
+        fields = {name: _fill_text(value, variables, crm_language(languages)) for name, value in fields.items()}
         after = record.get("after") or []
         if not isinstance(after, list) or any(parent not in seen for parent in after):
             raise ScriptInvalid(f"{where}.after must name records listed earlier.", f"{where}.after")
@@ -163,8 +182,12 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "local_voice": body.get("local_voice") or None,
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
-        "fail_say": _localized(fail_say, languages, "fail_say") if fail_say else None,
-        "hold_say": _localized(body["hold_say"], languages, "hold_say") if body.get("hold_say") else None,
+        "variables": variables,
+        "fail_say": _fill(_localized(fail_say, languages, "fail_say"), variables, "fail_say") if fail_say else None,
+        "hold_say": (
+            _fill(_localized(body["hold_say"], languages, "hold_say"), variables, "hold_say")
+            if body.get("hold_say") else None
+        ),
         "steps": steps,
         "commit": {"records": clean_records},
     }
@@ -185,6 +208,109 @@ def _localized(value: Any, languages: list[str], param: str) -> dict[str, str]:
     raise ScriptInvalid(f"{param} must be text, or text per language.", param)
 
 
+VARIABLE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+MAX_ROUTES = 10
+MAX_CALLER_TURNS = 40
+
+
+def _variables(raw: Any, languages: list[str]) -> dict[str, dict[str, str]]:
+    """{"company": "Merck"} or {"company": {"ar-EG": "ميرك", "en-US": "Merck"}}.
+    A plain string is used in every language."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > 30:
+        raise ScriptInvalid("variables must be an object of up to 30 names.", "variables")
+    out = {}
+    for name, value in raw.items():
+        if not isinstance(name, str) or not STEP_KEY.match(name) or name in RESERVED_KEYS:
+            raise ScriptInvalid(f"Variable name {name!r} is not allowed.", "variables")
+        out[name] = _localized(value, languages, f"variables.{name}")
+    return out
+
+
+def _fill_text(text: str, variables: Mapping[str, Mapping[str, str]], language: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        return variables[name][language] if name in variables else match.group(0)
+
+    return VARIABLE.sub(replace, text)
+
+
+def _fill(texts: dict[str, str], variables: Mapping[str, Mapping[str, str]], param: str) -> dict[str, str]:
+    """Spoken lines may only use declared variables; a typo is a publish error,
+    not a caller hearing "{{compnay}}"."""
+    out = {}
+    for language, text in texts.items():
+        for name in VARIABLE.findall(text):
+            if name not in variables:
+                raise ScriptInvalid(f"{param} uses {{{{{name}}}}}, which is not in variables.", param)
+        out[language] = _fill_text(text, variables, language)
+    return out
+
+
+def crm_language(languages: list[str]) -> str:
+    """CRM fields take the English value of a variable when there is one."""
+    return next((lang for lang in languages if lang.startswith("en")), languages[0])
+
+
+def _routes(raw: Any, languages: list[str], param: str) -> list[dict[str, Any]]:
+    """[{"when": ["new", "جديد"] | {"ar-EG": [...], "en-US": [...]}, "next": "q_new", "value": "New"}]
+
+    The first route whose keyword appears in the caller's answer wins; no match
+    falls through to the step's `next`. `value` (optional) is stored as the
+    answer instead of the caller's words, e.g. a picklist value for the CRM."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_ROUTES:
+        raise ScriptInvalid(f"routes must be a list of up to {MAX_ROUTES}.", param)
+    out = []
+    for index, route in enumerate(raw):
+        where = f"{param}[{index}]"
+        if not isinstance(route, Mapping):
+            raise ScriptInvalid(f"{where} must be an object.", where)
+        when = route.get("when")
+        if isinstance(when, list):
+            when = {lang: when for lang in languages}
+        if not isinstance(when, Mapping) or not when:
+            raise ScriptInvalid(f"{where}.when must list keywords.", f"{where}.when")
+        keywords = {}
+        for lang, words in when.items():
+            if lang not in languages or not isinstance(words, list) or not words or not all(
+                isinstance(w, str) and w.strip() for w in words
+            ):
+                raise ScriptInvalid(f"{where}.when needs keywords per script language.", f"{where}.when")
+            keywords[lang] = [normalize_answer(w) for w in words]
+        nxt = route.get("next")
+        if nxt is not None and not isinstance(nxt, str):
+            raise ScriptInvalid(f"{where}.next must be a step key or null.", f"{where}.next")
+        value = route.get("value")
+        if value is not None and not isinstance(value, str):
+            raise ScriptInvalid(f"{where}.value must be text.", f"{where}.value")
+        out.append({"when": keywords, "next": nxt, "value": value})
+    return out
+
+
+_ARABIC_MARKS = re.compile(r"[\u064B-\u0652\u0670\u0640]")  # harakat, dagger alef, tatweel
+_ARABIC_FOLD = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي"})
+_NOT_WORD = re.compile(r"[^\w]+")
+
+
+def normalize_answer(text: str) -> str:
+    """Fold case, Arabic spelling variants, diacritics, and punctuation so a
+    keyword like "أيوه" matches whisper's "ايوة"."""
+    text = _ARABIC_MARKS.sub("", text.lower()).translate(_ARABIC_FOLD)
+    return " " + " ".join(_NOT_WORD.sub(" ", text).split()) + " "
+
+
+def pick_route(step: Mapping[str, Any], answer: str, language: str) -> dict[str, Any] | None:
+    heard = normalize_answer(answer)
+    for route in step.get("routes") or []:
+        for keyword in route["when"].get(language) or []:
+            if keyword.strip() and keyword.strip() in heard:
+                return route
+    return None
+
+
 def text_for(value: Any, language: str) -> str:
     """Scripts published before languages existed store plain strings."""
     if isinstance(value, Mapping):
@@ -199,15 +325,18 @@ def _bounded_int(value: Any, low: int, high: int, param: str) -> int:
 
 
 def _reject_cycles(steps: list[dict[str, Any]]) -> None:
-    following = {step["key"]: step["next"] for step in steps}
-    for start in following:
+    """A loop through a question is fine (each pass waits for the caller, e.g.
+    "sorry, was that new or existing?"). A loop of announcements only would
+    talk forever, so that is the one that is refused."""
+    by_key = {step["key"]: step for step in steps}
+    for start in by_key:
         seen = set()
         key: str | None = start
-        while key is not None:
+        while key is not None and not by_key[key]["gather"]:
             if key in seen:
-                raise ScriptInvalid(f"Steps loop back on themselves at {key!r}.", "steps")
+                raise ScriptInvalid(f"Announcements loop back on themselves at {key!r}.", "steps")
             seen.add(key)
-            key = following[key]
+            key = by_key[key]["next"]
 
 
 class VoiceEngine:
@@ -224,10 +353,11 @@ class VoiceEngine:
         self.base_url = public_base_url.rstrip("/")
         self.ttl_days = ttl_days
 
-    def gather_url(self, step: str, attempt: int) -> str:
-        return f"{self.base_url}/v1/voice/twilio/gather?" + urlencode(
-            {"step": step, "attempt": attempt}
-        )
+    def gather_url(self, step: str, attempt: int, turn: int | None = None) -> str:
+        params = {"step": step, "attempt": attempt}
+        if turn is not None:
+            params["turn"] = turn
+        return f"{self.base_url}/v1/voice/twilio/gather?" + urlencode(params)
 
     # Calls -------------------------------------------------------------------
 
@@ -285,8 +415,11 @@ class VoiceEngine:
         self.store.save_reply(call_sid, INBOUND_STEP, 0, reply)
         return reply
 
-    def on_gather(self, *, call_sid: str, step: str, attempt: int, speech: str) -> Reply:
-        cached = self.store.reply_for(call_sid, step, attempt)
+    def on_gather(
+        self, *, call_sid: str, step: str, attempt: int, speech: str, turn: int | None = None
+    ) -> Reply:
+        cache_step = f"{step}#{turn}" if turn is not None else step
+        cached = self.store.reply_for(call_sid, cache_step, attempt)
         if cached is not None:
             return cached
         session = self.store.session_by_call(call_sid)
@@ -295,6 +428,7 @@ class VoiceEngine:
             or session["status"] != "in_progress"
             or session["current_step"] != step
             or session["attempt"] != attempt
+            or (turn is not None and (session.get("turn") or 0) != turn)
         ):
             # Out of order or forged-but-signed: never continue the script.
             return _reply(None, [{"hangup": True}])
@@ -305,16 +439,22 @@ class VoiceEngine:
         turns = list(session["turns"])
         answers = dict(session["answers"])
 
+        if sum(1 for t in turns if t["role"] == "caller") >= MAX_CALLER_TURNS:
+            # A route loop that never resolves must not keep a caller (and the line) forever.
+            text, current = "", {**current, "max_attempts": attempt, "on_fail": "hangup"}
         if text:
             turns.append({"role": "caller", "text": text})
-            answers[step] = text
+            route = pick_route(current, text, session_language(session))
+            answers[step] = route["value"] if route and route.get("value") else text
             self.store.update_session(session["id"], turns=turns, answers=answers)
-            reply = self._advance({**session, "turns": turns, "answers": answers}, current["next"])
+            following = route["next"] if route else current["next"]
+            reply = self._advance({**session, "turns": turns, "answers": answers}, following)
         elif attempt < current["max_attempts"]:
-            self.store.update_session(session["id"], attempt=attempt + 1)
+            next_turn = (session.get("turn") or 0) + 1
+            self.store.update_session(session["id"], attempt=attempt + 1, turn=next_turn)
             reply = _reply(
                 script,
-                [self._gather_verb({**session, "attempt": attempt + 1}, current)],
+                [self._gather_verb({**session, "attempt": attempt + 1, "turn": next_turn}, current)],
                 session_language(session),
             )
         elif current["on_fail"] == "continue":
@@ -335,7 +475,7 @@ class VoiceEngine:
             log.info("voice session %s abandoned at %s", session["id"], step)
             reply = _reply(script, [{"say": message, "key": "__fail__"}, {"hangup": True}], language)
 
-        self.store.save_reply(call_sid, step, attempt, reply)
+        self.store.save_reply(call_sid, cache_step, attempt, reply)
         return reply
 
     def on_recording(self, *, call_sid: str, recording_url: str) -> None:
@@ -355,7 +495,7 @@ class VoiceEngine:
                 verbs.append(
                     twiml.gather(
                         twiml.say(g["prompt"], voice=reply.get("voice"), language=reply.get("language")),
-                        action=self.gather_url(g["step"], g["attempt"]),
+                        action=self.gather_url(g["step"], g["attempt"], g.get("turn")),
                         language=reply.get("language"),
                         timeout=g["timeout"],
                         speech_timeout=g["speech_timeout"],
@@ -374,8 +514,11 @@ class VoiceEngine:
         while key is not None:
             step = _step(script, key)
             if step["gather"]:
-                self.store.update_session(session["id"], current_step=key, attempt=1)
-                verbs.append(self._gather_verb({**session, "turns": turns, "attempt": 1}, step))
+                next_turn = (session.get("turn") or 0) + 1
+                self.store.update_session(session["id"], current_step=key, attempt=1, turn=next_turn)
+                verbs.append(
+                    self._gather_verb({**session, "turns": turns, "attempt": 1, "turn": next_turn}, step)
+                )
                 return _reply(script, verbs, language)
             text = text_for(step["say"], language)
             turns.append({"role": "agent", "text": text})
@@ -412,6 +555,7 @@ class VoiceEngine:
             "gather": {
                 "step": step["key"],
                 "attempt": session["attempt"],
+                "turn": session.get("turn"),
                 "prompt": prompt,
                 "timeout": step["timeout"],
                 "speech_timeout": step["speech_timeout"],

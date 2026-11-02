@@ -191,7 +191,8 @@ def test_start_call_by_script_id(engine):
         (lambda s: s.update(id="bad id"), "id"),
         (lambda s: s.update(steps=[]), "steps"),
         (lambda s: s["steps"][0].update(next="nowhere"), "steps"),
-        (lambda s: s["steps"][4].update(next="greeting"), "steps"),
+        # greeting -> goodbye -> greeting: announcements only, would talk forever
+        (lambda s: (s["steps"][4].update(next="greeting"), s["steps"][0].update(next="goodbye")), "steps"),
         (lambda s: s["steps"][1].update(key="transcript"), "steps[1].key"),
         (lambda s: s["steps"][1].update(max_attempts=9), "steps[1].max_attempts"),
         (lambda s: s.update(inbound_numbers=["0100"]), "inbound_numbers"),

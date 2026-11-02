@@ -132,4 +132,12 @@
         <length>4000</length>
         <visibleLines>4</visibleLines>
     </fields>
+    <fields>
+        <fullName>Variables__c</fullName>
+        <label>Variables</label>
+        <description>One per line: company = Acme Pharma. Per language: company.ar = أكمي فارما, company.en = Acme Pharma. Use {{company}} in any greeting, question, closing, or Fixed Value.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>4</visibleLines>
+    </fields>
 </CustomObject>
