@@ -136,7 +136,7 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `VOICE_TTS_CACHE` | `~/Cloudiator/voice-tts` | browser call: cached `say` audio, keyed by text+voice |
 | `WHISPER_CPP_BIN` | `/opt/homebrew/bin/whisper-cli` | browser call STT; always run with `--no-gpu` |
 | `WHISPER_MODEL` | `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin` | ggml weights; missing → each answer is `503 speech_unavailable` |
-| `WHISPER_THREADS` | `4` | CPU threads for one transcription |
+| `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
 | `VOICE_WEB_MAX_AUDIO_BYTES` | `2000000` | cap on one recorded answer |
 

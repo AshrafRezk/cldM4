@@ -183,3 +183,33 @@ def test_voice_selection():
     assert speech.voice_for("en-US", None) == "Samantha"
     assert speech.voice_for("ar-EG", "Tarik") == "Tarik"
     assert speech.voice_for("fr-FR", None) is None
+
+
+def test_audio_window_tracks_clip_length():
+    assert speech.audio_ctx(0.5) == 512   # floor: short answers repeat below this
+    assert speech.audio_ctx(3.7) == 512
+    assert speech.audio_ctx(14.0) == 1152
+    assert speech.audio_ctx(60.0) == 1500  # whisper's full 30 s window
+    assert all(speech.audio_ctx(x / 2) % 64 == 0 or speech.audio_ctx(x / 2) == 1500 for x in range(80))
+
+
+@pytest.mark.skipif(
+    not (os.path.exists("/usr/bin/say") and os.path.exists("/opt/homebrew/bin/whisper-cli")
+         and os.path.isfile(os.path.expanduser("~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin"))),
+    reason="needs say, whisper-cli, and the model (the Mini)",
+)
+async def test_real_round_trip_say_then_whisper(tmp_path):
+    """Majed says a name; whisper on the CPU hears it back."""
+    import subprocess
+    from types import SimpleNamespace
+
+    aiff = tmp_path / "a.aiff"
+    subprocess.run(["/usr/bin/say", "-v", "Samantha", "-o", str(aiff), "My name is Sara"], check=True)
+    cfg = SimpleNamespace(
+        whisper_cpp_bin="/opt/homebrew/bin/whisper-cli",
+        whisper_model=os.path.expanduser("~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin"),
+        whisper_threads=8,
+        ffmpeg_bin="/opt/homebrew/bin/ffmpeg",
+    )
+    text = await speech.transcribe(aiff.read_bytes(), language="en-US", settings=cfg)
+    assert "sara" in text.lower()

@@ -93,6 +93,19 @@ async def synthesize_data_url(text: str, **kwargs) -> str:
     return "data:audio/mp4;base64," + base64.b64encode(await synthesize(text, **kwargs)).decode()
 
 
+def audio_ctx(seconds: float) -> int:
+    """Encoder window for a clip, in whisper frames (1500 = 30 s).
+
+    The encoder always runs its whole window, so a 2 s answer at the default
+    1500 costs as much as 30 s of speech (~7 s on the M4 CPU). Measured on the
+    Mini with large-v3-turbo q5_0, 8 threads: windows at ~1.5x the clip + 2 s
+    keep Arabic names and digits exact; below 512 short answers repeat
+    themselves ("أحمد علي أحمد علي"), so 512 (~10 s) is the floor.
+    """
+    frames = (seconds * 1.5 + 2) / 30 * 1500
+    return int(min(1500, max(512, -(-frames // 64) * 64)))
+
+
 async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
     if not audio:
         return ""
@@ -115,9 +128,11 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
                 20.0,
             )
             base = Path(tmp) / "out"
+            seconds = max(0, wav.stat().st_size - 44) / 32000  # 16 kHz, 16-bit mono
             await _run(
                 [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
-                 "--no-gpu", "-t", str(settings.whisper_threads), "-nt", "-np",
+                 "--no-gpu", "-t", str(settings.whisper_threads),
+                 "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
                  "-otxt", "-of", str(base)],
                 STT_TIMEOUT,
             )

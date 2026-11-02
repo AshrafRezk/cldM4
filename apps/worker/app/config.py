@@ -181,7 +181,7 @@ class Settings:
             _str("WHISPER_MODEL", "~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin")
         )
     )
-    whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 4))
+    whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 8))
     ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
     voice_web_max_audio_bytes: int = field(
         default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 2_000_000)
