@@ -257,8 +257,8 @@ sf org assign permset --name Cloudiator_Admin --target-org myorg`}</pre>
       <section className="card glass">
         <h2>3. Services & modalities</h2>
         <p className="muted">
-          Text, image, and document paths are live on the engineer preset. Audio/speech waits on Phase G. FLUX jobs need
-          an <code>image_generation</code> scope.
+          Text, image, and document paths are live on the engineer preset. Voice calls need the <code>voice</code>{" "}
+          scope and the <code>salesforce/voice</code> package. FLUX jobs need an <code>image_generation</code> scope.
         </p>
         <label className="field">
           <span>Service</span>

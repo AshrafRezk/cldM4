@@ -108,6 +108,20 @@ public with sharing class CloudiatorService {
         return fromHttp('JobPoll', res, 'None', 'Mixed', jobId, relatedRecordId, true);
     }
 
+    /** GET for read-only routes (voice scripts and sessions). Needs the matching scope on the key. */
+    public static Result getJson(String service, String path) {
+        Result r = new Result();
+        try {
+            CloudiatorHttp.Response res = CloudiatorHttp.request('GET', path, null, 30000);
+            r = fromHttp(service, res, 'None', 'Text', path, null, false);
+        } catch (Exception e) {
+            r.ok = false;
+            r.errorMessage = e.getMessage();
+            r.logId = CloudiatorLogger.log(service, false, null, 'None', 'Text', path, null, e.getMessage(), null, null);
+        }
+        return r;
+    }
+
     public static Result health() {
         CloudiatorHttp.Response res = CloudiatorHttp.request('GET', '/v1/health', null, 15000);
         return fromHttp('Health', res, 'None', 'Text', null, null, false);

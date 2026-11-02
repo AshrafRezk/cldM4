@@ -25,6 +25,17 @@
           <template if:true={chatResult}>
             <pre class="slds-box slds-m-top_small slds-scrollable_y" style="max-height:16rem;white-space:pre-wrap">{chatResult}</pre>
           </template>
+          <h3 class="slds-text-heading_small slds-m-top_large">Voice</h3>
+          <lightning-button label="Load voice scripts" onclick={loadVoiceScripts} disabled={busy}></lightning-button>
+          <template for:each={voiceScripts} for:item="script">
+            <div key={script.id} class="slds-box slds-box_x-small slds-m-top_x-small">
+              <strong>{script.label}</strong>
+              <lightning-button class="slds-m-left_small" variant="neutral" label="New call link" data-id={script.id} onclick={callLink} disabled={busy}></lightning-button>
+            </div>
+          </template>
+          <template if:true={voiceResult}>
+            <pre class="slds-box slds-m-top_small" style="white-space:pre-wrap">{voiceResult}</pre>
+          </template>
           <h3 class="slds-text-heading_small slds-m-top_large">Recent call logs</h3>
           <lightning-datatable
             key-field="Id"

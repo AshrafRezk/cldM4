@@ -24,12 +24,12 @@ export const SERVICES = [
     note: "Needs image_generation scope",
   },
   {
-    id: "audio",
-    name: "Audio",
-    path: "—",
-    flow: "—",
-    modality: "Audio → Text (later)",
-    note: "Not in v1 engineer OpenAPI",
+    id: "voice",
+    name: "Voice calls",
+    path: "POST /v1/voice/scripts",
+    flow: "Commit Cloudiator voice sessions",
+    modality: "Speech → Record",
+    note: "Needs voice scope; deploy salesforce/voice",
   },
 ];
 

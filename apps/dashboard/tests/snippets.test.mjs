@@ -56,3 +56,16 @@ test("the built client bundle contains the Apex timeout and stream:false", async
   assert.match(bundled, /setTimeout\(120000\)/);
   assert.match(bundled, /stream['"]?\s*=>\s*false|stream": false/);
 });
+
+test("voice is a Salesforce service, with a body the worker accepts, and the OpenAPI mints call links", async () => {
+  const { SERVICES } = await import("../src/salesforceSnippets.js");
+  const voice = SERVICES.find((row) => row.id === "voice");
+  assert.ok(voice, "voice is listed in the Salesforce tab");
+  assert.match(voice.note, /voice scope/);
+  assert.deepEqual(voice.body.languages, ["ar-EG", "en-US"]);
+  assert.equal(SERVICES.some((row) => row.id === "audio"), false, "no stale 'audio waits on Phase G' entry");
+  const { buildOpenApi } = await import("../../../packages/schema/generate.mjs");
+  const doc = buildOpenApi(["chat", "voice"], { target: "salesforce", publicBaseUrl: "https://api.cloudiator.org" });
+  assert.ok(doc.paths["/v1/voice/scripts/{id}/web-link"].post);
+  assert.equal(buildOpenApi(["chat"], { target: "salesforce" }).paths["/v1/voice/scripts"], undefined);
+});

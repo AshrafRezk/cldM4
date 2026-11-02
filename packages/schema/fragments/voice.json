@@ -210,6 +210,72 @@
           }
         }
       }
+    },
+    "/v1/voice/scripts/{id}/web-link": {
+      "post": {
+        "operationId": "voiceWebLinkCreate",
+        "summary": "Mint a browser call link for a published script. Shown once; anyone with it can start a call.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceWebLink"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice/scripts/{id}/web-link/revoke": {
+      "post": {
+        "operationId": "voiceWebLinkRevoke",
+        "summary": "Revoke every call link of a script. Calls already in progress finish.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceWebLinkRevoked"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -383,6 +449,35 @@
             "items": {
               "$ref": "#/components/schemas/VoiceAckRecord"
             }
+          }
+        }
+      },
+      "VoiceWebLink": {
+        "type": "object",
+        "required": [
+          "script_id",
+          "url"
+        ],
+        "properties": {
+          "script_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "VoiceWebLinkRevoked": {
+        "type": "object",
+        "required": [
+          "revoked"
+        ],
+        "properties": {
+          "revoked": {
+            "type": "integer"
           }
         }
       }

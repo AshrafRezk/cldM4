@@ -27,6 +27,9 @@ public with sharing class CloudiatorAppController {
         out.add(info('ImageOps', 'Image ops', '/v1/tools/image', 'Image', 'Image', 'Resize/convert/QR (not FLUX).', true));
         out.add(info('JobCreate', 'Image job (FLUX)', '/v1/jobs', 'Text', 'Image', 'Requires image_generation scope. Poll with JobPoll.', true));
         out.add(info('JobPoll', 'Poll job', '/v1/jobs/{id}', 'None', 'Mixed', 'One poll per transaction.', true));
+        out.add(info('VoiceScripts', 'Voice scripts', '/v1/voice/scripts', 'None', 'Text', 'Published call scripts. Needs the voice scope; author scripts with the salesforce/voice package.', false));
+        out.add(info('VoiceCallLink', 'Voice call link', '/v1/voice/scripts/{id}/web-link', 'Text', 'Text', 'Browser call link for a script (shown once). Callers speak Egyptian Arabic or English.', false));
+        out.add(info('VoiceSessions', 'Voice sessions', '/v1/voice/sessions', 'None', 'Text', 'Finished calls waiting for CRM commit (Commit Cloudiator voice sessions).', false));
         out.add(info('Health', 'Health', '/v1/health', 'None', 'Text', 'Local appliance health (no Neon).', false));
         return out;
     }
@@ -54,6 +57,14 @@ public with sharing class CloudiatorAppController {
         else if (serviceName == 'Text') { path = '/v1/tools/text'; }
         else if (serviceName == 'Time') { path = '/v1/tools/time'; }
         else if (serviceName == 'ImageOps') { path = '/v1/tools/image'; modalityIn = 'Image'; modalityOut = 'Image'; }
+        else if (serviceName == 'VoiceScripts') { return CloudiatorService.getJson('Voice', '/v1/voice/scripts'); }
+        else if (serviceName == 'VoiceSessions') { return CloudiatorService.getJson('Voice', '/v1/voice/sessions?status=ready_to_commit'); }
+        else if (serviceName == 'VoiceCallLink') {
+            String scriptId = (String) payload.get('script_id');
+            if (String.isBlank(scriptId)) { throw new AuraHandledException('script_id is required.'); }
+            path = '/v1/voice/scripts/' + EncodingUtil.urlEncode(scriptId, 'UTF-8') + '/web-link';
+            return CloudiatorService.tool('Voice', path, new Map<String, Object>(), 'Text', 'Text', null);
+        }
         else if (serviceName == 'Embeddings') { return CloudiatorService.embeddings((String) payload.get('input'), null); }
         else { throw new AuraHandledException('Unknown service: ' + serviceName); }
         return CloudiatorService.tool(serviceName, path, payload, modalityIn, modalityOut, null);
