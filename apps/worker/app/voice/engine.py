@@ -994,9 +994,13 @@ def refinable_answers(script: Mapping[str, Any], answers: Mapping[str, Any]) -> 
     route, and read-back numbers were confirmed by the caller, so neither changes."""
     return [
         step["key"] for step in script["steps"]
-        if step.get("gather") and not step.get("routes") and not step.get("confirm")
-        and str(answers.get(step["key"]) or "").strip()
+        if free_text(step) and str(answers.get(step["key"]) or "").strip()
     ]
+
+
+def free_text(step: Mapping[str, Any]) -> bool:
+    """An answer in the caller's own words: no route chose it, no read-back confirmed it."""
+    return bool(step.get("gather")) and not step.get("routes") and not step.get("confirm")
 
 
 def _step(script: Mapping[str, Any], key: str) -> dict[str, Any]:

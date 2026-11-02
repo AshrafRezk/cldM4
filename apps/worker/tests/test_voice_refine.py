@@ -120,3 +120,23 @@ async def test_no_kept_audio_releases_at_once(tmp_path, engine, monkeypatch):
     session = finished_call(engine)
     await r.refine_waiting()
     assert engine.store.session_by_call(session["call_sid"])["status"] == "ready_to_commit"
+
+
+def test_menu_and_yes_no_audio_is_never_kept(tmp_path, engine, monkeypatch):
+    r = refiner(tmp_path, engine, FAKE_HELPER, monkeypatch)
+    session = finished_call(engine)
+    r.keep(session, "menu", b"RIFF", "جديد")
+    r.keep(session, "mobile", b"RIFF", "أيوه")
+    assert not (tmp_path / "refine" / session["id"]).exists()
+
+
+def test_audio_of_a_call_that_needs_no_refining_goes_at_once(tmp_path, engine, monkeypatch):
+    r = refiner(tmp_path, engine, FAKE_HELPER, monkeypatch)
+    session = finished_call(engine)
+    r.keep(session, "name", b"RIFF", "أشرف")
+    engine.store.update_session(session["id"], status="abandoned")
+    other = finished_call(engine)
+    r.keep(other, "name", b"RIFF", "أشرف")  # still refining: kept
+    assert r.tidy() == 1
+    assert not (tmp_path / "refine" / session["id"]).exists()
+    assert (tmp_path / "refine" / other["id"]).exists()

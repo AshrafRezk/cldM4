@@ -268,6 +268,11 @@ class VoiceStore:
             rows = conn.execute(sql, args).fetchall()
         return [_session(row) for row in rows]  # type: ignore[misc]
 
+    def session_status(self, session_id: str) -> str | None:
+        with self._db() as conn:
+            row = conn.execute("SELECT status FROM voice_sessions WHERE id = ?", (session_id,)).fetchone()
+        return row[0] if row else None
+
     def sessions_with_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
         """Across tenants, oldest first: for the Mini's own background work."""
         with self._db() as conn:
