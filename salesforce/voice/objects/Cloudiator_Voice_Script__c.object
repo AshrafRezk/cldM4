@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cloudiator Voice Script</label>
+    <pluralLabel>Cloudiator Voice Scripts</pluralLabel>
+    <description>Phone intake script published to the Cloudiator appliance. Definition__c is the script JSON from docs/voice.md.</description>
+    <nameField>
+        <label>Script Name</label>
+        <type>Text</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ReadWrite</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableReports>true</enableReports>
+    <enableSearch>true</enableSearch>
+    <fields>
+        <fullName>Definition__c</fullName>
+        <label>Definition</label>
+        <description>Full script JSON: steps, language, voice, commit.records.</description>
+        <type>LongTextArea</type>
+        <length>131072</length>
+        <visibleLines>25</visibleLines>
+    </fields>
+    <fields>
+        <fullName>Inbound_Numbers__c</fullName>
+        <label>Inbound Numbers</label>
+        <description>Comma-separated E.164 Twilio numbers. Overrides inbound_numbers in Definition__c when set.</description>
+        <type>Text</type>
+        <length>255</length>
+    </fields>
+    <fields>
+        <fullName>Active__c</fullName>
+        <label>Active</label>
+        <type>Checkbox</type>
+        <defaultValue>true</defaultValue>
+    </fields>
+    <fields>
+        <fullName>External_Id__c</fullName>
+        <label>Script Id</label>
+        <description>The script id on the appliance (letters, digits, - or _). Overrides id in Definition__c.</description>
+        <type>Text</type>
+        <length>80</length>
+        <externalId>true</externalId>
+        <unique>true</unique>
+        <caseSensitive>false</caseSensitive>
+        <required>true</required>
+    </fields>
+    <fields>
+        <fullName>Published_Version__c</fullName>
+        <label>Published Version</label>
+        <type>Number</type>
+        <precision>9</precision>
+        <scale>0</scale>
+    </fields>
+    <fields>
+        <fullName>Last_Publish_Error__c</fullName>
+        <label>Last Publish Error</label>
+        <type>TextArea</type>
+    </fields>
+</CustomObject>

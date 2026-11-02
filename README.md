@@ -1,6 +1,6 @@
 # Cloudiator (cldM4)
 
-**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. How to mint a key and use the playground and tools is [docs/using-console.md](docs/using-console.md). What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md). After v1: ideas that still fit this Mac are [docs/future-phases.md](docs/future-phases.md).
+**This repository is the production plan and the product.** Phases A–E are proven on the Mini: worker + tunnel at `https://api.cloudiator.org`, dashboard at `https://app.cloudiator.org`. How to mint a key and use the playground and tools is [docs/using-console.md](docs/using-console.md). What is left to finish v1 is [docs/next-steps.md](docs/next-steps.md). **Next product slice (Claude Code):** scripted Twilio phone into Salesforce CRM — [docs/claude-code-handoff.md](docs/claude-code-handoff.md). Later backlog: [docs/future-phases.md](docs/future-phases.md).
 
 Remote: `https://github.com/AshrafRezk/cldM4.git`
 
@@ -62,6 +62,8 @@ Do **not** run Ollama pulls or LaunchAgents here. You may still read the plan. I
 | [docs/hardware-and-network.md](docs/hardware-and-network.md) | **Day 0.** Physical Mini, Ethernet, CGNAT, no port forwards, accounts, prove-internet commands |
 | [docs/operator-checklist.md](docs/operator-checklist.md) | **Fill this in before Phase B.** Domain, Cloudflare zone settings, Neon, Netlify, Nominatim contact, boot policy |
 | [docs/using-console.md](docs/using-console.md) | **Use it.** Mint a key, send a playground chat, call every live tool |
+| [docs/claude-code-handoff.md](docs/claude-code-handoff.md) | **Claude Code (Opus).** Business brief + scripted phone → CRM contract; 120-minute implementation window |
+| [docs/voice.md](docs/voice.md) | Voice intake runbook: Twilio webhooks, script format, Salesforce deploy, retention |
 | [docs/next-steps.md](docs/next-steps.md) | **Current.** What remains to finish v1. Do not put secrets here |
 | [docs/plan-review-findings.md](docs/plan-review-findings.md) | Pre-Phase-A audit: P0/P1/P2 findings and where each fix landed |
 | [docs/cursor-settings.md](docs/cursor-settings.md) | Cursor Pro Plus ($60): model picker, Privacy Mode, spend cap, per-phase model |

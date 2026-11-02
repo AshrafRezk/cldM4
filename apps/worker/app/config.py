@@ -159,6 +159,16 @@ class Settings:
     hard_free_disk_gb: float = field(default_factory=lambda: _float("HARD_FREE_DISK_GB", 5.0))
     queue_db: str = field(default_factory=lambda: _str("QUEUE_DB", DEFAULT_QUEUE_DB))
 
+    # Voice intake (docs/voice.md). Without the Twilio token the webhooks 503;
+    # the Salesforce-side routes still work.
+    twilio_auth_token: str | None = field(default_factory=lambda: _opt("TWILIO_AUTH_TOKEN"))
+    voice_db: str = field(
+        default_factory=lambda: os.path.expanduser(_str("VOICE_DB", "~/Cloudiator/voice.db"))
+    )
+    voice_session_ttl_days: float = field(
+        default_factory=lambda: _float("VOICE_SESSION_TTL_DAYS", 7.0)
+    )
+
     health_rpm: int = field(default_factory=lambda: _int("HEALTH_RPM", 120))
 
     # PLAN.md §11. The Mini holds one process for weeks against a Neon compute

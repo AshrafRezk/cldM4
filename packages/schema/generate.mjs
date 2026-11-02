@@ -26,6 +26,7 @@ import toolsText from "./fragments/tools-text.json" with { type: "json" };
 import toolsTime from "./fragments/tools-time.json" with { type: "json" };
 import toolsUnits from "./fragments/tools-units.json" with { type: "json" };
 import usage from "./fragments/usage.json" with { type: "json" };
+import voice from "./fragments/voice.json" with { type: "json" };
 import scopesJson from "./scopes.json" with { type: "json" };
 
 const FRAGMENTS = [
@@ -49,6 +50,7 @@ const FRAGMENTS = [
   toolsTime,
   toolsUnits,
   usage,
+  voice,
 ];
 const FORBIDDEN_COMPOSITION = ["oneOf", "anyOf", "allOf", "not"];
 const APEX_OPERATION_ID = /^[A-Za-z][A-Za-z0-9_]*$/;

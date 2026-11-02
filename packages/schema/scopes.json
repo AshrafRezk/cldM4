@@ -19,7 +19,8 @@
     "tools.image_ops",
     "tools.audio_ops",
     "tools.google_places",
-    "tools.face_detect"
+    "tools.face_detect",
+    "voice"
   ],
   "presets": {
     "salesforce_engineer": {
@@ -35,7 +36,8 @@
         "tools.docs",
         "tools.text",
         "tools.time",
-        "tools.image_ops"
+        "tools.image_ops",
+        "voice"
       ],
       "max_tokens": 512,
       "max_context": 4096,
@@ -69,6 +71,11 @@
     "heavy": {
       "capabilities": ["chat", "embeddings"],
       "note": "gpt-oss:20b is exclusive and Phase E only; do not list it until pulled"
+    },
+    "voice_intake": {
+      "capabilities": ["chat", "voice"],
+      "force_no_stream": true,
+      "log_prompts": false
     },
     "speech": {
       "capabilities": ["chat", "transcriptions", "tools.audio_ops"]
