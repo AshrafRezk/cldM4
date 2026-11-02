@@ -167,3 +167,12 @@ def test_the_same_question_twice_is_not_a_retry(engine):
     assert first != second or engine.store.session_by_call(call)["turn"] == 3
     replay = engine.on_gather(call_sid=call, step="menu", attempt=1, speech="no idea", turn=1)
     assert replay == first, "a Twilio/page retry of turn 1 still replays"
+
+
+def test_answers_lose_trailing_punctuation_but_the_transcript_keeps_it(engine):
+    call, _ = start(engine, pharma(), "ar-EG")
+    say(engine, call, "menu", "جديد")
+    say(engine, call, "new_name", "أشرف رزق.")
+    session = engine.store.session_by_call(call)
+    assert session["commit_doc"]["records"][0]["fields"]["SuppliedName"] == "أشرف رزق"
+    assert "Caller: أشرف رزق." in session["commit_doc"]["records"][0]["fields"]["Description"]
