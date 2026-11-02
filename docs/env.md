@@ -139,7 +139,11 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |
 | `FFMPEG_BIN` | `/opt/homebrew/bin/ffmpeg` | normalizes uploads to 16 kHz mono WAV |
 | `VOICE_WEB_MAX_AUDIO_BYTES` | `6000000` | cap on one recorded answer (the page sends 16-bit WAV at the mic's own rate, ~96 KB/s at 48 kHz, ≈ 60 s) |
-| `VOICE_TTS_ENGINE` | `voicetut` | `voicetut` renders script lines at publish time; `say` turns rendering off (macOS voices only) |
+| `VOICE_TTS_ENGINE` | `auto` | `auto`: Azure if its key is set, else VoiceTut if installed, else macOS `say` only. Or force `azure`, `voicetut`, `say` |
+| `AZURE_SPEECH_KEY` | unset | secret. Azure Speech resource key; only fixed script text is sent, at publish time |
+| `AZURE_SPEECH_REGION` | unset | e.g. `westeurope` (letters and digits only) |
+| `AZURE_VOICE_AR` | `ar-EG-SalmaNeural` | default Arabic voice (`ar-EG-ShakirNeural` is male) |
+| `AZURE_VOICE_EN` | `en-GB-SoniaNeural` | default English voice (`en-GB-RyanNeural` is male) |
 | `VOICETUT_PYTHON` | `~/Cloudiator/tts-venv/bin/python` | the isolated venv with torch, OmniVoice, and voicetut-tts |
 | `VOICETUT_THREADS` | `6` | CPU threads for a render (it runs `nice -n 10`) |
 | `VOICE_AUDIO_DIR` | `~/Cloudiator/voice-audio` | `rendered/` (content-addressed clips) and `recordings/` (per tenant/script/line) |

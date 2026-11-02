@@ -2,15 +2,18 @@
 
 1. **Recording** a person uploaded for that question and language (from
    Salesforce). Nothing sounds more natural, and a call center has staff.
-2. **Rendered**: VoiceTut-TTS (Egyptian Arabic + English, Apache-2.0) made the
-   clip when the script was published. Script lines are fixed, so a slow,
-   natural model runs once, in the background, on the CPU — never during a
-   call and never on the Metal GPU that belongs to Gemma.
+2. **Rendered** when the script was published, by the configured engine:
+   - **azure**: Microsoft neural voices (Egyptian Arabic ar-EG-Salma/Shakir,
+     British English en-GB-Sonia/Ryan). Only the fixed line text is sent, once
+     per publish; callers' audio never leaves the Mini.
+   - **voicetut**: VoiceTut-TTS (Egyptian Arabic + English, Apache-2.0), slow,
+     on the CPU in its own venv — never during a call, never on the GPU.
 3. **Fallback**: macOS `say` (Majed / Samantha), instant, so a call never waits
    for a render that has not finished.
 
 Rendered clips are content-addressed (engine, speaker, language, text), so a
-republish only renders lines whose text changed.
+republish only renders lines whose text changed, and switching engines never
+plays a clip made by the other one.
 """
 
 from __future__ import annotations
@@ -31,8 +34,10 @@ from .engine import FAIL_MESSAGES, languages_of, text_for
 
 log = logging.getLogger("cloudiator.voice.audio")
 
-RENDER_ENGINE = "voicetut-v1"
-DEFAULT_SPEAKERS = {"ar": "Hadeer", "en": "Hadeer"}
+ENGINE_VERSIONS = {"voicetut": "voicetut-v1", "azure": "azure-v1"}
+VOICETUT_DEFAULT = "Hadeer"
+AZURE_VOICE = re.compile(r"^([a-z]{2,3}-[A-Z]{2})-[A-Za-z]+(?:Multilingual)?Neural(?:HD)?$")
+AZURE_REGION = re.compile(r"^[a-z0-9]{3,30}$")
 RENDER_TIMEOUT_PER_LINE = 300.0
 SAFE_PART = re.compile(r"[^A-Za-z0-9_.-]")
 
@@ -41,11 +46,11 @@ def _lang(language: str) -> str:
     return language.split("-")[0].lower()
 
 
-def script_lines(script: Mapping[str, Any]) -> list[dict[str, str]]:
+def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, str]]:
     """Every fixed line a caller can hear, per language."""
     lines = []
     for language in languages_of(script):
-        speaker = (script.get("voices") or {}).get(language) or DEFAULT_SPEAKERS.get(_lang(language), "Hadeer")
+        speaker = speaker_for(script, language) if speaker_for else VOICETUT_DEFAULT
         for step in script["steps"]:
             lines.append(
                 {"key": step["key"], "language": language, "speaker": speaker,
@@ -68,11 +73,42 @@ class VoiceAudio:
         self._task: asyncio.Task | None = None
         self.last_error: str | None = None
 
+    # Engine and voices -------------------------------------------------------
+
+    @property
+    def engine(self) -> str:
+        """auto: Azure when its key is set, else VoiceTut when installed, else off."""
+        s = self.settings
+        choice = (s.voice_tts_engine or "auto").lower()
+        azure_ready = bool(s.azure_speech_key and s.azure_speech_region)
+        voicetut_ready = os.path.exists(s.voicetut_python)
+        if choice == "auto":
+            return "azure" if azure_ready else "voicetut" if voicetut_ready else "say"
+        if choice == "azure" and not azure_ready:
+            return "say"
+        if choice == "voicetut" and not voicetut_ready:
+            return "say"
+        return choice if choice in ENGINE_VERSIONS else "say"
+
+    def speaker_for(self, script: Mapping[str, Any], language: str) -> str:
+        chosen = (script.get("voices") or {}).get(language) or ""
+        if self.engine == "azure":
+            if AZURE_VOICE.match(chosen):
+                return chosen
+            return self.settings.azure_voice_ar if _lang(language) == "ar" else self.settings.azure_voice_en
+        return chosen if chosen and not AZURE_VOICE.match(chosen) else VOICETUT_DEFAULT
+
+    def lines(self, script: Mapping[str, Any]) -> list[dict[str, str]]:
+        return script_lines(script, self.speaker_for)
+
     # Paths -------------------------------------------------------------------
 
-    def rendered_path(self, speaker: str, language: str, text: str) -> Path:
-        digest = hashlib.sha256(f"{RENDER_ENGINE}\0{speaker}\0{_lang(language)}\0{text}".encode()).hexdigest()
-        return self.root / "rendered" / f"{digest[:40]}.m4a"
+    def rendered_path(self, speaker: str, language: str, text: str, engine: str | None = None) -> Path:
+        engine = engine or self.engine
+        version = ENGINE_VERSIONS.get(engine, engine)
+        digest = hashlib.sha256(f"{version}\0{speaker}\0{_lang(language)}\0{text}".encode()).hexdigest()
+        suffix = ".mp3" if engine == "azure" else ".m4a"
+        return self.root / "rendered" / f"{digest[:40]}{suffix}"
 
     def recording_path(self, tenant_id: str, script_id: str, key: str, language: str) -> Path:
         tenant = hashlib.sha256(tenant_id.encode()).hexdigest()[:16]
@@ -89,10 +125,10 @@ class VoiceAudio:
             recording = self.recording_path(tenant_id, script["id"], key, language)
             if recording.is_file():
                 return _data_url(recording.read_bytes()), "recording"
-        speaker = (script.get("voices") or {}).get(language) or DEFAULT_SPEAKERS.get(_lang(language), "Hadeer")
-        rendered = self.rendered_path(speaker, language, text)
-        if rendered.is_file():
-            return _data_url(rendered.read_bytes()), "rendered"
+        if self.engine != "say":
+            rendered = self.rendered_path(self.speaker_for(script, language), language, text)
+            if rendered.is_file():
+                return _data_url(rendered.read_bytes(), rendered.suffix), "rendered"
         try:
             data = await speech.synthesize(
                 text, language=language, local_voice=None, cache_dir=self.settings.voice_tts_cache
@@ -130,10 +166,12 @@ class VoiceAudio:
 
     def status(self, tenant_id: str, script: Mapping[str, Any]) -> list[dict[str, str]]:
         rows = []
-        for line in script_lines(script):
+        for line in self.lines(script):
             if self.recording_path(tenant_id, script["id"], line["key"], line["language"]).is_file():
                 source = "recording"
-            elif self.rendered_path(line["speaker"], line["language"], line["text"]).is_file():
+            elif self.engine != "say" and self.rendered_path(
+                line["speaker"], line["language"], line["text"]
+            ).is_file():
                 source = "rendered"
             else:
                 source = "fallback"
@@ -144,17 +182,14 @@ class VoiceAudio:
     # Background rendering ----------------------------------------------------
 
     def enabled(self) -> bool:
-        return (
-            self.settings.voice_tts_engine == "voicetut"
-            and os.path.exists(self.settings.voicetut_python)
-        )
+        return self.engine != "say"
 
     def schedule(self, script: Mapping[str, Any]) -> int:
         """Queue the lines that have no clip yet. Returns how many."""
         if not self.enabled():
             return 0
         missing = [
-            line for line in script_lines(script)
+            line for line in self.lines(script)
             if not self.rendered_path(line["speaker"], line["language"], line["text"]).is_file()
         ]
         if missing:
@@ -179,6 +214,38 @@ class VoiceAudio:
                     log.error("voice render failed: %s", exc)
 
     async def _render(self, lines: Iterable[dict[str, str]]) -> None:
+        if self.engine == "azure":
+            await self._render_azure(list(lines))
+        else:
+            await self._render_voicetut(list(lines))
+
+    async def _render_azure(self, lines: list[dict[str, str]]) -> None:
+        """Seconds per line. Two requests at a time is well inside the free tier's limits."""
+        gate = asyncio.Semaphore(2)
+        done = 0
+        errors: list[str] = []
+
+        async def one(line: dict[str, str]) -> None:
+            nonlocal done
+            async with gate:
+                try:
+                    audio = await azure_tts(line["text"], line["speaker"], self.settings)
+                except speech.SpeechUnavailable as exc:
+                    errors.append(str(exc))
+                    return
+            target = self.rendered_path(line["speaker"], line["language"], line["text"], "azure")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            part = target.with_suffix(".part")
+            part.write_bytes(audio)
+            part.replace(target)
+            done += 1
+
+        await asyncio.gather(*(one(line) for line in lines))
+        log.info("voice render (azure): %d/%d lines", done, len(lines))
+        if errors:
+            raise speech.SpeechUnavailable(errors[0])
+
+    async def _render_voicetut(self, lines: Iterable[dict[str, str]]) -> None:
         """One subprocess per batch: the model loads once, renders every line,
         and exits, so its ~3 GB never stays resident next to Gemma."""
         lines = list(lines)
@@ -211,7 +278,7 @@ class VoiceAudio:
                 wav = Path(job["wav"])
                 if not wav.is_file():
                     continue
-                target = self.rendered_path(line["speaker"], line["language"], line["text"])
+                target = self.rendered_path(line["speaker"], line["language"], line["text"], "voicetut")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tmp_out = target.with_suffix(".part.m4a")
                 await speech._run(
@@ -224,5 +291,42 @@ class VoiceAudio:
             log.info("voice render: %d/%d lines", done, len(lines))
 
 
-def _data_url(data: bytes) -> str:
-    return "data:audio/mp4;base64," + base64.b64encode(data).decode()
+def _data_url(data: bytes, suffix: str = ".m4a") -> str:
+    mime = "audio/mpeg" if suffix == ".mp3" else "audio/mp4"
+    return f"data:{mime};base64," + base64.b64encode(data).decode()
+
+
+async def azure_tts(text: str, voice: str, settings) -> bytes:
+    """One line through Azure neural TTS. The host comes from the configured
+    region only, never from a script, so a script cannot point this anywhere."""
+    import httpx
+    from xml.sax.saxutils import escape
+
+    region = settings.azure_speech_region or ""
+    if not AZURE_REGION.match(region):
+        raise speech.SpeechUnavailable("AZURE_SPEECH_REGION is not a region name (e.g. westeurope)")
+    match = AZURE_VOICE.match(voice)
+    if not match:
+        raise speech.SpeechUnavailable(f"{voice!r} is not an Azure neural voice name")
+    ssml = (
+        f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{match.group(1)}">'
+        f'<voice name="{voice}">{escape(text)}</voice></speak>'
+    )
+    url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                url,
+                content=ssml.encode("utf-8"),
+                headers={
+                    "Ocp-Apim-Subscription-Key": settings.azure_speech_key,
+                    "Content-Type": "application/ssml+xml",
+                    "X-Microsoft-OutputFormat": "audio-48khz-96kbitrate-mono-mp3",
+                    "User-Agent": "cloudiator-voice",
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise speech.SpeechUnavailable(f"Azure TTS unreachable: {type(exc).__name__}") from exc
+    if response.status_code != 200 or not response.content:
+        raise speech.SpeechUnavailable(f"Azure TTS returned {response.status_code} for {voice}")
+    return response.content
