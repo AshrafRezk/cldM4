@@ -281,7 +281,7 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assis
             ) from exc
         intent = None
         current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
-        if current is not None and session["status"] == "in_progress":
+        if current is not None and session["status"] == "in_progress" and session.get("confirming") is None:
             intent = await assistant.intent(session["definition"], current, heard, session_language(session))
         reply = engine.on_gather(
             call_sid=call_sid, step=step, attempt=attempt, speech=heard, turn=turn_no, intent=intent
@@ -305,7 +305,18 @@ async def _turn(
     for verb in reply["verbs"]:
         gather = verb.get("gather") or {}
         text = verb.get("say") or gather.get("prompt")
-        if text:
+        if text and gather.get("confirm_digits"):
+            data_url, source = await audio.confirm_clip(
+                tenant_id=tenant_id, script=script, language=language, persona=reply.get("persona"),
+                digits=gather["confirm_digits"],
+            )
+            if data_url is None:  # no pieces to stitch (no render engine): speak it whole
+                data_url, source = await audio.clip(
+                    tenant_id=tenant_id, script=script, key=None, language=language, text=text,
+                    persona=reply.get("persona"),
+                )
+            clips.append({"text": text, "audio": data_url, "source": source})
+        elif text:
             data_url, source = await audio.clip(
                 tenant_id=tenant_id, script=script, key=verb.get("key") or gather.get("step"),
                 language=language, text=text, persona=reply.get("persona"),

@@ -105,6 +105,7 @@ Questions run in **Order**. On each Question record:
 | Target Field | `Object.Field` the answer fills, e.g. `Contact.MobilePhone`. Blank = transcript only |
 | Required | if nobody answers after the attempts, end the call politely |
 | Attempts | how many times to ask (1–5) |
+| Read Back | for numbers (mobile, case number): the agent reads the digits back, "قلت 0 1 0 1 2…، صح كده؟ / You said 0 1 0 1 2… Is that right?", in the persona's own voice. "أيوه / yes / oui" keeps it, "لأ / no / non" asks again (an attempt), and saying the number again replaces it. A rejected number is never stored. Templates tick it for mobile numbers |
 | Next | the Answer Key to go to next, or `goodbye`. Blank = the next question by Order. Also where a caller goes when no route matches |
 | Routes | one per line: `keywords => next key [= stored value]` |
 

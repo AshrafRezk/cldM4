@@ -61,6 +61,9 @@ public with sharing class CloudiatorVoiceScriptBuilder {
                 step.put('gather', true);
                 step.put('max_attempts', attempts);
                 step.put('on_fail', q.Required__c == true ? 'hangup' : 'continue');
+                if (q.Read_Back__c == true) {
+                    step.put('confirm', true);
+                }
                 List<Object> routeList = routes(q.Routes__c, 'Question ' + q.Order__c);
                 if (!routeList.isEmpty()) {
                     step.put('routes', routeList);

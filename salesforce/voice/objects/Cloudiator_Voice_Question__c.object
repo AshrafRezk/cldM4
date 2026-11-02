@@ -100,4 +100,11 @@
         <length>4000</length>
         <visibleLines>4</visibleLines>
     </fields>
+    <fields>
+        <fullName>Read_Back__c</fullName>
+        <label>Read Back</label>
+        <description>For numbers (mobile, case number): the agent reads the digits back and asks "صح كده؟ / Is that right?". A "no" asks again.</description>
+        <type>Checkbox</type>
+        <defaultValue>false</defaultValue>
+    </fields>
 </CustomObject>

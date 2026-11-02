@@ -39,7 +39,7 @@ public with sharing class CloudiatorVoicePublish {
                    Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
                    Arabic_Off_Script__c, English_Off_Script__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
-                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c
+                           Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c, Read_Back__c
                     FROM Questions__r ORDER BY Order__c),
                    (SELECT Id, FAQ_Key__c, Keywords__c, Arabic_Answer__c, English_Answer__c
                     FROM FAQs__r ORDER BY Name)

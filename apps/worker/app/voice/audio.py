@@ -30,7 +30,19 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import speech
-from .engine import FAIL_MESSAGES, back_text, find_persona, hold_text, languages_of, off_script_text, speak
+from .engine import (
+    CONFIRM_AGAIN,
+    CONFIRM_RIGHT,
+    CONFIRM_SAID,
+    DIGIT_WORDS,
+    FAIL_MESSAGES,
+    back_text,
+    find_persona,
+    hold_text,
+    languages_of,
+    off_script_text,
+    speak,
+)
 
 log = logging.getLogger("cloudiator.voice.audio")
 
@@ -79,6 +91,13 @@ def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, 
                 lines.append({**base, "key": "__back__", "text": speak(back_text(language), language, persona)})
             for item in script.get("faq") or []:
                 lines.append({**base, "key": f"__faq_{item['key']}", "text": speak(item["say"], language, persona)})
+            if any(step.get("confirm") for step in script["steps"]):
+                lang = "ar" if _lang(language) == "ar" else "en"
+                lines.append({**base, "key": "__said__", "text": CONFIRM_SAID[lang]})
+                lines.append({**base, "key": "__right__", "text": CONFIRM_RIGHT[lang]})
+                lines.append({**base, "key": "__again__", "text": CONFIRM_AGAIN[lang]})
+                for digit, word in enumerate(DIGIT_WORDS[lang]):
+                    lines.append({**base, "key": f"__digit_{digit}", "text": word})
     return lines
 
 
@@ -175,6 +194,43 @@ class VoiceAudio:
         except speech.SpeechUnavailable as exc:
             log.warning("tts unavailable: %s", exc)
             return None, "none"
+
+    async def confirm_clip(
+        self, *, tenant_id: str, script: Mapping[str, Any], language: str, persona: str | None, digits: str
+    ) -> tuple[str | None, str]:
+        """"قلت 0 1 0 1… صح كده؟" in the persona's own voice, stitched from
+        pre-rendered pieces (a new sentence would take ~20 s to render)."""
+        lang = "ar" if _lang(language) == "ar" else "en"
+        pieces = [("__said__", CONFIRM_SAID[lang])]
+        pieces += [(f"__digit_{d}", DIGIT_WORDS[lang][int(d)]) for d in digits]
+        pieces.append(("__right__", CONFIRM_RIGHT[lang]))
+        chosen = find_persona(script, persona) if script.get("personas") else None
+        pid = chosen["id"] if chosen else None
+        paths = []
+        for key, text in pieces:
+            recording = self.recording_path(tenant_id, script["id"], key, language, pid)
+            rendered = (self.rendered_path(self.speaker_for(script, language, chosen), language, text)
+                        if self.engine != "say" else None)
+            path = recording if recording.is_file() else rendered if rendered and rendered.is_file() else None
+            if path is None:
+                return None, "pending"
+            paths.append(path)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "confirm.m4a"
+            inputs: list[str] = []
+            for path in paths:
+                inputs += ["-i", str(path)]
+            # A short pause after "قلت", a beat between digits, and a pause before "صح كده؟".
+            gaps = [0.25] + [0.12] * (len(paths) - 3) + [0.3, 0]
+            parts = "".join(f"[{i}:a]aresample=24000,aformat=channel_layouts=mono,apad=pad_dur={gap}[a{i}];"
+                            for i, gap in enumerate(gaps))
+            graph = parts + "".join(f"[a{i}]" for i in range(len(paths))) + f"concat=n={len(paths)}:v=0:a=1[out]"
+            await speech._run(
+                [self.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", *inputs,
+                 "-filter_complex", graph, "-map", "[out]", "-c:a", "aac", "-b:a", "64k", str(out)],
+                20.0,
+            )
+            return _data_url(out.read_bytes()), "rendered"
 
     # Recordings --------------------------------------------------------------
 

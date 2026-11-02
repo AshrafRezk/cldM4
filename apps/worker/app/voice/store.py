@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS voice_sessions (
     language TEXT,
     turn INTEGER NOT NULL DEFAULT 0,
     persona TEXT,
+    confirming TEXT,
     answers TEXT NOT NULL DEFAULT '{}',
     turns TEXT NOT NULL DEFAULT '[]',
     recording_url TEXT,
@@ -366,6 +367,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE voice_sessions ADD COLUMN turn INTEGER NOT NULL DEFAULT 0")
     if "persona" not in columns:
         conn.execute("ALTER TABLE voice_sessions ADD COLUMN persona TEXT")
+    if "confirming" not in columns:
+        conn.execute("ALTER TABLE voice_sessions ADD COLUMN confirming TEXT")
 
 
 def _hash(token: str) -> str:
