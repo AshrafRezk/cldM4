@@ -158,7 +158,7 @@ async def test_a_staff_recording_wins_and_can_be_removed(make_client, install_ke
         assert bad.status_code == 400
     async with make_client() as anon:
         turn = (await anon.post(f"{path}/start", params={"lang": "ar-EG"})).json()
-    assert [c["source"] for c in turn["clips"]] == ["fallback", "recording"]
+    assert [c["source"] for c in turn["clips"]] == ["pending", "recording"]
     async with make_client(headers) as client:
         assert (await client.delete(f"{base}/ask_name/ar-EG")).json() == {"deleted": True}
 

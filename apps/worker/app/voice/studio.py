@@ -162,7 +162,7 @@ button:disabled{opacity:.45;cursor:default}
 (() => {
   const base = location.pathname.replace(/\\/$/, "");
   const root = document.getElementById("lines");
-  const SOURCE = { recording: "your recording", rendered: "generated voice", fallback: "basic voice (rendering)", none: "no audio" };
+  const SOURCE = { recording: "your recording", rendered: "generated voice", fallback: "basic voice (rendering)", pending: "natural voice rendering…", none: "no audio" };
   let ctx = null, recorder = null;
 
   async function json(path, opts) {
