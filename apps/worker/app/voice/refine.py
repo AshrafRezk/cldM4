@@ -9,7 +9,9 @@ only ever collects ready sessions, so it never sees the live guess first.
 
 Nothing is lost on failure: a missing model, a crash or a timeout releases the
 session with the live answers. The kept audio is deleted once a call is
-released, and anything left behind is swept after a day.
+released. Only free-text answers are kept at all (never a menu choice or a
+yes/no), a call that ends any other way (abandoned, or nothing to refine) has
+its audio deleted within seconds, and anything else is swept after a day.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from . import speech
-from .engine import VoiceEngine, clean_answer, refinable_answers
+from .engine import VoiceEngine, clean_answer, free_text, refinable_answers
 
 log = logging.getLogger("cloudiator.voice.refine")
 
@@ -59,6 +61,9 @@ class Refiner:
         """Keep the answer's audio until the call is refined. The latest answer to a step wins."""
         if not (self.enabled and audio and heard.strip()):
             return
+        step_def = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
+        if step_def is None or not free_text(step_def):
+            return  # menu choices and yes/no answers are never heard again, so never kept
         folder = self._dir(session["id"])
         folder.mkdir(parents=True, exist_ok=True)
         name = SAFE.sub("_", step)
@@ -80,6 +85,7 @@ class Refiner:
         while True:
             try:
                 await self.refine_waiting()
+                self.tidy()
                 if time.time() - swept > 3600:
                     self.sweep()
                     swept = time.time()
@@ -186,6 +192,19 @@ class Refiner:
             if isinstance(item, dict) and "id" in item:
                 lines.append(item)
         return lines
+
+    def tidy(self) -> int:
+        """Delete kept audio as soon as its call is over without needing it:
+        abandoned, or finished with nothing to refine."""
+        removed = 0
+        if not self.root.is_dir():
+            return 0
+        for folder in self.root.iterdir():
+            status = self.engine.store.session_status(folder.name) if folder.is_dir() else None
+            if status is not None and status not in ("in_progress", "refining"):
+                shutil.rmtree(folder, ignore_errors=True)
+                removed += 1
+        return removed
 
     def sweep(self) -> int:
         """Audio from calls that never finished (the caller hung up) goes after a day."""
