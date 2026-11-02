@@ -9,7 +9,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  included_files = ["../../packages/schema/**"]
+  included_files = ["../../packages/schema/**", "netlify/functions/_lib/sf-package/**"]
 
 [dev]
   command = "npm run dev"

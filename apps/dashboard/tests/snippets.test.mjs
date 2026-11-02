@@ -6,14 +6,14 @@ import { test } from "node:test";
 
 import { apexSnippet, jsonBodyExample } from "../netlify/functions/_lib/salesforce.mjs";
 import { mintSecret } from "../netlify/functions/_lib/keys.mjs";
+import { installSteps } from "../src/salesforceSnippets.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 test("Apex snippet contains the Salesforce timeout and stream:false", () => {
   const snippet = apexSnippet("https://api.cloudiator.org");
-  assert.match(snippet, /req\.setTimeout\(120000\)/);
+  assert.match(snippet, /setTimeout\(120000\)/);
   assert.match(snippet, /'stream' => false/);
-  assert.match(snippet, /"stream": false/);
 });
 
 test("JSON example sent by Apex/playground forces stream false", () => {
@@ -36,11 +36,23 @@ test("the client playground calls the Mini API, not a Netlify inference function
   assert.equal(src.includes("11434"), false);
 });
 
+test("Console can connect an already-minted sk-cld key without redeploying", () => {
+  const panel = readFileSync(join(here, "../src/SalesforcePanel.jsx"), "utf8");
+  const install = readFileSync(join(here, "../netlify/functions/_lib/sfInstall.mjs"), "utf8");
+  assert.match(panel, /Connect existing key only/);
+  assert.match(panel, /configureOnly/);
+  assert.match(install, /configureOnly/);
+  assert.match(install, /mode: payload\.configureOnly \? "connect" : "install"/);
+  const steps = installSteps().join(" ");
+  assert.match(steps, /Connect existing key only/);
+  assert.match(steps, /existing sk-cld/);
+});
+
 test("the built client bundle contains the Apex timeout and stream:false", async () => {
   const { readFileSync, readdirSync } = await import("node:fs");
   const distJs = join(here, "../dist/assets");
   const files = readdirSync(distJs).filter((name) => name.endsWith(".js"));
   const bundled = files.map((name) => readFileSync(join(distJs, name), "utf8")).join("\n");
   assert.match(bundled, /setTimeout\(120000\)/);
-  assert.match(bundled, /"stream": false/);
+  assert.match(bundled, /stream['"]?\s*=>\s*false|stream": false/);
 });

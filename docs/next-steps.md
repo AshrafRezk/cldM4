@@ -6,7 +6,7 @@ Repo on the Mini: `/Users/ashrafrezk/cldM4`
 Env (outside git, `chmod 600`): `/Users/ashrafrezk/Cloudiator/.env`  
 Secrets stay in the password manager, not this file. Blanks: [operator-checklist.md](operator-checklist.md).
 
-v1 is finished when every box in [Finish line](#finish-line) is checked. Work top to bottom. Steps 1–4 are operator actions on the Mini, Neon, Netlify, and Cloudflare. Step 5 is the only remaining code phase.
+v1 is finished when every box in [Finish line](#finish-line) is checked. Steps 1–4 and Phase F **worker** code are done. Remaining: Salesforce org proof (5b) and Mini boot/alert (6). Continue on the Mini with [finish-v1-mini.md](finish-v1-mini.md).
 
 **To use what is already live** — mint a key, send a playground chat, and call every tool Phases A–E shipped — follow [using-console.md](using-console.md).
 
@@ -28,14 +28,17 @@ v1 is finished when every box in [Finish line](#finish-line) is checked. Work to
 
 ## Finish line
 
-- [x] **1. Reboot clears leftover swap.** 2026-11-02: local and public `/v1/health` both `"ok": true`, `swap_used_mb` 0, `degraded` [], `db` ok, both models loaded.
-- [x] **2. Playground chat** → `usage_daily`. Neon on 2026-11-02 shows `/v1/chat/completions` 5 calls / 0 errors on 2026-09-27, plus later `/v1/models`, `/v1/embeddings`, `/v1/usage` days.
-- [x] **3. Neon retention nightly on the Mini.** `ai.cloudiator.retention` is installed and ran clean through 2026-10-31. From 2026-11-01 every run hit Neon's cold start against the 3s connect timeout; the script now uses 30s plus 3 retries (`RETENTION_CONNECT_TIMEOUT_SECONDS`, `RETENTION_ATTEMPTS`). Manual run 2026-11-02: `retention ok: usage_events=3 older_than_30d=0 usage_daily_rows=8`.
-- [ ] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Redirect is already in `apps/dashboard/netlify.toml`. Prove after production deploy: `curl -sI https://cloudiator.netlify.app/ | grep -i location`. 2026-11-02: from the Mini's network Netlify's edge IPs (35.157.26.135, 63.176.8.218) time out while netlify.com loads, so check from another network (phone hotspot).
-- [x] **5. Phase F worker code** — `force_no_stream` accepts `stream: true` with `x-cloudiator-stream-downgraded: true`; `max_response_bytes` returns artifact + truncated preview. Tests: `test_sf_stream_downgrade.py`, `test_response_size_cap.py`. **Still open on a Salesforce org:** External Services import + real Apex callout ([salesforce.md](salesforce.md)).
-- [ ] **6. Unattended boot** — checked 2026-11-02: FileVault **off**, auto-login `ashrafrezk`, `autorestart 1` (start after power failure), `sleep 0`, `womp 1`. Health alert: `scripts/health-ping.sh` + `scripts/install-health-launchagent.sh` (host-setup §10), transitions tested in dry-run. **Open:** set `SLACK_WEBHOOK_URL` or `NTFY_URL`, install the agent, stop the worker once and see the alert; tick the FileVault-off option in operator-checklist §6.
+**Mini session playbook (copy-paste prompts):** [finish-v1-mini.md](finish-v1-mini.md).
 
-**Next product slice (does not block the v1 finish line):** scripted Twilio phone answering + Salesforce-configurable scripts + CRM commit records. Full business brief, API contract, Apex shape, and 120-minute Claude Code instructions: **[claude-code-handoff.md](claude-code-handoff.md)**. **Worker side implemented** (hermetic pytest green); operator runbook in **[voice.md](voice.md)**. Still open: `TWILIO_AUTH_TOKEN` on the Mini, a Twilio number pointed at the inbound webhook, first sandbox deploy of `salesforce/voice` (Apex not yet compiled in an org), one live call end to end. Later ideas (voice ops console UI, WhatsApp, RAG, rembg, …) remain in **[future-phases.md](future-phases.md)**.
+- [x] **1. Reboot clears leftover swap.** 2026-11-02: local and public `/v1/health` both `"ok": true`, `swap_used_mb` 0, `degraded` [], both models loaded.
+- [x] **2. Playground chat** → `usage_daily`. Neon on 2026-11-02 shows `/v1/chat/completions` 5 calls / 0 errors on 2026-09-27, plus later `/v1/models`, `/v1/embeddings`, `/v1/usage` days.
+- [x] **3. Neon retention nightly on the Mini.** `ai.cloudiator.retention` ran clean through 2026-10-31. From 2026-11-01 every run hit Neon's cold start against the 3s connect timeout; the script now uses 30s plus 3 retries (`RETENTION_CONNECT_TIMEOUT_SECONDS`, `RETENTION_ATTEMPTS`). Manual run 2026-11-02: `retention ok: usage_events=3 older_than_30d=0 usage_daily_rows=8`.
+- [x] **4. `cloudiator.netlify.app` → `https://app.cloudiator.org`.** Root + dashboard host 301; production deploy 2026-10-12 proved `301` + `location: https://app.cloudiator.org/`. (The live deploy, 2026-10-12 08:19 from the CLI, reports 6 redirect rules processed. From the Mini's own network Netlify's edge IPs time out, so re-check from another network.)
+- [x] **5a. Phase F worker code** — `force_no_stream` / `max_response_bytes` + tests on `main`.
+- [ ] **5b. Salesforce org proof** — Deploy `salesforce/` unmanaged app (or Named Credential + Apex), External Services from `?target=salesforce`, real callout + call log row ([salesforce-app.md](salesforce-app.md)). Mini chat: Session A in [finish-v1-mini.md](finish-v1-mini.md).
+- [ ] **6. Unattended boot** — checked 2026-11-02: FileVault **off**, auto-login `ashrafrezk`, `autorestart 1` (start after power failure), `sleep 0`, `womp 1`. Health alert: `scripts/health-ping.sh` + `scripts/install-health-launchagent.sh` (host-setup §10; alerts once per state change, checks the tunnel too, Slack and/or ntfy), transitions tested in dry-run. **Open:** set `SLACK_WEBHOOK_URL` or `NTFY_URL`, install the agent, stop the worker once and see the alert; tick the FileVault-off option in operator-checklist §6.
+
+**Next product slice (does not block the v1 finish line):** scripted phone answering + Salesforce-configurable scripts + CRM commit records. Brief: **[claude-code-handoff.md](claude-code-handoff.md)**. **Worker side implemented** (hermetic pytest green); runbook in **[voice.md](voice.md)**. The engine, sessions, commit document, and `salesforce/voice` Apex are carrier-neutral; only the TwiML webhook layer is Twilio-specific. Still open: choose the front door (Twilio, a browser call, or an own-SIM line), first sandbox deploy of `salesforce/voice`, one live call end to end. Later ideas (voice ops console UI, WhatsApp, RAG, rembg, …) remain in **[future-phases.md](future-phases.md)**.
 
 Explicitly **not** required to finish v1: `gpt-oss:20b`, FLUX 8-bit, vLLM-metal, a Cloudflare Worker, `apps/gateway/`, or the voice handoff. The old “Phase G SIM phone” idea is superseded for the first shippable line by the Twilio slice in `claude-code-handoff.md`.
 
@@ -110,7 +113,9 @@ Expect `301` and `location: https://app.cloudiator.org/`. An incognito window on
 
 ## 5. Phase F — Salesforce pack
 
-Docs for the org are already in [salesforce.md](salesforce.md): Named Credential, External Credential, the permission set that grants the **principal** (without it Apex 401s while curl works), `req.setTimeout(120000)`, `"stream": false`, and poll patterns A/B/C (one poll per transaction). Do not rewrite that page from scratch.
+**Worker side is done.** Org proof is finish-line **5b** — paste Session A from [finish-v1-mini.md](finish-v1-mini.md) on the Mini.
+
+Docs for the org are already in [salesforce.md](salesforce.md): Named Credential, External Credential, the permission set that grants the **principal** (without it Apex 401s while curl works), `req.setTimeout(120000)`, `"stream": false`, and poll patterns A/B/C (one poll per transaction). Deployable Apex: `examples/salesforce/`. Do not rewrite that page from scratch.
 
 **Phase F worker code is in the repo** (`resolve_stream_downgrade`, `enforce_max_response_bytes`, `tests/test_sf_stream_downgrade.py`, `tests/test_response_size_cap.py`). After that commit is on `main` and pulled on the Mini:
 
@@ -141,11 +146,11 @@ mlx-whisper stays optional and uses the same exclusive slot as FLUX. Skip it for
 
 ## 6. Unattended boot and alerting
 
-These are still blank in [operator-checklist.md](operator-checklist.md). A power cut with FileVault on stops at the unlock screen: no LaunchAgent, no Ollama, Salesforce sees 503, and nobody is paged.
+Paste Session B from [finish-v1-mini.md](finish-v1-mini.md) on the Mini. These are still blank in [operator-checklist.md](operator-checklist.md). A power cut with FileVault on stops at the unlock screen: no LaunchAgent, no Ollama, Salesforce sees 503, and nobody is paged.
 
 - Tick exactly one of §6 A / B / C. Recommended: FileVault on, a UPS, manual unlock.
 - Automatic login for `ashrafrezk`. Energy: computer does not sleep; wake for network; start up after a power failure.
-- `SLACK_WEBHOOK_URL` in `/Users/ashrafrezk/Cloudiator/.env`. Install the 2-minute health ping from [host-setup.md](host-setup.md) §10. Stop the worker once and confirm the alert fires, then start it again.
+- `SLACK_WEBHOOK_URL` and/or `NTFY_URL` in `/Users/ashrafrezk/Cloudiator/.env`. Run `scripts/install-health-launchagent.sh` (see [host-setup.md](host-setup.md) §10). Stop the worker once and confirm the DOWN and recovered alerts fire.
 
 Also still open, and worth doing in the same sitting:
 

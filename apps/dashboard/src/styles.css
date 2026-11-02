@@ -444,6 +444,19 @@ legend {
 .caps { font-size: 0.8rem; color: var(--muted); }
 .steps { padding-left: 1.2rem; color: var(--muted); }
 .steps li { margin: 0.35rem 0; }
+
+.sf-guide { display: flex; flex-direction: column; gap: 1rem; }
+.sf-guide .field { margin: 0.75rem 0; }
+.sf-guide select {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+}
+.sf-meta { display: grid; gap: 0.55rem; margin: 0.75rem 0 1rem; }
+.sf-meta div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; }
+.sf-meta dt { color: var(--muted); margin: 0; }
+.sf-meta dd { margin: 0; }
 .pill {
   font-size: 0.72rem;
   letter-spacing: 0.08em;

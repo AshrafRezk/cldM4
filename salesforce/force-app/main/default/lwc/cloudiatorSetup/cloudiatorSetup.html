@@ -1,0 +1,27 @@
+<template>
+  <lightning-card title="Cloudiator Setup" icon-name="custom:custom63">
+    <div class="slds-p-around_medium">
+      <p class="slds-m-bottom_small">
+        Mint a <strong>Salesforce engineer</strong> key in
+        <a href="https://app.cloudiator.org/console" target="_blank">app.cloudiator.org/console</a>,
+        then paste it here. The key is stored in a <em>protected</em> hierarchy custom setting (Apex-only).
+      </p>
+      <template if:true={loaded}>
+        <lightning-input label="API base URL" value={baseUrl} data-field="baseUrl" onchange={onChange}></lightning-input>
+        <lightning-input label="Default model" value={defaultModel} data-field="defaultModel" onchange={onChange} class="slds-m-top_small"></lightning-input>
+        <lightning-textarea label="API key (sk-cld-…)" value={apiKey} data-field="apiKey" onchange={onChange} class="slds-m-top_small"></lightning-textarea>
+        <lightning-input type="checkbox" label="Use Named Credential callout:Cloudiator (after you create External Credential + principal)" checked={useNamedCredential} data-field="useNamedCredential" onchange={onChange} class="slds-m-top_small"></lightning-input>
+        <template if:true={hasApiKey}>
+          <p class="slds-text-color_success slds-m-top_small">Key on file …{apiKeyLast4}</p>
+        </template>
+        <div class="slds-m-top_medium">
+          <lightning-button variant="brand" label="Save" onclick={save} disabled={busy} class="slds-m-right_small"></lightning-button>
+          <lightning-button label="Test /v1/health" onclick={test} disabled={busy}></lightning-button>
+        </div>
+        <template if:true={message}>
+          <p class="slds-m-top_small">{message}</p>
+        </template>
+      </template>
+    </div>
+  </lightning-card>
+</template>

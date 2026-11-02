@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Paste minted API key and base URL</description>
+    <label>Cloudiator Setup</label>
+    <lwcComponent>cloudiatorSetup</lwcComponent>
+    <motif>Custom13: Settings</motif>
+</CustomTab>
