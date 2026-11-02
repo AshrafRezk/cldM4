@@ -255,6 +255,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
         "variables": variables,
+        # How words are said: {"ميرك": "مِيرْك"}. Harakat only; the shown text never changes.
+        "pronunciations": _pronunciations(body.get("pronunciations")),
         # Agents a caller can choose ("Hello, this is {{agent}} from {{company}}").
         "personas": personas,
         # A short tone after each question tells the caller when to speak.
@@ -309,6 +311,28 @@ def _variables(raw: Any, languages: list[str]) -> dict[str, dict[str, str]]:
         if not isinstance(name, str) or not STEP_KEY.match(name) or name in RESERVED_KEYS:
             raise ScriptInvalid(f"Variable name {name!r} is not allowed.", "variables")
         out[name] = _localized(value, languages, f"variables.{name}")
+    return out
+
+
+def _pronunciations(raw: Any) -> dict[str, str]:
+    """{"word": "the same word with harakat"}. A value may only add harakat, so a
+    pronunciation can never change what is said, only how it is voiced."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > 200:
+        raise ScriptInvalid("pronunciations must be an object of up to 200 words.", "pronunciations")
+    out = {}
+    for word, voiced in raw.items():
+        if not isinstance(word, str) or not isinstance(voiced, str):
+            raise ScriptInvalid("pronunciations maps a word to the same word with harakat.", "pronunciations")
+        word, voiced = word.strip(), voiced.strip()
+        if not ARABIC_WORD.fullmatch(word) or len(word) > 40:
+            raise ScriptInvalid(f"{word!r} is not a single Arabic word.", "pronunciations")
+        if _ARABIC_MARKS.sub("", voiced) != _ARABIC_MARKS.sub("", word):
+            raise ScriptInvalid(
+                f"The pronunciation of {word!r} may only add harakat to it.", "pronunciations"
+            )
+        out[_ARABIC_MARKS.sub("", word)] = voiced
     return out
 
 
@@ -502,6 +526,7 @@ def _routes(raw: Any, languages: list[str], param: str) -> list[dict[str, Any]]:
     return out
 
 
+ARABIC_WORD = re.compile(r"[\u0621-\u064A\u064B-\u0652\u0670]+")
 _ARABIC_MARKS = re.compile(r"[\u064B-\u0652\u0670\u0640]")  # harakat, dagger alef, tatweel
 _ARABIC_FOLD = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي", "ة": "ه", "ؤ": "و", "ئ": "ي"})
 _NOT_WORD = re.compile(r"[^\w]+")
@@ -575,10 +600,33 @@ class VoiceEngine:
     The cache stores the Reply, so a retry on either channel replays exactly.
     """
 
-    def __init__(self, store: VoiceStore, *, public_base_url: str, ttl_days: float) -> None:
+    def __init__(
+        self, store: VoiceStore, *, public_base_url: str, ttl_days: float, refine: bool = False
+    ) -> None:
         self.store = store
         self.base_url = public_base_url.rstrip("/")
         self.ttl_days = ttl_days
+        # With a second, slower speech model on the Mini (refine.py), a finished
+        # call waits as "refining" while it re-hears the free-text answers, and
+        # only then becomes "ready_to_commit" for Salesforce.
+        self.refine = refine
+
+    def commit_for(
+        self, session: Mapping[str, Any], turns: list[dict[str, Any]], answers: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        script = session["definition"]
+        persona = session_persona(session)
+        return render_commit(
+            script.get("commit") or {"records": []},
+            answers=answers,
+            transcript=transcript_text(turns),
+            call={
+                "agent": speak("{{agent}}", crm_language(languages_of(script)), persona) if persona else "",
+                "from": session.get("from_number") or "",
+                "to": session.get("to_number") or "",
+                "call_sid": session["call_sid"],
+            },
+        )
 
     def gather_url(self, step: str, attempt: int, turn: int | None = None) -> str:
         params = {"step": step, "attempt": attempt}
@@ -857,25 +905,20 @@ class VoiceEngine:
             verbs.append({"say": text, "key": step["key"]})
             key = step["next"]
 
-        commit = render_commit(
-            script.get("commit") or {"records": []},
-            answers=session["answers"],
-            transcript=transcript_text(turns),
-            call={
-                "agent": speak("{{agent}}", crm_language(languages_of(script)), persona) if persona else "",
-                "from": session.get("from_number") or "",
-                "to": session.get("to_number") or "",
-                "call_sid": session["call_sid"],
-            },
+        commit = self.commit_for(session, turns, session["answers"])
+        status = (
+            "refining"
+            if self.refine and refinable_answers(script, session["answers"])
+            else "ready_to_commit"
         )
         self.store.update_session(
             session["id"],
             turns=turns,
-            status="ready_to_commit",
+            status=status,
             current_step=None,
             commit_doc=commit,
         )
-        log.info("voice session %s ready to commit", session["id"])
+        log.info("voice session %s %s", session["id"], status.replace("_", " "))
         verbs.append({"hangup": True})
         return _reply(script, verbs, language, persona)
 
@@ -943,6 +986,17 @@ def languages_of(script: Mapping[str, Any]) -> list[str]:
 
 def session_language(session: Mapping[str, Any]) -> str:
     return session.get("language") or session["definition"].get("language") or "en-US"
+
+
+def refinable_answers(script: Mapping[str, Any], answers: Mapping[str, Any]) -> list[str]:
+    """Steps whose answer is the caller's own words (a name, a description):
+    worth hearing again with the slower model. Menu choices already chose a
+    route, and read-back numbers were confirmed by the caller, so neither changes."""
+    return [
+        step["key"] for step in script["steps"]
+        if step.get("gather") and not step.get("routes") and not step.get("confirm")
+        and str(answers.get(step["key"]) or "").strip()
+    ]
 
 
 def _step(script: Mapping[str, Any], key: str) -> dict[str, Any]:

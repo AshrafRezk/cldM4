@@ -64,6 +64,7 @@ from .voice.engine import VoiceEngine
 from .voice.line import CallLine
 from .voice.routes import register_voice_routes
 from .voice.studio import register_studio_routes
+from .voice.refine import Refiner as VoiceRefiner
 from .voice.web import register_web_routes
 from .voice.store import VoiceStore
 from .translation import (
@@ -134,6 +135,8 @@ voice = VoiceEngine(
     ttl_days=settings.voice_session_ttl_days,
 )
 voice_audio = VoiceAudio(settings)
+voice_refiner = VoiceRefiner(settings, voice)
+voice.refine = voice_refiner.enabled
 voice_assistant = VoiceAssistant(settings, ollama=ollama, scheduler=scheduler)
 voice_line = CallLine(
     capacity=max(1, settings.voice_max_active_calls), idle_seconds=settings.voice_call_idle_seconds
@@ -212,12 +215,15 @@ async def lifespan(app: FastAPI):
         stt_warm = asyncio.create_task(_warm_speech(), name="warm-speech")
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
+    if voice_refiner.enabled:
+        voice_refiner.start()  # also releases calls left "refining" by a restart
     artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")
     try:
         yield
     finally:
         warm.cancel()
         janitor.cancel()
+        await voice_refiner.stop()
         artifact_janitor.cancel()
         await scheduler.stop()
         await jobs.stop()
@@ -769,7 +775,7 @@ register_voice_routes(
 register_studio_routes(app, engine=voice, audio=voice_audio, require_key=require_key)
 register_web_routes(
     app, engine=voice, audio=voice_audio, line=voice_line, assistant=voice_assistant,
-    settings=settings, require_key=require_key,
+    settings=settings, require_key=require_key, refiner=voice_refiner,
 )
 
 

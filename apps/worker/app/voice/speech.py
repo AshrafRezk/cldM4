@@ -225,6 +225,11 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
                     log.warning("egyptian speech model unavailable, using whisper.cpp: %s", exc)
             if text is None:
                 text = await _whisper_cpp(wav, language, settings, binary, model, Path(tmp))
+    return clean_transcript(text)
+
+
+def clean_transcript(text: str) -> str:
+    """Every model's output goes through the same filters."""
     # whisper.cpp marks silence and noise as [BLANK_AUDIO], (music), etc.
     text = " ".join(NOISE_TAGS.sub(" ", text).split())
     return normalize_digits(number_words_to_digits(collapse_repeats(drop_hallucinations(text))))

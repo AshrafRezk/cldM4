@@ -194,6 +194,21 @@ class Settings:
         ))
     )
     egyptian_stt_threads: int = field(default_factory=lambda: _int("EGYPTIAN_STT_THREADS", 6))
+    # Hybrid recognition: after a call, a slower, more accurate model re-hears the
+    # free-text answers (names, descriptions) before Salesforce collects them.
+    # Whisper large-v2 fine-tuned on Arabic-English code-switching (GPL-3.0,
+    # CTranslate2 int8 on the CPU, ~6 s an answer). "off", or no model there, turns it off.
+    voice_refine_model: str = field(
+        default_factory=lambda: os.path.expanduser(_str(
+            "VOICE_REFINE_MODEL",
+            "~/.cache/huggingface/hub/models--Mano200600--faster-whisper-large-v2-ar-codeswitching"
+            "/snapshots/d5f4abed70875e12e40c27def424a6558c37a1a0",
+        ))
+    )
+    voice_refine_threads: int = field(default_factory=lambda: _int("VOICE_REFINE_THREADS", 4))
+    voice_refine_dir: str = field(
+        default_factory=lambda: os.path.expanduser(_str("VOICE_REFINE_DIR", "~/Cloudiator/voice-refine"))
+    )
     ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
     # Natural voices (docs/voice.md): script lines are rendered at publish time.
     # auto = Azure when AZURE_SPEECH_KEY is set, else VoiceTut, else macOS say.

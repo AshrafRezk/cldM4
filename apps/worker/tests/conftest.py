@@ -47,6 +47,9 @@ os.environ.update(
         # Never spawn the 1 GB Egyptian speech helper from the suite.
         "VOICE_STT_ENGINE": "whisper_cpp",
         "VOICE_DEBUG_DIR": os.path.join(_TEST_STATE_DIR, "voice-debug"),
+        # Hybrid recognition is off unless a test turns it on (test_voice_refine.py).
+        "VOICE_REFINE_MODEL": "off",
+        "VOICE_REFINE_DIR": os.path.join(_TEST_STATE_DIR, "voice-refine"),
         "TWILIO_AUTH_TOKEN": "test-twilio-auth-token",
         "MFLUX_MODEL_PATH": os.path.join(_TEST_STATE_DIR, "flux-schnell-4bit"),
         "MFLUX_LOW_RAM": "true",

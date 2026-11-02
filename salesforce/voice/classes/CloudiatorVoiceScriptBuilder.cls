@@ -90,6 +90,7 @@ public with sharing class CloudiatorVoiceScriptBuilder {
             'languages' => languages,
             'voices' => voices,
             'variables' => variables(script.Variables__c, languages),
+            'pronunciations' => pronunciations(script.Pronunciations__c),
             'personas' => personas(script.Personas__c, languages),
             'beep' => script.Beep__c != false,
             'hold_music' => script.Hold_Music__c != false,
@@ -297,6 +298,27 @@ public with sharing class CloudiatorVoiceScriptBuilder {
                 voices.put(lang, !arabic && parts.size() > 3 && String.isNotBlank(parts[3]) ? parts[3] : parts[2]);
             }
             out.add(new Map<String, Object>{ 'id' => id, 'name' => names, 'voice' => voices });
+        }
+        return out;
+    }
+
+    /** "ميرك = مِيرْك", one per line. Cloudiator checks that only harakat were added. */
+    @TestVisible
+    private static Map<String, Object> pronunciations(String raw) {
+        Map<String, Object> out = new Map<String, Object>();
+        if (String.isBlank(raw)) {
+            return out;
+        }
+        for (String line : raw.split('\n')) {
+            line = line.trim();
+            if (String.isBlank(line)) {
+                continue;
+            }
+            Integer eq = line.indexOf('=');
+            if (eq < 1) {
+                throw new BuildException('Pronunciation "' + line + '" must be word = word with harakat.');
+            }
+            out.put(line.substring(0, eq).trim(), line.substring(eq + 1).trim());
         }
         return out;
     }

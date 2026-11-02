@@ -51,7 +51,9 @@ class _IpLimiter:
         hits.append(now)
 
 
-def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assistant, settings, require_key) -> None:
+def register_web_routes(
+    app: FastAPI, *, engine: VoiceEngine, audio, line, assistant, settings, require_key, refiner=None
+) -> None:
     store = engine.store
     limiter = _IpLimiter(PER_IP_PER_MINUTE)
     app.state.voice_ip_limiter = limiter
@@ -283,6 +285,9 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assis
         current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
         if current is not None and session["status"] == "in_progress" and session.get("confirming") is None:
             intent = await assistant.intent(session["definition"], current, heard, session_language(session))
+        if refiner is not None and intent is None and current is not None:
+            # Kept until the call ends, then heard again by the accurate model (refine.py).
+            refiner.keep(session, step, answer, heard)
         reply = engine.on_gather(
             call_sid=call_sid, step=step, attempt=attempt, speech=heard, turn=turn_no, intent=intent
         )

@@ -19,7 +19,7 @@ from .engine import ScriptInvalid, VoiceEngine, languages_of, validate_script
 from .store import NumberTaken, iso
 
 SALESFORCE_ID = re.compile(r"^[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$")
-SESSION_STATUSES = {"in_progress", "ready_to_commit", "committed", "abandoned"}
+SESSION_STATUSES = {"in_progress", "refining", "ready_to_commit", "committed", "abandoned"}
 TWIML = "application/xml"
 
 

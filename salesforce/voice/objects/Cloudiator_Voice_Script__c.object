@@ -141,6 +141,14 @@
         <visibleLines>4</visibleLines>
     </fields>
     <fields>
+        <fullName>Pronunciations__c</fullName>
+        <label>Pronunciations</label>
+        <description>Fix how the voice says an Arabic word by writing its harakat, one per line: ميرك = مِيرْك. Only harakat may be added; callers still read the plain word. Changed lines re-render on publish.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>4</visibleLines>
+    </fields>
+    <fields>
         <fullName>Personas__c</fullName>
         <label>Personas</label>
         <description>Agents the caller can choose, one per line: English name | Arabic name | voice (optional 4th: English voice). Example: Mariam | مريم | Mariam. Lines can say {{agent}}.</description>

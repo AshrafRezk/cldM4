@@ -145,7 +145,7 @@ async def test_the_readback_is_stitched_from_rendered_pieces(tmp_path):
     clean = validate_script(intake())
     for line in audio.lines(clean):
         if line["language"] == "ar-EG":
-            path = audio.rendered_path(line["speaker"], line["language"], line["text"])
+            path = audio.rendered_path(line["speaker"], line["language"], line["spoken"])
             path.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([main.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-f", "lavfi",
                             "-i", "sine=frequency=300:duration=0.3", "-c:a", "aac", str(path)], check=True)

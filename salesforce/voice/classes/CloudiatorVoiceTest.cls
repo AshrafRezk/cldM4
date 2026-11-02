@@ -126,7 +126,7 @@ private class CloudiatorVoiceTest {
         Cloudiator_Voice_Script__c script = [
             SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                    Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
+                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Pronunciations__c, Personas__c, Beep__c, Hold_Music__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
                            Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c, Read_Back__c FROM Questions__r ORDER BY Order__c)
             FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
@@ -164,7 +164,7 @@ private class CloudiatorVoiceTest {
             Cloudiator_Voice_Script__c script = [
                 SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                        Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
+                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Pronunciations__c, Personas__c, Beep__c, Hold_Music__c,
                        (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
                                Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c, Read_Back__c FROM Questions__r ORDER BY Order__c)
                 FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
@@ -248,6 +248,16 @@ private class CloudiatorVoiceTest {
         System.assertEquals('أكمي فارما', ((Map<String, Object>) vars.get('company')).get('ar-EG'));
         System.assertEquals('Acme Pharma', ((Map<String, Object>) vars.get('company')).get('en-US'));
         System.assertEquals('Acme Care', ((Map<String, Object>) vars.get('program')).get('ar-EG'));
+
+        Map<String, Object> said = CloudiatorVoiceScriptBuilder.pronunciations('ميرك = مِيرْك\n\nمريم = مَرْيَم');
+        System.assertEquals('مِيرْك', said.get('ميرك'));
+        System.assertEquals(2, said.size());
+        try {
+            CloudiatorVoiceScriptBuilder.pronunciations('ميرك');
+            System.assert(false, 'expected a pronunciation format error');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('harakat'), e.getMessage());
+        }
 
         List<Object> routes = CloudiatorVoiceScriptBuilder.routes('new, جديد, أول مرة => new_name = New\nexisting, متابعة => case_number', 'Q');
         Map<String, Object> first = (Map<String, Object>) routes[0];
