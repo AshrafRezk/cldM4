@@ -15,7 +15,9 @@ Two front doors share one engine, one session store, one commit document, and th
 
 The link is the only credential on the page and only starts calls on that one script; it never carries an `sk-cld-` key. Turns are rate limited per client IP (40/min, from `CF-Connecting-IP`), one answer is capped at `VOICE_WEB_MAX_AUDIO_BYTES` (2 MB ≈ 60 s), and a retried turn replays its cached reply without transcribing again.
 
-**Speech stays off the GPU.** TTS is `say` (`Majed` for Arabic, `Samantha` for English, or the script's `local_voice`), cached under `VOICE_TTS_CACHE` by text+voice, so static prompts are a file read after the first call. STT is `whisper-cli --no-gpu` with `WHISPER_THREADS` CPU threads, one transcription at a time, through `ffmpeg` to 16 kHz mono. It never touches Ollama or the Metal slot. Apple's recognizer is not used: it is on-device for English only and sends Arabic to Apple.
+**Speech stays off the GPU.** TTS is `say` (`Majed` for Arabic, `Samantha` for English, or the script's `local_voice`), cached under `VOICE_TTS_CACHE` by text+voice, so static prompts are a file read after the first call. STT is `whisper-cli --no-gpu` with `WHISPER_THREADS` CPU threads, one transcription at a time, through `ffmpeg` to 16 kHz mono. It never touches Ollama or the Metal slot. Apple's recognizer is not used: it is on-device for English only and sends Arabic to Apple. Transcripts are normalized before they reach the script: Arabic-Indic digits become 0–9 and dashes/spaces between digits are dropped, so a spoken phone number lands as `01012345678`, not `01-01-2-3-4-5-6-7-8`.
+
+Restart the worker with `scripts/restart-worker.sh` (stop, wait for exit, start, wait for health). `launchctl kickstart -k` races the single-worker boot gate and costs about 90 s of 502s.
 
 Setup: `brew install whisper-cpp` (done on the Mini 2026-11-02) and a ggml model at `WHISPER_MODEL` (default `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin`). Without the model, calls still start and speak, and each answer returns `503 speech_unavailable`.
 

@@ -213,3 +213,19 @@ async def test_real_round_trip_say_then_whisper(tmp_path):
     )
     text = await speech.transcribe(aiff.read_bytes(), language="en-US", settings=cfg)
     assert "sara" in text.lower()
+
+
+@pytest.mark.parametrize(
+    "heard, expected",
+    [
+        ("01-01-2-3-4-5-6-7-8", "01012345678"),
+        ("رقمي ٠١٠ ١٢٣ ٤٥٦٧٨", "رقمي 01012345678"),
+        ("0101-2-3-4", "0101234"),
+        ("call 010 – 1234 5678 please", "call 01012345678 please"),
+        ("سارة أحمد", "سارة أحمد"),
+        ("pay 2.5 pounds on day 3", "pay 2.5 pounds on day 3"),
+        ("room 5, floor 2", "room 5, floor 2"),
+    ],
+)
+def test_digit_normalization(heard, expected):
+    assert speech.normalize_digits(heard) == expected
