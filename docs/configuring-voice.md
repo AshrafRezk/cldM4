@@ -119,6 +119,7 @@ existing, follow, قديم, متابعة => case_number = Follow-up
 
 - The first line with a keyword that appears in the answer wins. "لا دي حالة **جديدة** يا فندم" goes to `new_name`.
 - Matching ignores case, punctuation, Arabic diacritics and spelling variants (أ/إ/ا, ة/ه, ى/ي), so "مُتابعه" still matches "متابعة". Put several ways of saying the same thing on one line.
+- Callers mix languages, and keywords from **every** language of the script count on every line ("new" on the Arabic line routes too). Speech recognition often writes an English word said in an Egyptian sentence in Arabic letters ("new case" → "نيوكيس"), so add those spellings as keywords as well: `new, نيو, جديد`.
 - `= New` stores **New** as the answer instead of the caller's words, which is what a picklist like `Case.Type` needs. Without it, the caller's words are stored.
 - No match: the caller goes to **Next**. Point Next at a short announcement ("معلش، ما سمعتش كويس.") whose Next is the menu again, and the menu is asked again. A call ends politely after 40 answers, so a loop can never hold the line forever.
 - A loop made only of announcements is refused at publish (it would talk forever).
