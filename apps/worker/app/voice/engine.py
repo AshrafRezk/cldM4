@@ -64,17 +64,21 @@ DIGIT_WORDS = {
     "ar": ["صفر", "واحد", "اتنين", "تلاتة", "أربعة", "خمسة", "ستة", "سبعة", "تمانية", "تسعة"],
     "en": ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"],
 }
-_YES = {"ايوه", "ايوا", "ايوة", "اه", "آه", "صح", "صحيح", "مظبوط", "مضبوط", "تمام", "نعم", "بالظبط", "اكيد", "ماشي",
-        "yes", "yeah", "yep", "correct", "right", "exactly", "sure", "ok", "okay", "oui", "exact", "voila"}
-_NO = {"لا", "لأ", "لاء", "غلط", "مش", "no", "nope", "wrong", "incorrect", "non", "pas"}
+# Matched on word stems as speech recognition writes them: "أيوه صح" came back
+# as "ايو صحة" on a live call. "ايه" (what) must not count as yes.
+_YES_STEMS = ("ايو", "اه", "صح", "تمام", "مظبوط", "مضبوط", "بالظبط", "اكيد", "نعم", "ماشي", "طبعا")
+_YES_WORDS = {"yes", "yeah", "yep", "yup", "correct", "right", "exactly", "sure", "ok", "okay", "oui", "exact", "voila"}
+_NO_WORDS = {"لا", "لأ", "لاء", "no", "nope", "wrong", "incorrect", "non"}
+_NO_STEMS = ("غلط", "مش ")
 
 
 def yes_no(text: str) -> bool | None:
-    """"أيوه صح" -> True, "لأ غلط" / "مش صح" -> False, anything else -> None."""
-    words = normalize_answer(text).split()
-    if any(w in _NO for w in words) or "مش صح" in " ".join(words):
+    """"أيوه صح" / "ايو صحة" -> True, "لأ غلط" / "مش صح" -> False, else None."""
+    heard = normalize_answer(text)
+    words = heard.split()
+    if any(w in _NO_WORDS for w in words) or any(stem in heard for stem in _NO_STEMS):
         return False
-    if any(w in _YES for w in words):
+    if any(w in _YES_WORDS for w in words) or any(w.startswith(stem) for w in words for stem in _YES_STEMS):
         return True
     return None
 

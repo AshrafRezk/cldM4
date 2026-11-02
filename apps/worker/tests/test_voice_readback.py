@@ -59,6 +59,9 @@ def gather_of(reply):
     ("أيوه صح", True), ("ايوة", True), ("تمام كده", True), ("yes that's right", True), ("oui", True),
     ("لأ غلط", False), ("مش صح", False), ("no", False), ("non", False),
     ("ممكن تعيد", None), ("01012345678", None),
+    # as recognition actually wrote them on live calls
+    ("ايو صحة", True), ("آه صحيح", True), ("تمامًا", True), ("ايوا يا فندم", True),
+    ("ايه؟", None), ("قلت ايه", None), ("لأ مش كده", False), ("غلطانة", False),
 ])
 def test_yes_no(text, expected):
     assert yes_no(text) is expected
