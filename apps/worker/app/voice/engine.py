@@ -302,6 +302,12 @@ def normalize_answer(text: str) -> str:
     return " " + " ".join(_NOT_WORD.sub(" ", text).split()) + " "
 
 
+def clean_answer(text: str) -> str:
+    """Whisper ends sentences with punctuation; a name or phone field should
+    not ("أشرف رزق." -> "أشرف رزق"). The transcript keeps the original."""
+    return text.strip().rstrip(".,،؛;:!?؟…").strip()
+
+
 def pick_route(step: Mapping[str, Any], answer: str, language: str) -> dict[str, Any] | None:
     heard = normalize_answer(answer)
     for route in step.get("routes") or []:
@@ -445,7 +451,7 @@ class VoiceEngine:
         if text:
             turns.append({"role": "caller", "text": text})
             route = pick_route(current, text, session_language(session))
-            answers[step] = route["value"] if route and route.get("value") else text
+            answers[step] = route["value"] if route and route.get("value") else clean_answer(text)
             self.store.update_session(session["id"], turns=turns, answers=answers)
             following = route["next"] if route else current["next"]
             reply = self._advance({**session, "turns": turns, "answers": answers}, following)
