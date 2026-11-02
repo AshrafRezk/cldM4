@@ -81,6 +81,9 @@ public with sharing class CloudiatorVoiceScriptBuilder {
             'languages' => languages,
             'voices' => voices,
             'variables' => variables(script.Variables__c, languages),
+            'personas' => personas(script.Personas__c, languages),
+            'beep' => script.Beep__c != false,
+            'hold_music' => script.Hold_Music__c != false,
             'inbound_numbers' => numbers(script.Inbound_Numbers__c),
             'active' => script.Active__c == true,
             'steps' => steps,
@@ -214,6 +217,42 @@ public with sharing class CloudiatorVoiceScriptBuilder {
                 route.put('value', value);
             }
             out.add(route);
+        }
+        return out;
+    }
+
+    /** "Mariam | مريم | Mariam" (English name | Arabic name | voice [| English voice]) per line. */
+    @TestVisible
+    private static List<Object> personas(String raw, List<String> languages) {
+        List<Object> out = new List<Object>();
+        if (String.isBlank(raw)) {
+            return out;
+        }
+        Set<String> ids = new Set<String>();
+        for (String line : raw.split('\n')) {
+            if (String.isBlank(line)) {
+                continue;
+            }
+            List<String> parts = new List<String>();
+            for (String part : line.split('\\|')) {
+                parts.add(part.trim());
+            }
+            if (parts.size() < 3 || String.isBlank(parts[0]) || String.isBlank(parts[1]) || String.isBlank(parts[2])) {
+                throw new BuildException('Persona "' + line.trim() + '" must be English name | Arabic name | voice.');
+            }
+            String id = parts[0].toLowerCase().replaceAll('[^a-z0-9_]', '_');
+            if (!KEY.matcher(id).matches() || ids.contains(id)) {
+                throw new BuildException('Persona "' + parts[0] + '" needs a unique English name.');
+            }
+            ids.add(id);
+            Map<String, Object> names = new Map<String, Object>();
+            Map<String, Object> voices = new Map<String, Object>();
+            for (String lang : languages) {
+                Boolean arabic = lang.startsWith('ar');
+                names.put(lang, arabic ? parts[1] : parts[0]);
+                voices.put(lang, !arabic && parts.size() > 3 && String.isNotBlank(parts[3]) ? parts[3] : parts[2]);
+            }
+            out.add(new Map<String, Object>{ 'id' => id, 'name' => names, 'voice' => voices });
         }
         return out;
     }

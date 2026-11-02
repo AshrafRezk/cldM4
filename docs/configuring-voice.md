@@ -16,7 +16,8 @@ This guide is for the person setting up a new client: a pharma patient-support p
 | **Announcements** | Spoken, no answer expected | "Our nurses are available 9 to 5." |
 | **Routes** | Send the caller to a different next question depending on what they said | new patient vs existing case |
 | **CRM mapping** | Which Salesforce field each answer fills, plus fixed values and links | `Contact.MobilePhone`, `Case.Origin=Phone` |
-| **Hold / no-answer lines** | Spoken while waiting in line / when someone never answers | built in, can be replaced |
+| **Personas** | Agents the caller can pick; `{{agent}}` is their name | Mariam, Ahmed |
+| **Hold / no-answer lines** | Spoken while waiting in line (over hold music) / when someone never answers | built in, can be replaced |
 | **Voice** | Generated on the Mini, or a person's recording from the studio | studio recording per line |
 | **Call link** | The URL callers open | `https://api.cloudiator.org/v1/voice/web/cl_…` |
 
@@ -40,6 +41,30 @@ program.ar = برنامج أكمي كير
 - A misspelled `{{compnay}}` is refused when you publish, so callers never hear braces.
 
 **Setting up the next client** is: clone the script, change the Variables (and Script Id), publish. Every line is re-voiced automatically.
+
+## Personas: callers choose who they talk to
+
+List the agents a script offers in **Personas** on the Voice Script, one per line: `English name | Arabic name | voice`, with an optional 4th column for a different English voice.
+
+```
+Mariam | مريم | Mariam
+Ahmed | أحمد | Ahmed | Karim
+```
+
+- The call page shows **تحب تكلم مين؟ · Who would you like to talk to?** with one choice per persona (the first is selected), above the language buttons.
+- Write `{{agent}}` in any line: `أهلاً، معاك {{agent}} من {{company}}.` → *"أهلاً، معاك مريم من أكمي فارما."* `{{agent}}` also works in Fixed Values (CRM gets the English name), e.g. `Case.Subject=Call with {{agent}}`.
+- Each persona speaks in their own voice. Voice names are the Mini's speakers: female Hadeer, Hanan, Mariam, Rana, Sarah, Yasmin, Yara; male Ahmed, Ali, Hassan, Karim, Mahmoud, Mohammed, Mostafa, Ramy, Shaker, Tareq, Yehia, Youssef.
+- In the recording studio, each persona has its own set of lines, so the real Mariam records Mariam's lines and the real Ahmed records Ahmed's.
+- Up to 6 personas per script. Without personas, `{{agent}}` is refused at publish.
+
+## Beep, and what callers hear while they wait
+
+- **Beep Before Answer** (on by default): a short soft tone after each question, so "قولي اسمك بعد الصافرة / after the beep" is true. Untick it to turn it off.
+- **Waiting in line.** The Mini takes one call at a time. Anyone else hears **Hold Music** (on by default; soft chords generated in the caller's browser, no music file, nothing fetched from anyone) and, every 30 seconds, the music dips and the agent says, in the caller's language:
+  - *"أهلاً بيك، معاك مريم من أكمي فارما. أنا بخلّص مكالمة دلوقتي وهبدأ معاك على طول. متقفلش من فضلك، وشكراً على صبرك!"*
+  - *"Hi, this is Mariam from Acme Pharma. I'm just finishing a call and will be with you right away. Please don't hang up, and thank you for your patience!"*
+  
+  The opening uses the persona they picked and the `company` variable when the script has them ("Thanks for calling Acme Pharma." without personas). The page also shows their place in line. A script can replace the whole message with `hold_say` (JSON). The hold line can be recorded in the studio like any other.
 
 ## Questions, announcements, and routes
 
@@ -183,6 +208,7 @@ For integrations that publish without Salesforce: `POST https://api.cloudiator.o
 
 ## Limits
 
-- Up to 50 steps per script, 10 routes per question, 30 variables, 4 languages (Arabic and English have text fields in Salesforce).
+- Up to 50 steps per script, 10 routes per question, 30 variables, 6 personas, 4 languages (Arabic and English have text fields in Salesforce).
+- Every persona multiplies the lines to voice: 3 personas × 2 languages × 10 lines = 60 clips, about 20 minutes of background rendering on the Mini after a publish. Calls work meanwhile with the basic voice.
 - One call at a time on the Mini; other callers wait in line and hear the hold message.
 - A call ends after 40 answers.

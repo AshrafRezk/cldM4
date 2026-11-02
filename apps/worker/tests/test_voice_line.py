@@ -97,10 +97,11 @@ async def test_second_caller_waits_then_connects(make_client, install_key, fake_
 
         second = (await anon.post(f"{path}/start", params={"lang": "ar-EG"})).json()
         assert second["queued"] is True and second["position"] == 1
-        assert second["clips"][0]["text"].startswith("شكراً لانتظارك")
+        assert "متقفلش من فضلك" in second["clips"][0]["text"]
+        assert second["music"] is True and second["repeat_seconds"] == 30
         third = (await anon.post(f"{path}/start", params={"lang": "en-US"})).json()
         assert third["position"] == 2
-        assert third["clips"][0]["text"].startswith("Thanks for holding")
+        assert "Please don't hang up" in third["clips"][0]["text"]
         assert (await anon.get(f"{path}/line")).json() == {"capacity": 1, "active": 1, "waiting": 2}
 
         still = (await anon.post(f"{path}/wait", params={"ticket": second["ticket"]})).json()

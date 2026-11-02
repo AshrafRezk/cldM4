@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..errors import CloudiatorError
 from . import speech
-from .engine import ScriptInvalid, VoiceEngine, hold_text, languages_of, session_language
+from .engine import ScriptInvalid, VoiceEngine, find_persona, hold_text, languages_of, session_language, speak
 from .web_page import render_page
 
 log = logging.getLogger("cloudiator.voice.web")
@@ -90,7 +90,11 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
             raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
         _version, script = found
         return HTMLResponse(
-            render_page(title=script.get("display_name") or script_id, languages=languages_of(script)),
+            render_page(
+                title=script.get("display_name") or script_id,
+                languages=languages_of(script),
+                personas=script.get("personas") or [],
+            ),
             headers={
                 "Cache-Control": "no-store",
                 "Referrer-Policy": "no-referrer",
@@ -98,12 +102,14 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
             },
         )
 
-    def begin(tenant_id: str, script_id: str, language: str | None) -> tuple[str, dict[str, Any]]:
+    def begin(
+        tenant_id: str, script_id: str, language: str | None, persona: str | None = None
+    ) -> tuple[str, dict[str, Any]]:
         call_sid = "WB" + uuid.uuid4().hex
         try:
             reply = engine.start_call(
                 tenant_id=tenant_id, script_id=script_id, call_sid=call_sid,
-                from_label="web", language=language,
+                from_label="web", language=language, persona=persona,
             )
         except ScriptInvalid as exc:
             raise CloudiatorError(400, "invalid_request_error", str(exc), param="lang") from exc
@@ -118,13 +124,15 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
         language = ticket.language or (script.get("language") or "en-US")
         clips = []
         if with_audio and found:
-            text = hold_text(script, language)
+            text = speak(hold_text(script, language), language, find_persona(script, ticket.persona))
             data_url, source = await audio.clip(
-                tenant_id=tenant_id, script=script, key="__hold__", language=language, text=text
+                tenant_id=tenant_id, script=script, key="__hold__", language=language,
+                text=text, persona=ticket.persona,
             )
             clips.append({"text": text, "audio": data_url, "source": source})
         return {"queued": True, "ticket": ticket.id, "position": position, "language": language,
-                "clips": clips, "poll_seconds": 3}
+                "clips": clips, "poll_seconds": 3, "repeat_seconds": 30,
+                "music": bool(script.get("hold_music", True))}
 
     @app.post("/v1/voice/web/{token}/start")
     async def start(token: str, request: Request) -> JSONResponse:
@@ -132,16 +140,20 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
         limiter.check(_client_ip(request))
         tenant_id, script_id = link(request, token)
         language = request.query_params.get("lang") or None
+        persona = request.query_params.get("persona") or None
         found = store.script_by_id(tenant_id, script_id)
         if found is None:
             raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
         if language is not None and language not in languages_of(found[1]):
             raise CloudiatorError(400, "invalid_request_error", f"This script does not speak {language}.", param="lang")
+        if persona is not None and find_persona(found[1], persona) is None:
+            raise CloudiatorError(400, "invalid_request_error", "No such persona on this script.", param="persona")
         request.state.usage.tool = "voice_web_start"
         if line.can_start_now():
-            call_sid, reply = begin(tenant_id, script_id, language)
+            call_sid, reply = begin(tenant_id, script_id, language, persona)
             return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
         ticket = line.join(token, language)
+        ticket.persona = persona
         return JSONResponse(content=await hold(tenant_id, script_id, ticket, line.position(ticket.id), True))
 
     @app.post("/v1/voice/web/{token}/wait")
@@ -155,7 +167,7 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
         turn_ticket = line.take_turn(ticket_id)
         if turn_ticket is not None:
             request.state.usage.tool = "voice_web_start"
-            call_sid, reply = begin(tenant_id, script_id, turn_ticket.language)
+            call_sid, reply = begin(tenant_id, script_id, turn_ticket.language, turn_ticket.persona)
             return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=None))
         return JSONResponse(content=await hold(tenant_id, script_id, ticket, line.position(ticket_id), False))
 
@@ -252,7 +264,7 @@ async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], sto
         if text:
             data_url, source = await audio.clip(
                 tenant_id=tenant_id, script=script, key=verb.get("key") or gather.get("step"),
-                language=language, text=text,
+                language=language, text=text, persona=reply.get("persona"),
             )
             clips.append({"text": text, "audio": data_url, "source": source})
         if gather:
@@ -260,12 +272,14 @@ async def _turn(audio, tenant_id: str, call_sid: str, reply: dict[str, Any], sto
                 "step": gather["step"],
                 "attempt": gather["attempt"],
                 "turn": gather.get("turn"),
+                "beep": gather.get("beep", True),
                 "timeout": gather["timeout"],
                 "speech_timeout": gather["speech_timeout"],
             }
         if verb.get("hangup"):
             done = True
-    return {"call_id": call_sid, "language": language, "heard": heard, "clips": clips, "listen": listen, "done": done}
+    return {"call_id": call_sid, "language": language, "persona": reply.get("persona"), "heard": heard,
+            "clips": clips, "listen": listen, "done": done}
 
 
 def _client_ip(request: Request) -> str:

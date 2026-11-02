@@ -126,7 +126,7 @@ private class CloudiatorVoiceTest {
         Cloudiator_Voice_Script__c script = [
             SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                    Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c,
+                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
                            Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
             FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
@@ -160,7 +160,7 @@ private class CloudiatorVoiceTest {
             Cloudiator_Voice_Script__c script = [
                 SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
                        Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
-                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c,
+                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
                        (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
                                Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c FROM Questions__r ORDER BY Order__c)
                 FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
@@ -284,5 +284,23 @@ private class CloudiatorVoiceTest {
         System.assertEquals('new_name', menu.get('next'), 'Next overrides order; also the no-match path');
         System.assertEquals(1, ((List<Object>) menu.get('routes')).size());
         System.assert(def.containsKey('variables'));
+    }
+
+    @IsTest
+    static void personasParse() {
+        List<String> langs = new List<String>{ 'ar-EG', 'en-US' };
+        List<Object> people = CloudiatorVoiceScriptBuilder.personas('Mariam | مريم | Mariam\nAhmed | أحمد | Ahmed | Karim', langs);
+        Map<String, Object> mariam = (Map<String, Object>) people[0];
+        Map<String, Object> ahmed = (Map<String, Object>) people[1];
+        System.assertEquals('mariam', mariam.get('id'));
+        System.assertEquals('مريم', ((Map<String, Object>) mariam.get('name')).get('ar-EG'));
+        System.assertEquals('Karim', ((Map<String, Object>) ahmed.get('voice')).get('en-US'));
+        System.assertEquals('Ahmed', ((Map<String, Object>) ahmed.get('voice')).get('ar-EG'));
+        try {
+            CloudiatorVoiceScriptBuilder.personas('Mariam | مريم', langs);
+            System.assert(false, 'expected a format error');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('voice'), e.getMessage());
+        }
     }
 }

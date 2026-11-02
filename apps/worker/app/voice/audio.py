@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import speech
-from .engine import FAIL_MESSAGES, hold_text, languages_of, text_for
+from .engine import FAIL_MESSAGES, find_persona, hold_text, languages_of, speak
 
 log = logging.getLogger("cloudiator.voice.audio")
 
@@ -46,24 +46,24 @@ def _lang(language: str) -> str:
     return language.split("-")[0].lower()
 
 
-def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, str]]:
-    """Every fixed line a caller can hear, per language."""
+def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, Any]]:
+    """Every fixed line a caller can hear, per persona and language. With
+    personas, `{{agent}}` is their name and each speaks in their own voice."""
     lines = []
-    for language in languages_of(script):
-        speaker = speaker_for(script, language) if speaker_for else VOICETUT_DEFAULT
-        for step in script["steps"]:
-            lines.append(
-                {"key": step["key"], "language": language, "speaker": speaker,
-                 "text": text_for(step["say"], language)}
+    for persona in script.get("personas") or [None]:
+        pid = persona["id"] if persona else None
+        for language in languages_of(script):
+            speaker = speaker_for(script, language, persona) if speaker_for else VOICETUT_DEFAULT
+            base = {"language": language, "speaker": speaker, "persona": pid}
+            for step in script["steps"]:
+                lines.append({**base, "key": step["key"], "text": speak(step["say"], language, persona)})
+            fail = (
+                speak(script["fail_say"], language, persona)
+                if script.get("fail_say")
+                else FAIL_MESSAGES["ar" if _lang(language) == "ar" else "en"]
             )
-        fail = (
-            text_for(script["fail_say"], language)
-            if script.get("fail_say")
-            else FAIL_MESSAGES["ar" if _lang(language) == "ar" else "en"]
-        )
-        lines.append({"key": "__fail__", "language": language, "speaker": speaker, "text": fail})
-        lines.append({"key": "__hold__", "language": language, "speaker": speaker,
-                      "text": hold_text(script, language)})
+            lines.append({**base, "key": "__fail__", "text": fail})
+            lines.append({**base, "key": "__hold__", "text": speak(hold_text(script, language), language, persona)})
     return lines
 
 
@@ -92,8 +92,8 @@ class VoiceAudio:
             return "say"
         return choice if choice in ENGINE_VERSIONS else "say"
 
-    def speaker_for(self, script: Mapping[str, Any], language: str) -> str:
-        chosen = (script.get("voices") or {}).get(language) or ""
+    def speaker_for(self, script: Mapping[str, Any], language: str, persona: Mapping[str, Any] | None = None) -> str:
+        chosen = ((persona or {}).get("voices") or script.get("voices") or {}).get(language) or ""
         if self.engine == "azure":
             if AZURE_VOICE.match(chosen):
                 return chosen
@@ -112,23 +112,36 @@ class VoiceAudio:
         suffix = ".mp3" if engine == "azure" else ".m4a"
         return self.root / "rendered" / f"{digest[:40]}{suffix}"
 
-    def recording_path(self, tenant_id: str, script_id: str, key: str, language: str) -> Path:
+    def recording_path(
+        self, tenant_id: str, script_id: str, key: str, language: str, persona: str | None = None
+    ) -> Path:
+        """One recording per line, language and persona: the real Mariam records Mariam's lines."""
         tenant = hashlib.sha256(tenant_id.encode()).hexdigest()[:16]
-        name = f"{SAFE_PART.sub('_', key)}.{SAFE_PART.sub('_', language)}.m4a"
+        who = f".{SAFE_PART.sub('_', persona)}" if persona else ""
+        name = f"{SAFE_PART.sub('_', key)}.{SAFE_PART.sub('_', language)}{who}.m4a"
         return self.root / "recordings" / tenant / SAFE_PART.sub("_", script_id) / name
 
     # Call time ---------------------------------------------------------------
 
     async def clip(
-        self, *, tenant_id: str, script: Mapping[str, Any], key: str | None, language: str, text: str
+        self,
+        *,
+        tenant_id: str,
+        script: Mapping[str, Any],
+        key: str | None,
+        language: str,
+        text: str,
+        persona: str | None = None,
     ) -> tuple[str | None, str]:
         """(data URL, source) for one line. Never blocks on a render."""
+        chosen = find_persona(script, persona) if script.get("personas") else None
+        pid = chosen["id"] if chosen else None
         if key:
-            recording = self.recording_path(tenant_id, script["id"], key, language)
+            recording = self.recording_path(tenant_id, script["id"], key, language, pid)
             if recording.is_file():
                 return _data_url(recording.read_bytes()), "recording"
         if self.engine != "say":
-            rendered = self.rendered_path(self.speaker_for(script, language), language, text)
+            rendered = self.rendered_path(self.speaker_for(script, language, chosen), language, text)
             if rendered.is_file():
                 return _data_url(rendered.read_bytes(), rendered.suffix), "rendered"
         try:
@@ -143,9 +156,10 @@ class VoiceAudio:
     # Recordings --------------------------------------------------------------
 
     async def save_recording(
-        self, tenant_id: str, script_id: str, key: str, language: str, audio: bytes
+        self, tenant_id: str, script_id: str, key: str, language: str, audio: bytes,
+        persona: str | None = None,
     ) -> Path:
-        path = self.recording_path(tenant_id, script_id, key, language)
+        path = self.recording_path(tenant_id, script_id, key, language, persona)
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / "in"
@@ -164,8 +178,10 @@ class VoiceAudio:
             path.write_bytes(out.read_bytes())
         return path
 
-    def delete_recording(self, tenant_id: str, script_id: str, key: str, language: str) -> bool:
-        path = self.recording_path(tenant_id, script_id, key, language)
+    def delete_recording(
+        self, tenant_id: str, script_id: str, key: str, language: str, persona: str | None = None
+    ) -> bool:
+        path = self.recording_path(tenant_id, script_id, key, language, persona)
         if path.is_file():
             path.unlink()
             return True
@@ -174,7 +190,9 @@ class VoiceAudio:
     def status(self, tenant_id: str, script: Mapping[str, Any]) -> list[dict[str, str]]:
         rows = []
         for line in self.lines(script):
-            if self.recording_path(tenant_id, script["id"], line["key"], line["language"]).is_file():
+            if self.recording_path(
+                tenant_id, script["id"], line["key"], line["language"], line.get("persona")
+            ).is_file():
                 source = "recording"
             elif self.engine != "say" and self.rendered_path(
                 line["speaker"], line["language"], line["text"]
@@ -182,8 +200,8 @@ class VoiceAudio:
                 source = "rendered"
             else:
                 source = "fallback"
-            rows.append({"key": line["key"], "language": line["language"], "speaker": line["speaker"],
-                         "source": source})
+            rows.append({"key": line["key"], "language": line["language"], "persona": line.get("persona"),
+                         "speaker": line["speaker"], "source": source})
         return rows
 
     # Background rendering ----------------------------------------------------
