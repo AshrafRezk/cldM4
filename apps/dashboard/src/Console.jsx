@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api.js";
 import { haptic } from "./haptic.js";
 import { KeyForm } from "./KeyForm.jsx";
+import { KeyScopes } from "./KeyScopes.jsx";
 import { Logo } from "./Logo.jsx";
 import { Playground } from "./Playground.jsx";
 import { SalesforcePanel } from "./SalesforcePanel.jsx";
@@ -13,6 +14,11 @@ const TABS = [
   { id: "usage", label: "Usage" },
   { id: "salesforce", label: "Salesforce" },
 ];
+
+function when(value) {
+  if (!value) return "never";
+  return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
 
 export function Console({ go, path }) {
   const [me, setMe] = useState(null);
@@ -33,6 +39,7 @@ export function Console({ go, path }) {
   const [sfInstallBanner, setSfInstallBanner] = useState(null);
 
   const selectedKey = keys.find((key) => key.id === selectedKeyId) || null;
+  const selectedTenant = tenants.find((tenant) => tenant.id === tenantId) || null;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -177,6 +184,35 @@ export function Console({ go, path }) {
     }
   }
 
+  async function deleteTenant() {
+    if (!selectedTenant) return;
+    const active = keys.filter((key) => !key.revokedAt).length;
+    const typed = window.prompt(
+      `Delete tenant ${selectedTenant.name}? Its ${active} active key(s) are revoked and stop working within 60 seconds. ` +
+        `Usage history is kept. Type ${selectedTenant.slug} to confirm.`,
+    );
+    if (typed === null) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.deleteTenant(selectedTenant.id, typed.trim());
+      const rest = tenants.filter((tenant) => tenant.id !== selectedTenant.id);
+      setTenants(rest);
+      setTenantId(rest[0]?.id || "");
+      setSelectedKeyId("");
+      setPlaintext("");
+      haptic("warn");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onScopesSaved(updated) {
+    setKeys((current) => current.map((key) => (key.id === updated.id ? { ...key, ...updated, lastUsedAt: key.lastUsedAt } : key)));
+  }
+
   const playgroundKey = plaintext || "";
 
   const chartDays = useMemo(() => {
@@ -295,6 +331,11 @@ export function Console({ go, path }) {
                 </li>
               ))}
             </ul>
+            {selectedTenant ? (
+              <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={deleteTenant}>
+                Delete {selectedTenant.slug}
+              </button>
+            ) : null}
           </div>
 
           <div className="card glass">
@@ -308,7 +349,12 @@ export function Console({ go, path }) {
         </section>
 
         <section className="card glass">
-          <h2>Keys</h2>
+          <h2>Keys{selectedTenant ? ` · ${selectedTenant.name}` : ""}</h2>
+          <p className="muted">
+            Every key minted for this tenant, newest first. Only the public part is stored in readable form; the secret
+            was shown once when the key was minted and cannot be shown again. Lost it? Mint a new key and revoke the old
+            one.
+          </p>
           {!keys.length ? <p className="muted">No keys on this tenant yet.</p> : null}
           <ul className="list key-list">
             {keys.map((key) => (
@@ -323,8 +369,9 @@ export function Console({ go, path }) {
                 >
                   <strong>{key.name}</strong>
                   <span className="muted">
-                    {key.publicId} · {key.preset || "custom"}
-                    {key.revokedAt ? " · revoked" : ""}
+                    {key.publicId} · {key.preset || "custom"} · created {when(key.createdAt)} · last used{" "}
+                    {when(key.lastUsedAt)}
+                    {key.revokedAt ? ` · revoked ${when(key.revokedAt)}` : ""}
                   </span>
                 </button>
               </li>
@@ -339,7 +386,18 @@ export function Console({ go, path }) {
                 </code>
                 {selectedKey.revokedAt ? <span className="badge">revoked</span> : null}
               </p>
-              <p className="caps">{(selectedKey.capabilities || []).join(" · ")}</p>
+              {selectedKey.revokedAt || !scopes ? (
+                <p className="caps">{(selectedKey.capabilities || []).join(" · ")}</p>
+              ) : (
+                <KeyScopes
+                  keyRow={selectedKey}
+                  scopes={scopes}
+                  busy={busy}
+                  setBusy={setBusy}
+                  setError={setError}
+                  onSaved={onScopesSaved}
+                />
+              )}
               <div className="row">
                 <a className="btn btn-ghost" href={api.openapiUrl(selectedKey.id)} download>
                   Download OpenAPI JSON

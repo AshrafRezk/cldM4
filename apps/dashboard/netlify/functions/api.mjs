@@ -54,6 +54,22 @@ function asList(value) {
   return [];
 }
 
+/** Unique, known capabilities, at least one. */
+async function checkedCapabilities(list) {
+  const allowed = await knownCapabilities();
+  const capabilities = [...new Set(list.map(String))];
+  if (!capabilities.length) {
+    throw httpError(400, "Pick at least one capability, or a preset.");
+  }
+  for (const cap of capabilities) {
+    if (!allowed.has(cap)) throw httpError(400, `Unknown capability ${cap}.`);
+  }
+  return capabilities;
+}
+
+const CACHE_WARNING =
+  "Takes up to 60 seconds to reach the Mini (worker key cache). POST /v1/admin/cache/flush on the Mini makes it immediate.";
+
 function publicKey(row) {
   return {
     id: row.id,
@@ -70,12 +86,13 @@ function publicKey(row) {
     logPrompts: Boolean(row.log_prompts),
     revokedAt: row.revoked_at,
     createdAt: row.created_at,
+    lastUsedAt: row.last_used_at ?? null,
   };
 }
 
 async function handle(event) {
   if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: { "Access-Control-Allow-Methods": "GET, POST, OPTIONS" } };
+    return { statusCode: 204, headers: { "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS" } };
   }
 
   const path = routePath(event);
@@ -148,6 +165,7 @@ async function handle(event) {
     const rows = await db`
       SELECT id, slug, name, created_at
       FROM tenants
+      WHERE deleted_at IS NULL
       ORDER BY created_at DESC
     `;
     return ok({ tenants: rows }, cookie);
@@ -165,21 +183,55 @@ async function handle(event) {
     if (!name) throw httpError(400, "Tenant name is required.");
     const rows = await db`
       INSERT INTO tenants (slug, name) VALUES (${slug}, ${name})
-      ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+      ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, deleted_at = NULL
       RETURNING id, slug, name, created_at
     `;
     return created({ tenant: rows[0] }, cookie);
+  }
+
+  const tenantOne = path.match(/^\/tenants\/([^/]+)$/);
+  if (tenantOne && method === "DELETE") {
+    // Soft delete: keys are revoked (the secret stops working), the tenant is
+    // hidden, and usage history stays. Creating the same slug again restores it.
+    const tenantId = tenantOne[1];
+    const body = readJson(event);
+    const found = await db`
+      SELECT id, slug FROM tenants WHERE id = ${tenantId}::uuid AND deleted_at IS NULL
+    `;
+    if (!found.length) throw httpError(404, "Tenant not found.");
+    if (String(body.confirm || "") !== found[0].slug) {
+      throw httpError(400, `Type the tenant slug (${found[0].slug}) to confirm.`);
+    }
+    const revoked = await db`
+      UPDATE api_keys SET revoked_at = now()
+      WHERE tenant_id = ${tenantId}::uuid AND revoked_at IS NULL
+      RETURNING id, public_id
+    `;
+    await db`UPDATE tenants SET deleted_at = now() WHERE id = ${tenantId}::uuid`;
+    return ok(
+      {
+        tenant: { id: tenantId, slug: found[0].slug },
+        revokedKeys: revoked.map((row) => row.public_id),
+        warning: `Its keys are revoked. ${CACHE_WARNING}`,
+      },
+      cookie,
+    );
   }
 
   const tenantKeys = path.match(/^\/tenants\/([^/]+)\/keys$/);
   if (tenantKeys && method === "GET") {
     const tenantId = tenantKeys[1];
     const rows = await db`
-      SELECT id, tenant_id, public_id, name, preset, capabilities, models, max_tokens,
-             max_context, rpm, force_no_stream, log_prompts, revoked_at, created_at
-      FROM api_keys
-      WHERE tenant_id = ${tenantId}::uuid
-      ORDER BY created_at DESC
+      SELECT k.id, k.tenant_id, k.public_id, k.name, k.preset, k.capabilities, k.models,
+             k.max_tokens, k.max_context, k.rpm, k.force_no_stream, k.log_prompts,
+             k.revoked_at, k.created_at,
+             greatest(
+               (SELECT max(ts) FROM usage_events WHERE key_id = k.id),
+               (SELECT max(day)::timestamptz FROM usage_daily WHERE key_id = k.id)
+             ) AS last_used_at
+      FROM api_keys k
+      WHERE k.tenant_id = ${tenantId}::uuid
+      ORDER BY k.created_at DESC
     `;
     return ok({ keys: rows.map(publicKey) }, cookie);
   }
@@ -187,29 +239,21 @@ async function handle(event) {
   if (tenantKeys && method === "POST") {
     const tenantId = tenantKeys[1];
     const body = readJson(event);
-    const tenants = await db`SELECT id FROM tenants WHERE id = ${tenantId}::uuid`;
+    const tenants = await db`
+      SELECT id FROM tenants WHERE id = ${tenantId}::uuid AND deleted_at IS NULL
+    `;
     if (!tenants.length) throw httpError(404, "Tenant not found.");
 
     const scopes = await loadScopes();
-    const allowed = await knownCapabilities();
     const presetName = body.preset ? String(body.preset) : null;
     const preset = parsePreset(scopes, presetName);
     if (presetName && !preset) {
       throw httpError(400, `Unknown preset ${presetName}.`);
     }
 
-    let capabilities = Array.isArray(body.capabilities)
-      ? body.capabilities.map(String)
-      : preset
-        ? [...preset.capabilities]
-        : [];
-    capabilities = [...new Set(capabilities)];
-    if (!capabilities.length) {
-      throw httpError(400, "Pick at least one capability, or a preset.");
-    }
-    for (const cap of capabilities) {
-      if (!allowed.has(cap)) throw httpError(400, `Unknown capability ${cap}.`);
-    }
+    const capabilities = await checkedCapabilities(
+      Array.isArray(body.capabilities) ? body.capabilities : preset ? preset.capabilities : [],
+    );
     if (capabilities.includes("image_generation") === false) {
       /* FLUX is Phase E; the checkbox exists so a later preset can enable it. */
     }
@@ -265,6 +309,39 @@ async function handle(event) {
       },
       cookie,
     );
+  }
+
+  const keyOne = path.match(/^\/keys\/([^/]+)$/);
+  if (keyOne && method === "PATCH") {
+    // Scopes and name only. The secret, and so the key the client holds, stays the same.
+    const keyId = keyOne[1];
+    const body = readJson(event);
+    const current = await db`
+      SELECT preset, name FROM api_keys WHERE id = ${keyId}::uuid AND revoked_at IS NULL
+    `;
+    if (!current.length) throw httpError(404, "Key not found or revoked.");
+    if (!Array.isArray(body.capabilities)) throw httpError(400, "capabilities must be a list.");
+    const capabilities = await checkedCapabilities(body.capabilities);
+    const name = body.name === undefined ? current[0].name : String(body.name).trim();
+    if (!name) throw httpError(400, "Key name is required.");
+    // The preset label stays only while the scopes still match it.
+    const scopes = await loadScopes();
+    const preset = current[0].preset ? parsePreset(scopes, current[0].preset) : null;
+    const same =
+      preset &&
+      preset.capabilities.length === capabilities.length &&
+      preset.capabilities.every((cap) => capabilities.includes(cap));
+    const rows = await db`
+      UPDATE api_keys
+      SET capabilities = ${JSON.stringify(capabilities)}::jsonb,
+          name = ${name},
+          preset = ${same ? current[0].preset : null}
+      WHERE id = ${keyId}::uuid AND revoked_at IS NULL
+      RETURNING id, tenant_id, public_id, name, preset, capabilities, models, max_tokens,
+                max_context, rpm, force_no_stream, log_prompts, revoked_at, created_at
+    `;
+    if (!rows.length) throw httpError(404, "Key not found or revoked.");
+    return ok({ key: publicKey(rows[0]), warning: CACHE_WARNING }, cookie);
   }
 
   const revoke = path.match(/^\/keys\/([^/]+)\/revoke$/);

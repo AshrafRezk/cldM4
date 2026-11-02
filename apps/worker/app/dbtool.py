@@ -98,10 +98,10 @@ async def _verify_schema(db: Neon) -> int:
 async def _apply_schema(db: Neon, path: Path) -> int:
     """Idempotent: every statement in infra/neon.sql is IF NOT EXISTS."""
     missing = await db.missing_tables()
-    if not missing:
-        print("schema is already applied; nothing to do")
-        return 0
-    print(f"applying {path} for missing tables: {', '.join(missing)}")
+    if missing:
+        print(f"applying {path} for missing tables: {', '.join(missing)}")
+    else:
+        print(f"tables present; re-applying {path} for added columns (idempotent)")
     await db.execute_script(path.read_text())
     still_missing = await db.missing_tables()
     if still_missing:
@@ -232,7 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("verify-schema", help="report which documented tables are missing")
 
-    apply_cmd = sub.add_parser("apply-schema", help="apply infra/neon.sql if tables are missing")
+    apply_cmd = sub.add_parser("apply-schema", help="apply infra/neon.sql (idempotent; also adds new columns)")
     apply_cmd.add_argument("--file", default=str(NEON_SQL))
 
     mint = sub.add_parser("mint-key", help="mint an sk-cld- key and print it once")

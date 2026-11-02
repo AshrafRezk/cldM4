@@ -9,8 +9,12 @@ CREATE TABLE IF NOT EXISTS tenants (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug          text NOT NULL UNIQUE,
   name          text NOT NULL,
-  created_at    timestamptz NOT NULL DEFAULT now()
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  deleted_at    timestamptz
 );
+
+-- Added after v1: a deleted tenant is hidden from the console; its keys are revoked.
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS api_keys (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
