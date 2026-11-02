@@ -200,6 +200,14 @@ class Settings:
     voice_audio_dir: str = field(
         default_factory=lambda: os.path.expanduser(_str("VOICE_AUDIO_DIR", "~/Cloudiator/voice-audio"))
     )
+    # When keywords miss, ask the loaded chat model which pre-written FAQ a
+    # caller's question means (a key or none, never text).
+    voice_llm_faq: bool = field(
+        default_factory=lambda: _str("VOICE_LLM_FAQ", "true").lower() in ("1", "true", "yes")
+    )
+    voice_llm_timeout_seconds: float = field(
+        default_factory=lambda: _float("VOICE_LLM_TIMEOUT_SECONDS", 6.0)
+    )
     # One line for the whole Mini: further browser callers wait in a queue.
     voice_max_active_calls: int = field(default_factory=lambda: _int("VOICE_MAX_ACTIVE_CALLS", 1))
     voice_call_idle_seconds: float = field(

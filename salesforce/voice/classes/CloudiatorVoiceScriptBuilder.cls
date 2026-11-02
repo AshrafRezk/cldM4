@@ -16,6 +16,12 @@ public with sharing class CloudiatorVoiceScriptBuilder {
     private static final Pattern KEY = Pattern.compile('^[A-Za-z_][A-Za-z0-9_]{0,39}$');
 
     public static Map<String, Object> build(Cloudiator_Voice_Script__c script, List<Cloudiator_Voice_Question__c> questions) {
+        return build(script, questions, new List<Cloudiator_Voice_FAQ__c>());
+    }
+
+    public static Map<String, Object> build(
+        Cloudiator_Voice_Script__c script, List<Cloudiator_Voice_Question__c> questions, List<Cloudiator_Voice_FAQ__c> faqs
+    ) {
         List<String> languages = languages(script.Languages__c);
         List<Cloudiator_Voice_Question__c> ordered = sortByOrder(questions);
         if (ordered.isEmpty()) {
@@ -89,7 +95,42 @@ public with sharing class CloudiatorVoiceScriptBuilder {
             'steps' => steps,
             'commit' => new Map<String, Object>{ 'records' => records(script, ordered, keys) }
         };
+        if (faqs != null && !faqs.isEmpty()) {
+            def.put('faq', faq(faqs, languages));
+        }
+        if (String.isNotBlank(script.Arabic_Off_Script__c) || String.isNotBlank(script.English_Off_Script__c)) {
+            def.put('off_script_say', localized(languages, script.Arabic_Off_Script__c, script.English_Off_Script__c, 'Off-script reply'));
+        }
         return def;
+    }
+
+    @TestVisible
+    private static List<Object> faq(List<Cloudiator_Voice_FAQ__c> faqs, List<String> languages) {
+        List<Object> out = new List<Object>();
+        Set<String> keys = new Set<String>();
+        Integer n = 0;
+        for (Cloudiator_Voice_FAQ__c f : faqs) {
+            n++;
+            String key = String.isNotBlank(f.FAQ_Key__c) ? f.FAQ_Key__c.trim() : 'faq' + n;
+            if (!KEY.matcher(key).matches() || keys.contains(key)) {
+                throw new BuildException('FAQ key "' + key + '" is invalid or repeated.');
+            }
+            keys.add(key);
+            List<String> words = new List<String>();
+            for (String w : (f.Keywords__c == null ? '' : f.Keywords__c).split(',')) {
+                if (String.isNotBlank(w)) {
+                    words.add(w.trim());
+                }
+            }
+            if (words.isEmpty()) {
+                throw new BuildException('FAQ "' + key + '" needs at least one keyword.');
+            }
+            out.add(new Map<String, Object>{
+                'key' => key, 'when' => words,
+                'say' => localized(languages, f.Arabic_Answer__c, f.English_Answer__c, 'FAQ ' + key)
+            });
+        }
+        return out;
     }
 
     @TestVisible

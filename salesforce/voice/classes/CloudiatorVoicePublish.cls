@@ -37,9 +37,12 @@ public with sharing class CloudiatorVoicePublish {
                    Languages__c, Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c,
                    English_Closing__c, Arabic_Voice__c, English_Voice__c, Transcript_Field__c,
                    Record_Links__c, Fixed_Values__c, Variables__c, Personas__c, Beep__c, Hold_Music__c,
+                   Arabic_Off_Script__c, English_Off_Script__c,
                    (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
                            Required__c, Max_Attempts__c, Announcement__c, Next_Key__c, Routes__c
-                    FROM Questions__r ORDER BY Order__c)
+                    FROM Questions__r ORDER BY Order__c),
+                   (SELECT Id, FAQ_Key__c, Keywords__c, Arabic_Answer__c, English_Answer__c
+                    FROM FAQs__r ORDER BY Name)
             FROM Cloudiator_Voice_Script__c
             WHERE Id IN :scriptRecordIds
             WITH USER_MODE
@@ -52,7 +55,7 @@ public with sharing class CloudiatorVoicePublish {
             try {
                 Map<String, Object> def = script.Questions__r.isEmpty()
                     ? definition(script)
-                    : CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
+                    : CloudiatorVoiceScriptBuilder.build(script, script.Questions__r, script.FAQs__r);
                 String payload = JSON.serialize(def);
                 if (!script.Questions__r.isEmpty()) {
                     script.Definition__c = JSON.serializePretty(def);

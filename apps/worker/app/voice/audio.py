@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import speech
-from .engine import FAIL_MESSAGES, find_persona, hold_text, languages_of, speak
+from .engine import FAIL_MESSAGES, back_text, find_persona, hold_text, languages_of, off_script_text, speak
 
 log = logging.getLogger("cloudiator.voice.audio")
 
@@ -74,6 +74,11 @@ def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, 
             )
             lines.append({**base, "key": "__fail__", "text": fail})
             lines.append({**base, "key": "__hold__", "text": speak(hold_text(script, language), language, persona)})
+            lines.append({**base, "key": "__offscript__", "text": speak(off_script_text(script, language), language, persona)})
+            if script.get("faq"):
+                lines.append({**base, "key": "__back__", "text": speak(back_text(language), language, persona)})
+            for item in script.get("faq") or []:
+                lines.append({**base, "key": f"__faq_{item['key']}", "text": speak(item["say"], language, persona)})
     return lines
 
 
@@ -222,6 +227,24 @@ class VoiceAudio:
                          "speaker": line["speaker"], "source": source})
         return rows
 
+    def readiness(self, tenant_id: str, script: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """Per persona+language: how many lines have a natural voice (a person's
+        recording or a render). Only fully ready ones take calls; with no render
+        engine at all, the macOS voice is all there is, so everything is ready."""
+        totals: dict[tuple, list[int]] = {}
+        for row in self.status(tenant_id, script):
+            key = (row.get("persona"), row["language"])
+            counts = totals.setdefault(key, [0, 0])
+            counts[1] += 1
+            if row["source"] in ("recording", "rendered"):
+                counts[0] += 1
+        always = self.engine == "say"
+        return [
+            {"persona": persona, "language": language, "ready": done, "total": total,
+             "ok": always or done == total}
+            for (persona, language), (done, total) in totals.items()
+        ]
+
     # Background rendering ----------------------------------------------------
 
     def enabled(self) -> bool:
@@ -231,14 +254,18 @@ class VoiceAudio:
         """Queue the lines that have no clip yet. Returns how many."""
         if not self.enabled():
             return 0
-        # Call order first: every persona's greeting and first question are
-        # natural before anyone reaches question five.
+        # One persona+language at a time, in call order: calls open per
+        # persona+language only once all of its lines are natural (readiness),
+        # so finishing Mariam-Arabic first beats a little of everyone.
         order = {step["key"]: i for i, step in enumerate(script["steps"])}
         order["__hold__"] = 1.5
+        people = {p["id"]: i for i, p in enumerate(script.get("personas") or [])}
+        langs = {lang: i for i, lang in enumerate(languages_of(script))}
         missing = sorted(
             (line for line in self.lines(script)
              if not self.rendered_path(line["speaker"], line["language"], line["text"]).is_file()),
-            key=lambda line: order.get(line["key"], 99),
+            key=lambda line: (people.get(line.get("persona"), 0), langs.get(line["language"], 0),
+                              order.get(line["key"], 99)),
         )
         if missing:
             self.queue.put_nowait(missing)

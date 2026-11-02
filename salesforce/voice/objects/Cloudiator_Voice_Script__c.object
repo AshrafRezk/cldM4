@@ -162,4 +162,20 @@
         <type>Checkbox</type>
         <defaultValue>true</defaultValue>
     </fields>
+    <fields>
+        <fullName>Arabic_Off_Script__c</fullName>
+        <label>Arabic Off-Script Reply</label>
+        <description>Optional. Said when a caller asks something no FAQ covers. Default: سؤال مهم، سجلته وحد من فريقنا هيرد عليك فيه. نرجع لسؤالنا.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Off_Script__c</fullName>
+        <label>English Off-Script Reply</label>
+        <description>Optional. Default: Good question. I've noted it and someone from our team will get back to you on it. Now, back to my question.</description>
+        <type>LongTextArea</type>
+        <length>1000</length>
+        <visibleLines>3</visibleLines>
+    </fields>
 </CustomObject>

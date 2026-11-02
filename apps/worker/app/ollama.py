@@ -127,6 +127,7 @@ class OllamaClient:
         options: dict[str, Any],
         tools: list[dict[str, Any]] | None = None,
         response_format: str | None = None,
+        think: bool | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model,
@@ -135,6 +136,10 @@ class OllamaClient:
             "options": options,
             "keep_alive": self.keep_alive_for(model),
         }
+        if think is not None:
+            # Gemma 4 reasons before answering unless told not to; for a short
+            # JSON decision that spends the whole token budget on hidden thinking.
+            payload["think"] = think
         if tools:
             payload["tools"] = tools
         if response_format == "json_object":

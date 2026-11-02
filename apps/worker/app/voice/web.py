@@ -50,9 +50,10 @@ class _IpLimiter:
         hits.append(now)
 
 
-def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, settings, require_key) -> None:
+def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, assistant, settings, require_key) -> None:
     store = engine.store
     limiter = _IpLimiter(PER_IP_PER_MINUTE)
+    app.state.voice_ip_limiter = limiter
 
     @app.post("/v1/voice/scripts/{script_id}/web-link")
     async def create_link(script_id: str, request: Request, key=Depends(require_key("voice"))) -> JSONResponse:
@@ -148,6 +149,14 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
             raise CloudiatorError(400, "invalid_request_error", f"This script does not speak {language}.", param="lang")
         if persona is not None and find_persona(found[1], persona) is None:
             raise CloudiatorError(400, "invalid_request_error", "No such persona on this script.", param="persona")
+        chosen = find_persona(found[1], persona)
+        want = (chosen["id"] if chosen else None, language or found[1]["language"])
+        for option in audio.readiness(tenant_id, found[1]):
+            if (option["persona"], option["language"]) == want and not option["ok"]:
+                raise CloudiatorError(
+                    409, "warming_up",
+                    f"This voice is still being prepared ({option['ready']}/{option['total']} lines).",
+                )
         request.state.usage.tool = "voice_web_start"
         if line.can_start_now():
             call_sid, reply = begin(tenant_id, script_id, language, persona)
@@ -155,6 +164,16 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
         ticket = line.join(token, language)
         ticket.persona = persona
         return JSONResponse(content=await hold(tenant_id, script_id, ticket, line.position(ticket.id), True))
+
+    @app.get("/v1/voice/web/{token}/ready")
+    async def ready(token: str, request: Request) -> JSONResponse:
+        """Which persona+language combinations can take a call right now."""
+        tenant_id, script_id = link(request, token)
+        found = store.script_by_id(tenant_id, script_id)
+        if found is None:
+            raise CloudiatorError(404, "link_not_found", "This call link is not valid.")
+        return JSONResponse(content={"engine": audio.engine, "options": audio.readiness(tenant_id, found[1])},
+                            headers={"Cache-Control": "no-store"})
 
     @app.post("/v1/voice/web/{token}/wait")
     async def wait(token: str, request: Request) -> JSONResponse:
@@ -244,7 +263,13 @@ def register_web_routes(app: FastAPI, *, engine: VoiceEngine, audio, line, setti
                 503, "speech_unavailable", "Speech recognition is not set up on this appliance.",
                 error_type="server_error",
             ) from exc
-        reply = engine.on_gather(call_sid=call_sid, step=step, attempt=attempt, speech=heard, turn=turn_no)
+        intent = None
+        current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
+        if current is not None and session["status"] == "in_progress":
+            intent = await assistant.intent(session["definition"], current, heard, session_language(session))
+        reply = engine.on_gather(
+            call_sid=call_sid, step=step, attempt=attempt, speech=heard, turn=turn_no, intent=intent
+        )
         if any(verb.get("hangup") for verb in reply["verbs"]):
             line.ended(call_sid)
         return JSONResponse(content=await _turn(audio, tenant_id, call_sid, reply, store, heard=heard))
