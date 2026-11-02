@@ -134,6 +134,9 @@ See [voice.md](voice.md). The live call path never touches Ollama, Whisper, or N
 | `VOICE_DB` | `~/Cloudiator/voice.db` | SQLite for published scripts and call sessions |
 | `VOICE_SESSION_TTL_DAYS` | `7` | sessions (transcripts included) are deleted this long after ack, or after the last update if never acked |
 | `VOICE_TTS_CACHE` | `~/Cloudiator/voice-tts` | browser call: cached `say` audio, keyed by text+voice |
+| `VOICE_STT_ENGINE` | `auto` | `auto`/`egyptian`: the Egyptian Arabic–English code-switching model (Whisper Small fine-tune, Apache-2.0) in a resident helper in the TTS venv, preloaded at boot, CPU only, ~1 GB RAM; falls back to whisper.cpp if it is missing or fails. `whisper_cpp`: large-v3-turbo only |
+| `EGYPTIAN_STT_MODEL` | HF cache snapshot `9e5bb21…` | the downloaded `IbrahimAmin/code-switched-egyptian-arabic-whisper-small` |
+| `EGYPTIAN_STT_THREADS` | `6` | CPU threads for the helper |
 | `WHISPER_CPP_BIN` | `/opt/homebrew/bin/whisper-cli` | browser call STT; always run with `--no-gpu` |
 | `WHISPER_MODEL` | `~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin` | ggml weights; missing → each answer is `503 speech_unavailable` |
 | `WHISPER_THREADS` | `8` | CPU threads for one transcription (M4: 4 performance + 6 efficiency cores) |

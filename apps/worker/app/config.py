@@ -182,6 +182,18 @@ class Settings:
         )
     )
     whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 8))
+    # Speech-to-text engine: "egyptian" (Whisper Small fine-tuned on Egyptian
+    # Arabic-English code-switching, in a resident helper in the TTS venv),
+    # "whisper_cpp" (large-v3-turbo), or "auto" (egyptian when installed).
+    voice_stt_engine: str = field(default_factory=lambda: _str("VOICE_STT_ENGINE", "auto"))
+    egyptian_stt_model: str = field(
+        default_factory=lambda: os.path.expanduser(_str(
+            "EGYPTIAN_STT_MODEL",
+            "~/.cache/huggingface/hub/models--IbrahimAmin--code-switched-egyptian-arabic-whisper-small"
+            "/snapshots/9e5bb219bc873b87e03fa156a17000a42a0ea3f9",
+        ))
+    )
+    egyptian_stt_threads: int = field(default_factory=lambda: _int("EGYPTIAN_STT_THREADS", 6))
     ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
     # Natural voices (docs/voice.md): script lines are rendered at publish time.
     # auto = Azure when AZURE_SPEECH_KEY is set, else VoiceTut, else macOS say.

@@ -58,6 +58,7 @@ from .jobs import JobRunner, public_job
 from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
 from .tool_routes import register_tool_routes
 from .voice.assistant import VoiceAssistant
+from .voice import speech as voice_speech
 from .voice.audio import VoiceAudio
 from .voice.engine import VoiceEngine
 from .voice.line import CallLine
@@ -205,6 +206,10 @@ async def lifespan(app: FastAPI):
             log.info("voice: %d script lines queued for rendering", queued)
     except Exception as exc:  # noqa: BLE001
         log.warning("voice: could not queue renders at boot: %s", exc)
+    stt_warm = None
+    if voice_speech.stt_engine(settings) == "egyptian":
+        # Load the Egyptian speech model now, not on the first caller's answer.
+        stt_warm = asyncio.create_task(_warm_speech(), name="warm-speech")
     warm = asyncio.create_task(_warm_models(), name="warm-models")
     janitor = asyncio.create_task(_janitor(), name="cache-janitor")
     artifact_janitor = asyncio.create_task(artifact_janitor_loop(artifacts), name="artifact-janitor")
@@ -217,6 +222,9 @@ async def lifespan(app: FastAPI):
         await scheduler.stop()
         await jobs.stop()
         jobs.close()
+        if stt_warm is not None:
+            stt_warm.cancel()
+        await voice_speech.egyptian_client(settings).close()
         await outbox.stop()
         outbox.close()
         await ollama.aclose()
@@ -259,6 +267,13 @@ async def _janitor() -> None:
             raise
         except Exception:  # noqa: BLE001 - the janitor outlives its failures
             log.exception("cache janitor pass failed")
+
+
+async def _warm_speech() -> None:
+    try:
+        await voice_speech.egyptian_client(settings)._ensure()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("egyptian speech model did not preload (calls fall back to whisper.cpp): %s", exc)
 
 
 async def _warm_models() -> None:
