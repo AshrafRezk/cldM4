@@ -210,6 +210,9 @@ async def test_real_round_trip_say_then_whisper(tmp_path):
         whisper_model=os.path.expanduser("~/Cloudiator/models/whisper/ggml-large-v3-turbo-q5_0.bin"),
         whisper_threads=8,
         ffmpeg_bin="/opt/homebrew/bin/ffmpeg",
+        voice_stt_engine="whisper_cpp",
+        egyptian_stt_model="/nonexistent",
+        voicetut_python="/nonexistent",
     )
     text = await speech.transcribe(aiff.read_bytes(), language="en-US", settings=cfg)
     assert "sara" in text.lower()

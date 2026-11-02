@@ -16,9 +16,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import logging
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -108,43 +110,209 @@ def audio_ctx(seconds: float) -> int:
     return int(min(1500, max(512, -(-frames // 64) * 64)))
 
 
+def stt_engine(settings) -> str:
+    """auto: the Egyptian code-switching model when installed, else whisper.cpp."""
+    choice = (settings.voice_stt_engine or "auto").lower()
+    egyptian_ready = os.path.isdir(settings.egyptian_stt_model) and os.path.exists(settings.voicetut_python)
+    if choice in ("auto", "egyptian"):
+        return "egyptian" if egyptian_ready else "whisper_cpp"
+    return "whisper_cpp"
+
+
+class EgyptianSTT:
+    """The resident helper (egy_stt_server.py): one model load, then one JSON
+    line per answer. Restarted if it dies; callers fall back to whisper.cpp."""
+
+    def __init__(self, command: list[str], *, load_timeout: float = 120.0, timeout: float = STT_TIMEOUT) -> None:
+        self.command = command
+        self.load_timeout = load_timeout
+        self.timeout = timeout
+        self.proc: asyncio.subprocess.Process | None = None
+        self._next = 0
+
+    async def _ensure(self) -> asyncio.subprocess.Process:
+        if self.proc is not None and self.proc.returncode is None:
+            return self.proc
+        self.proc = await asyncio.create_subprocess_exec(
+            *self.command, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        line = await asyncio.wait_for(self.proc.stdout.readline(), self.load_timeout)  # type: ignore[union-attr]
+        if not line or not json.loads(line).get("ready"):
+            await self.close()
+            raise SpeechUnavailable("Egyptian speech model did not start")
+        log.info("egyptian speech model loaded")
+        return self.proc
+
+    async def transcribe(self, wav: Path) -> str:
+        try:
+            proc = await self._ensure()
+            self._next += 1
+            rid = self._next
+            proc.stdin.write((json.dumps({"id": rid, "wav": str(wav)}) + "\n").encode())  # type: ignore[union-attr]
+            await proc.stdin.drain()  # type: ignore[union-attr]
+            while True:
+                line = await asyncio.wait_for(proc.stdout.readline(), self.timeout)  # type: ignore[union-attr]
+                if not line:
+                    raise SpeechUnavailable("Egyptian speech model exited")
+                reply = json.loads(line)
+                if reply.get("id") == rid:
+                    break
+        except (asyncio.TimeoutError, OSError, ValueError) as exc:
+            await self.close()
+            raise SpeechUnavailable(f"Egyptian speech model failed: {type(exc).__name__}") from exc
+        except SpeechUnavailable:
+            await self.close()
+            raise
+        if "error" in reply:
+            raise SpeechUnavailable(reply["error"])
+        return reply.get("text") or ""
+
+    async def close(self) -> None:
+        if self.proc is not None and self.proc.returncode is None:
+            self.proc.kill()
+            await self.proc.wait()
+        self.proc = None
+
+
+_egyptian: EgyptianSTT | None = None
+
+
+def egyptian_client(settings) -> EgyptianSTT:
+    global _egyptian
+    if _egyptian is None:
+        script = Path(__file__).with_name("egy_stt_server.py")
+        _egyptian = EgyptianSTT([
+            "/usr/bin/nice", "-n", "5", settings.voicetut_python, "-I", str(script),
+            settings.egyptian_stt_model, str(settings.egyptian_stt_threads),
+        ])
+    return _egyptian
+
+
 async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
     if not audio:
         return ""
+    engine = stt_engine(settings)
     binary = settings.whisper_cpp_bin
     model = os.path.expanduser(settings.whisper_model)
-    if not binary or not os.path.exists(binary):
-        raise SpeechUnavailable(f"whisper.cpp is not installed ({binary})")
-    if not os.path.isfile(model):
-        raise SpeechUnavailable(f"whisper model is missing ({model})")
+    whisper_ready = bool(binary) and os.path.exists(binary) and os.path.isfile(model)
+    if engine == "whisper_cpp" and not whisper_ready:
+        raise SpeechUnavailable(f"no speech model: whisper.cpp ({binary}) or its model ({model}) is missing")
     async with _stt_lock:
         with tempfile.TemporaryDirectory() as tmp:
             raw = Path(tmp) / "in"
             raw.write_bytes(audio)
             wav = Path(tmp) / "in.wav"
             # Whatever the browser sent (WAV from the call page, webm/mp4 from
-            # elsewhere) becomes 16 kHz mono PCM, capped in length.
+            # elsewhere) becomes 16 kHz mono 16-bit PCM, capped in length.
             await _run(
                 [settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-i", str(raw),
-                 "-t", str(MAX_UTTERANCE_SECONDS), "-ar", "16000", "-ac", "1", "-f", "wav", str(wav)],
+                 "-t", str(MAX_UTTERANCE_SECONDS), "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+                 "-f", "wav", str(wav)],
                 20.0,
             )
-            base = Path(tmp) / "out"
-            seconds = max(0, wav.stat().st_size - 44) / 32000  # 16 kHz, 16-bit mono
-            await _run(
-                [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
-                 "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
-                 # No initial prompt: tested on real Egyptian/English calls, it
-                 # leaks its own words into transcripts ("مش عارف. مفهمتش.").
-                 "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
-                 "-otxt", "-of", str(base)],
-                STT_TIMEOUT,
-            )
-            text_path = base.with_suffix(".txt")
-            text = text_path.read_text(encoding="utf-8", errors="replace") if text_path.exists() else ""
+            if speech_seconds(wav) < MIN_SPEECH_SECONDS:
+                # Both models invent fluent text from near-silence ("ماشي طيب",
+                # subtitle credits). No real speech, no transcript.
+                return ""
+            text = None
+            if engine == "egyptian":
+                try:
+                    text = await egyptian_client(settings).transcribe(wav)
+                except SpeechUnavailable as exc:
+                    if not whisper_ready:
+                        raise
+                    log.warning("egyptian speech model unavailable, using whisper.cpp: %s", exc)
+            if text is None:
+                text = await _whisper_cpp(wav, language, settings, binary, model, Path(tmp))
     # whisper.cpp marks silence and noise as [BLANK_AUDIO], (music), etc.
     text = " ".join(NOISE_TAGS.sub(" ", text).split())
-    return normalize_digits(collapse_repeats(drop_hallucinations(text)))
+    return normalize_digits(number_words_to_digits(collapse_repeats(drop_hallucinations(text))))
+
+
+MIN_SPEECH_SECONDS = 0.3
+_FRAME = 480  # 30 ms at 16 kHz
+
+
+def speech_seconds(wav: Path) -> float:
+    """Seconds of audio clearly louder than both the room and an absolute floor.
+
+    Measured on real calls: windows that peaked at RMS 0.012-0.015 held no
+    words yet produced confident transcripts; answers spoken at 0.1-0.2 pass
+    easily, and a quiet one at 0.026 still clears 0.01."""
+    import array
+    import math
+
+    data = array.array("h")
+    data.frombytes(wav.read_bytes()[44:])
+    if sys.byteorder != "little":
+        data.byteswap()
+    frames = []
+    for start in range(0, len(data) - _FRAME + 1, _FRAME):
+        chunk = data[start:start + _FRAME]
+        frames.append(math.sqrt(sum(x * x for x in chunk) / _FRAME) / 32768.0)
+    if not frames:
+        return 0.0
+    noise = sorted(frames)[len(frames) // 10]  # the room between words
+    # Capped so a caller who never pauses (no quiet frames to learn the room
+    # from) still counts: real answers measured 0.1-0.2, far above 0.05.
+    threshold = min(0.05, max(0.01, noise * 4))
+    return sum(1 for rms in frames if rms > threshold) * _FRAME / 16000
+
+
+async def _whisper_cpp(wav: Path, language: str | None, settings, binary: str, model: str, tmp: Path) -> str:
+    base = tmp / "out"
+    seconds = max(0, wav.stat().st_size - 44) / 32000  # 16 kHz, 16-bit mono
+    await _run(
+        [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
+         "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
+         # No initial prompt: tested on real Egyptian/English calls, it
+         # leaks its own words into transcripts ("مش عارف. مفهمتش.").
+         "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
+         "-otxt", "-of", str(base)],
+        STT_TIMEOUT,
+    )
+    text_path = base.with_suffix(".txt")
+    return text_path.read_text(encoding="utf-8", errors="replace") if text_path.exists() else ""
+
+
+# Spoken digits come back as words ("صفر 1 صفر 1 إثنان ثلاثة"), in whichever
+# language the caller used for that stretch.
+NUMBER_WORDS = {
+    "صفر": "0", "زيرو": "0", "واحد": "1", "اتنين": "2", "اثنين": "2", "اثنان": "2", "إثنين": "2", "إثنان": "2",
+    "تلاتة": "3", "تلاته": "3", "ثلاثة": "3", "ثلاثه": "3", "اربعة": "4", "أربعة": "4", "اربعه": "4", "أربعه": "4",
+    "خمسة": "5", "خمسه": "5", "ستة": "6", "سته": "6", "سبعة": "7", "سبعه": "7", "تمانية": "8", "تمانيه": "8",
+    "ثمانية": "8", "ثمانيه": "8", "تسعة": "9", "تسعه": "9",
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7",
+    "eight": "8", "nine": "9", "oh": "0",
+    "zéro": "0", "un": "1", "deux": "2", "trois": "3", "quatre": "4", "cinq": "5", "sept": "7", "huit": "8", "neuf": "9",
+}
+
+
+def number_words_to_digits(text: str) -> str:
+    """Only inside a run of two or more number tokens, so a phone number
+    becomes digits but "واحد بس" (just one) keeps its words."""
+    tokens = text.split()
+    def as_digit(token: str) -> str | None:
+        bare = token.strip(".,،!?؟").lower()
+        if bare.isdigit():
+            return bare
+        bare = bare[1:] if bare.startswith("و") and bare[1:] in NUMBER_WORDS else bare  # "وتلاتة"
+        return NUMBER_WORDS.get(bare)
+    out, run = [], []
+    for token in tokens + [None]:  # type: ignore[list-item]
+        digit = as_digit(token) if token is not None else None
+        if digit is not None:
+            run.append((token, digit))
+            continue
+        if len(run) >= 2:
+            out.append(" ".join(d for _t, d in run))
+        else:
+            out.extend(t for t, _d in run)
+        run = []
+        if token is not None:
+            out.append(token)
+    return " ".join(out)
 
 
 # What whisper writes when it hears near-silence: subtitle credits and channel
