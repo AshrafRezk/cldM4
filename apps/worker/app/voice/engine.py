@@ -22,6 +22,8 @@ log = logging.getLogger("cloudiator.voice")
 SCRIPT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 STEP_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 SOBJECT = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
+LANGUAGE = re.compile(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$")
+VOICE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9 ()._-]{0,40}$")
 E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
 RESERVED_KEYS = {"transcript", "from", "to", "call_sid"}
 MAX_STEPS = 50
@@ -55,6 +57,16 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         if not E164.match(number):
             raise ScriptInvalid(f"{number!r} is not an E.164 number.", "inbound_numbers")
 
+    languages = body.get("languages") or [body.get("language") or "en-US"]
+    if (
+        not isinstance(languages, list)
+        or not languages
+        or len(languages) > 4
+        or not all(isinstance(lang, str) and LANGUAGE.match(lang) for lang in languages)
+        or len(set(languages)) != len(languages)
+    ):
+        raise ScriptInvalid("languages must list 1-4 language tags like ar-EG, en-US.", "languages")
+
     raw_steps = body.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
         raise ScriptInvalid("steps must be a non-empty list.", "steps")
@@ -75,9 +87,7 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         if key in keys:
             raise ScriptInvalid(f"Duplicate step key {key!r}.", f"{where}.key")
         keys.add(key)
-        say = raw.get("say")
-        if not isinstance(say, str) or not say.strip():
-            raise ScriptInvalid(f"{where}.say must be text.", f"{where}.say")
+        say = _localized(raw.get("say"), languages, f"{where}.say")
         nxt = raw.get("next")
         if nxt is not None and not isinstance(nxt, str):
             raise ScriptInvalid(f"{where}.next must be a step key or null.", f"{where}.next")
@@ -87,7 +97,7 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         steps.append(
             {
                 "key": key,
-                "say": say.strip(),
+                "say": say,
                 "gather": bool(raw.get("gather", False)),
                 "timeout": _bounded_int(raw.get("timeout", 5), 1, 60, f"{where}.timeout"),
                 "speech_timeout": str(raw.get("speech_timeout", "auto")),
@@ -128,19 +138,52 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
         seen.append(sobject)
         clean_records.append({"sobject": sobject, "fields": dict(fields), "after": list(after)})
 
+    fail_say = body.get("fail_say")
+    voices = body.get("voices") or {}
+    if not isinstance(voices, Mapping) or not all(
+        lang in languages and isinstance(name, str) and VOICE_NAME.match(name) for lang, name in voices.items()
+    ):
+        raise ScriptInvalid("voices maps a script language to a voice name.", "voices")
+
     return {
         "id": script_id,
         "display_name": str(body.get("display_name") or script_id),
-        "language": str(body.get("language") or "en-US"),
+        "language": languages[0],
+        "languages": list(languages),
+        # Per-language speaker for the browser call: a VoiceTut speaker name
+        # (e.g. Hadeer, Mohammed) or, for the macOS fallback, a `say` voice.
+        "voices": dict(voices),
         "voice": body.get("voice") or None,
         # macOS `say` voice for the browser call (e.g. Majed, Samantha).
         "local_voice": body.get("local_voice") or None,
         "inbound_numbers": numbers,
         "active": bool(body.get("active", True)),
-        "fail_say": body.get("fail_say") or None,
+        "fail_say": _localized(fail_say, languages, "fail_say") if fail_say else None,
         "steps": steps,
         "commit": {"records": clean_records},
     }
+
+
+def _localized(value: Any, languages: list[str], param: str) -> dict[str, str]:
+    """Text for every script language: a plain string is used for all of them."""
+    if isinstance(value, str) and value.strip():
+        return {lang: value.strip() for lang in languages}
+    if isinstance(value, Mapping):
+        out = {}
+        for lang in languages:
+            text = value.get(lang)
+            if not isinstance(text, str) or not text.strip():
+                raise ScriptInvalid(f"{param} needs text for {lang}.", param)
+            out[lang] = text.strip()
+        return out
+    raise ScriptInvalid(f"{param} must be text, or text per language.", param)
+
+
+def text_for(value: Any, language: str) -> str:
+    """Scripts published before languages existed store plain strings."""
+    if isinstance(value, Mapping):
+        return value.get(language) or next(iter(value.values()))
+    return value
 
 
 def _bounded_int(value: Any, low: int, high: int, param: str) -> int:
@@ -193,10 +236,16 @@ class VoiceEngine:
             log.warning("inbound call to an unrouted number; hanging up")
             return _reply(None, [{"hangup": True}])
         tenant_id, version, script = found
-        return self._start(tenant_id, version, script, call_sid, from_number, to_number)
+        return self._start(tenant_id, version, script, call_sid, from_number, to_number, script["language"])
 
     def start_call(
-        self, *, tenant_id: str, script_id: str, call_sid: str, from_label: str
+        self,
+        *,
+        tenant_id: str,
+        script_id: str,
+        call_sid: str,
+        from_label: str,
+        language: str | None = None,
     ) -> Reply | None:
         """Browser call: the call link already names tenant and script."""
         cached = self.store.reply_for(call_sid, INBOUND_STEP, 0)
@@ -207,9 +256,14 @@ class VoiceEngine:
         if found is None:
             return None
         version, script = found
-        return self._start(tenant_id, version, script, call_sid, from_label, f"web:{script_id}")
+        language = language or script["language"]
+        if language not in languages_of(script):
+            raise ScriptInvalid(f"This script does not speak {language}.", "lang")
+        return self._start(
+            tenant_id, version, script, call_sid, from_label, f"web:{script_id}", language
+        )
 
-    def _start(self, tenant_id, version, script, call_sid, from_number, to_number) -> Reply:
+    def _start(self, tenant_id, version, script, call_sid, from_number, to_number, language) -> Reply:
         session = self.store.create_session(
             tenant_id=tenant_id,
             call_sid=call_sid,
@@ -218,8 +272,9 @@ class VoiceEngine:
             script=script,
             script_version=version,
             first_step=script["steps"][0]["key"],
+            language=language,
         )
-        log.info("voice session %s started on script %s", session["id"], script["id"])
+        log.info("voice session %s started on script %s (%s)", session["id"], script["id"], language)
         reply = self._advance(session, script["steps"][0]["key"])
         self.store.save_reply(call_sid, INBOUND_STEP, 0, reply)
         return reply
@@ -251,21 +306,28 @@ class VoiceEngine:
             reply = self._advance({**session, "turns": turns, "answers": answers}, current["next"])
         elif attempt < current["max_attempts"]:
             self.store.update_session(session["id"], attempt=attempt + 1)
-            reply = _reply(script, [self._gather_verb({**session, "attempt": attempt + 1}, current)])
+            reply = _reply(
+                script,
+                [self._gather_verb({**session, "attempt": attempt + 1}, current)],
+                session_language(session),
+            )
         elif current["on_fail"] == "continue":
             answers[step] = ""
             self.store.update_session(session["id"], answers=answers)
             reply = self._advance({**session, "answers": answers}, current["next"])
         else:
-            message = script.get("fail_say") or FAIL_MESSAGES[
-                "ar" if script["language"].lower().startswith("ar") else "en"
-            ]
+            language = session_language(session)
+            message = (
+                text_for(script["fail_say"], language)
+                if script.get("fail_say")
+                else FAIL_MESSAGES["ar" if language.lower().startswith("ar") else "en"]
+            )
             turns.append({"role": "agent", "text": message})
             self.store.update_session(
                 session["id"], status="abandoned", current_step=None, turns=turns
             )
             log.info("voice session %s abandoned at %s", session["id"], step)
-            reply = _reply(script, [{"say": message}, {"hangup": True}])
+            reply = _reply(script, [{"say": message, "key": "__fail__"}, {"hangup": True}], language)
 
         self.store.save_reply(call_sid, step, attempt, reply)
         return reply
@@ -300,6 +362,7 @@ class VoiceEngine:
     def _advance(self, session: dict[str, Any], key: str | None) -> Reply:
         """Speak non-gather steps from `key` until a gather or the end."""
         script = session["definition"]
+        language = session_language(session)
         turns = list(session["turns"])
         verbs: list[dict[str, Any]] = []
         while key is not None:
@@ -307,9 +370,10 @@ class VoiceEngine:
             if step["gather"]:
                 self.store.update_session(session["id"], current_step=key, attempt=1)
                 verbs.append(self._gather_verb({**session, "turns": turns, "attempt": 1}, step))
-                return _reply(script, verbs)
-            turns.append({"role": "agent", "text": step["say"]})
-            verbs.append({"say": step["say"]})
+                return _reply(script, verbs, language)
+            text = text_for(step["say"], language)
+            turns.append({"role": "agent", "text": text})
+            verbs.append({"say": text, "key": step["key"]})
             key = step["next"]
 
         commit = render_commit(
@@ -331,17 +395,18 @@ class VoiceEngine:
         )
         log.info("voice session %s ready to commit", session["id"])
         verbs.append({"hangup": True})
-        return _reply(script, verbs)
+        return _reply(script, verbs, language)
 
     def _gather_verb(self, session: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]:
         """The gather prompt is a turn too; it is recorded with any says before it."""
-        turns = list(session["turns"]) + [{"role": "agent", "text": step["say"]}]
+        prompt = text_for(step["say"], session_language(session))
+        turns = list(session["turns"]) + [{"role": "agent", "text": prompt}]
         self.store.update_session(session["id"], turns=turns)
         return {
             "gather": {
                 "step": step["key"],
                 "attempt": session["attempt"],
-                "prompt": step["say"],
+                "prompt": prompt,
                 "timeout": step["timeout"],
                 "speech_timeout": step["speech_timeout"],
             }
@@ -351,14 +416,26 @@ class VoiceEngine:
 Reply = dict[str, Any]
 
 
-def _reply(script: Mapping[str, Any] | None, verbs: list[dict[str, Any]]) -> Reply:
+def _reply(
+    script: Mapping[str, Any] | None, verbs: list[dict[str, Any]], language: str | None = None
+) -> Reply:
     script = script or {}
+    language = language or script.get("language")
     return {
-        "language": script.get("language"),
+        "script_id": script.get("id"),
+        "language": language,
         "voice": script.get("voice"),
-        "local_voice": script.get("local_voice"),
+        "local_voice": (script.get("voices") or {}).get(language) or script.get("local_voice"),
         "verbs": verbs,
     }
+
+
+def languages_of(script: Mapping[str, Any]) -> list[str]:
+    return list(script.get("languages") or [script.get("language") or "en-US"])
+
+
+def session_language(session: Mapping[str, Any]) -> str:
+    return session.get("language") or session["definition"].get("language") or "en-US"
 
 
 def _step(script: Mapping[str, Any], key: str) -> dict[str, Any]:

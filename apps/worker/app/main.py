@@ -57,6 +57,7 @@ from .ssrf import prepare_messages_for_ollama, validate_image_inputs
 from .jobs import JobRunner, public_job
 from .tool_loop import ToolRunner, default_chat_tools, load_registry, run_tool_loop
 from .tool_routes import register_tool_routes
+from .voice.audio import VoiceAudio
 from .voice.engine import VoiceEngine
 from .voice.routes import register_voice_routes
 from .voice.web import register_web_routes
@@ -128,6 +129,7 @@ voice = VoiceEngine(
     public_base_url=settings.public_base_url,
     ttl_days=settings.voice_session_ttl_days,
 )
+voice_audio = VoiceAudio(settings)
 
 
 class HealthLimiter:
@@ -731,8 +733,8 @@ def _register_unsupported_paths(application: FastAPI) -> None:
 
 
 register_tool_routes(app, artifacts=artifacts, runner=tool_runner, require_key=require_key)
-register_voice_routes(app, engine=voice, settings=settings, require_key=require_key)
-register_web_routes(app, engine=voice, settings=settings, require_key=require_key)
+register_voice_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
+register_web_routes(app, engine=voice, audio=voice_audio, settings=settings, require_key=require_key)
 
 
 @app.post("/v1/jobs")

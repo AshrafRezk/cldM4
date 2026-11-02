@@ -183,6 +183,18 @@ class Settings:
     )
     whisper_threads: int = field(default_factory=lambda: _int("WHISPER_THREADS", 8))
     ffmpeg_bin: str = field(default_factory=lambda: _str("FFMPEG_BIN", "/opt/homebrew/bin/ffmpeg"))
+    # Natural voices (docs/voice.md): VoiceTut-TTS renders fixed script lines
+    # at publish time in its own venv, CPU only. "say" disables rendering.
+    voice_tts_engine: str = field(default_factory=lambda: _str("VOICE_TTS_ENGINE", "voicetut"))
+    voicetut_python: str = field(
+        default_factory=lambda: os.path.expanduser(
+            _str("VOICETUT_PYTHON", "~/Cloudiator/tts-venv/bin/python")
+        )
+    )
+    voicetut_threads: int = field(default_factory=lambda: _int("VOICETUT_THREADS", 6))
+    voice_audio_dir: str = field(
+        default_factory=lambda: os.path.expanduser(_str("VOICE_AUDIO_DIR", "~/Cloudiator/voice-audio"))
+    )
     voice_web_max_audio_bytes: int = field(
         default_factory=lambda: _int("VOICE_WEB_MAX_AUDIO_BYTES", 2_000_000)
     )

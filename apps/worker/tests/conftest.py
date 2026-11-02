@@ -40,6 +40,10 @@ os.environ.update(
         # Never the operator's real ~/Cloudiator/queue.db.
         "QUEUE_DB": os.path.join(_TEST_STATE_DIR, "queue.db"),
         "VOICE_DB": os.path.join(_TEST_STATE_DIR, "voice.db"),
+        "VOICE_AUDIO_DIR": os.path.join(_TEST_STATE_DIR, "voice-audio"),
+        "VOICE_TTS_CACHE": os.path.join(_TEST_STATE_DIR, "voice-tts"),
+        # Rendering spawns a 3 GB model; the suite never does that.
+        "VOICE_TTS_ENGINE": "say",
         "TWILIO_AUTH_TOKEN": "test-twilio-auth-token",
         "MFLUX_MODEL_PATH": os.path.join(_TEST_STATE_DIR, "flux-schnell-4bit"),
         "MFLUX_LOW_RAM": "true",

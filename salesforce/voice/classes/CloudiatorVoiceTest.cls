@@ -119,4 +119,120 @@ private class CloudiatorVoiceTest {
         String longName = 'x'.repeat(200);
         System.assertEquals(80, ((String) CloudiatorVoiceCommit.coerce(Lead.LastName.getDescribe(), longName)).length());
     }
+
+    @IsTest
+    static void templateBuildsLinkedPatientScript() {
+        Id scriptId = CloudiatorVoiceTemplates.createOne('patient_support', null, 'psp-test');
+        Cloudiator_Voice_Script__c script = [
+            SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
+                   Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
+                   Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c,
+                   (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
+                           Required__c, Max_Attempts__c FROM Questions__r ORDER BY Order__c)
+            FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
+        ];
+        Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
+        System.assertEquals('psp-test', def.get('id'));
+        System.assertEquals(new List<String>{ 'ar-EG', 'en-US' }, def.get('languages'));
+        List<Object> steps = (List<Object>) def.get('steps');
+        System.assertEquals(6, steps.size(), 'greeting + 4 questions + goodbye');
+        Map<String, Object> first = (Map<String, Object>) steps[1];
+        System.assertEquals('full_name', first.get('key'));
+        System.assertEquals('hangup', first.get('on_fail'));
+        System.assert(((Map<String, Object>) first.get('say')).containsKey('en-US'));
+
+        List<Object> records = (List<Object>) ((Map<String, Object>) def.get('commit')).get('records');
+        Map<String, Object> contact = (Map<String, Object>) records[0];
+        Map<String, Object> caseRec = (Map<String, Object>) records[1];
+        System.assertEquals('Contact', contact.get('sobject'), 'parents first');
+        System.assertEquals('{{full_name}}', ((Map<String, Object>) contact.get('fields')).get('LastName'));
+        Map<String, Object> caseFields = (Map<String, Object>) caseRec.get('fields');
+        System.assertEquals('{{Contact.Id}}', caseFields.get('ContactId'));
+        System.assertEquals('{{transcript}}', caseFields.get('Description'));
+        System.assertEquals('Phone', caseFields.get('Origin'));
+        System.assertEquals(new List<String>{ 'Contact' }, caseRec.get('after'));
+    }
+
+    @IsTest
+    static void everyTemplateBuilds() {
+        for (String t : new List<String>{ 'case_intake', 'customer_onboarding' }) {
+            Id scriptId = CloudiatorVoiceTemplates.createOne(t, null, null);
+            Cloudiator_Voice_Script__c script = [
+                SELECT Id, Name, External_Id__c, Inbound_Numbers__c, Active__c, Languages__c,
+                       Arabic_Greeting__c, English_Greeting__c, Arabic_Closing__c, English_Closing__c,
+                       Arabic_Voice__c, English_Voice__c, Transcript_Field__c, Record_Links__c, Fixed_Values__c,
+                       (SELECT Id, Order__c, Step_Key__c, Arabic_Text__c, English_Text__c, Target_Field__c,
+                               Required__c, Max_Attempts__c FROM Questions__r ORDER BY Order__c)
+                FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId
+            ];
+            Map<String, Object> def = CloudiatorVoiceScriptBuilder.build(script, script.Questions__r);
+            System.assertEquals(t.replace('_', '-'), def.get('id'));
+        }
+        try {
+            CloudiatorVoiceTemplates.createOne('nope', null, null);
+            System.assert(false, 'expected a failure');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('Unknown template'));
+        }
+    }
+
+    @IsTest
+    static void builderRejectsMissingTextAndBadFields() {
+        Cloudiator_Voice_Script__c script = new Cloudiator_Voice_Script__c(
+            Name = 'x', External_Id__c = 'x', Languages__c = 'ar-EG;en-US',
+            Arabic_Greeting__c = 'أهلاً', English_Greeting__c = 'Hi',
+            Arabic_Closing__c = 'سلام', English_Closing__c = 'Bye'
+        );
+        Cloudiator_Voice_Question__c q = new Cloudiator_Voice_Question__c(
+            Order__c = 1, Arabic_Text__c = 'اسمك؟', English_Text__c = null, Target_Field__c = 'Case.Subject'
+        );
+        try {
+            CloudiatorVoiceScriptBuilder.build(script, new List<Cloudiator_Voice_Question__c>{ q });
+            System.assert(false, 'expected missing English text');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('English'), e.getMessage());
+        }
+        q.English_Text__c = 'Name?';
+        q.Target_Field__c = 'Subject';
+        try {
+            CloudiatorVoiceScriptBuilder.build(script, new List<Cloudiator_Voice_Question__c>{ q });
+            System.assert(false, 'expected a bad field reference');
+        } catch (CloudiatorVoiceScriptBuilder.BuildException e) {
+            System.assert(e.getMessage().contains('Object.Field'), e.getMessage());
+        }
+        System.assertEquals(new List<String>{ 'en-US' }, CloudiatorVoiceScriptBuilder.languages('en-US'));
+    }
+
+    @IsTest
+    static void recordingTitlesMapToLines() {
+        System.assertEquals(new String[]{ 'q10', 'ar-EG' }, CloudiatorVoiceRecordings.lineFor('q10', 'ar-EG'));
+        System.assertEquals(new String[]{ 'q10', 'en-US' }, CloudiatorVoiceRecordings.lineFor('q10', 'en'));
+        System.assertEquals(new String[]{ 'greeting', 'ar-EG' }, CloudiatorVoiceRecordings.lineFor(null, 'Greeting.ar-eg'));
+        System.assertEquals(null, CloudiatorVoiceRecordings.lineFor('q10', 'notes'));
+        System.assertEquals(null, CloudiatorVoiceRecordings.lineFor(null, 'menu.ar-EG'));
+    }
+
+    @IsTest
+    static void publishFromQuestionsUploadsRecordings() {
+        Id scriptId = CloudiatorVoiceTemplates.createOne('case_intake', null, 'ci-test');
+        Cloudiator_Voice_Question__c q = [SELECT Id FROM Cloudiator_Voice_Question__c WHERE Script__c = :scriptId ORDER BY Order__c LIMIT 1];
+        ContentVersion file = new ContentVersion(Title = 'ar-EG', PathOnClient = 'ar-EG.m4a', VersionData = Blob.valueOf('audio'));
+        insert file;
+        Id docId = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :file.Id].ContentDocumentId;
+        insert new ContentDocumentLink(ContentDocumentId = docId, LinkedEntityId = q.Id, ShareType = 'V');
+
+        Mock mock = new Mock();
+        Test.setMock(HttpCalloutMock.class, mock);
+        Test.startTest();
+        List<CloudiatorVoicePublish.Result> results = CloudiatorVoicePublish.publish(new List<Id>{ scriptId });
+        Test.stopTest();
+        System.assertEquals(null, results[0].error, results[0].error);
+        Cloudiator_Voice_Script__c saved = [SELECT Definition__c FROM Cloudiator_Voice_Script__c WHERE Id = :scriptId];
+        System.assert(saved.Definition__c.contains('full_name'), 'Definition__c shows what was sent');
+        Boolean uploaded = false;
+        for (String call : mock.calls) {
+            uploaded = uploaded || call.contains('/recordings/full_name/ar-EG');
+        }
+        System.assert(uploaded, 'recording not uploaded: ' + mock.calls);
+    }
 }

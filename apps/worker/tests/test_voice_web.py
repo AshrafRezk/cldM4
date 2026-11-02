@@ -21,11 +21,11 @@ def fake_speech(monkeypatch):
         calls["stt"] += 1
         return heard.pop(0) if audio else ""
 
-    async def synthesize_data_url(text, **kwargs):
-        return "data:audio/mp4;base64,AAAA"
+    async def synthesize(text, **kwargs):
+        return b"\x00\x00\x00\x18ftypM4A "
 
     monkeypatch.setattr(speech, "transcribe", transcribe)
-    monkeypatch.setattr(speech, "synthesize_data_url", synthesize_data_url)
+    monkeypatch.setattr(speech, "synthesize", synthesize)
     return heard, calls
 
 
@@ -141,13 +141,13 @@ async def test_link_minting_needs_voice_scope(make_client, install_key):
 
 
 async def test_missing_stt_is_a_503_not_a_silent_skip(make_client, install_key, monkeypatch):
-    async def synthesize_data_url(text, **kwargs):
-        return None
+    async def synthesize(text, **kwargs):
+        raise speech.SpeechUnavailable("no say here")
 
     async def broken(audio, *, language, settings):
         raise speech.SpeechUnavailable("whisper model is missing")
 
-    monkeypatch.setattr(speech, "synthesize_data_url", synthesize_data_url)
+    monkeypatch.setattr(speech, "synthesize", synthesize)
     monkeypatch.setattr(speech, "transcribe", broken)
     _record, headers = install_key(capabilities=["voice"])
     async with make_client(headers) as client:

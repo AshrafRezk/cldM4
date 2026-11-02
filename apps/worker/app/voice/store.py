@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS voice_sessions (
     status TEXT NOT NULL,
     current_step TEXT,
     attempt INTEGER NOT NULL DEFAULT 1,
+    language TEXT,
     answers TEXT NOT NULL DEFAULT '{}',
     turns TEXT NOT NULL DEFAULT '[]',
     recording_url TEXT,
@@ -95,6 +96,7 @@ class VoiceStore:
                 if not self._ready:
                     conn.execute("PRAGMA journal_mode=WAL")
                     conn.executescript(SCHEMA)
+                    _migrate(conn)
                     self._ready = True
                 with conn:
                     yield conn
@@ -199,14 +201,15 @@ class VoiceStore:
         script: dict[str, Any],
         script_version: int,
         first_step: str,
+        language: str | None = None,
     ) -> dict[str, Any]:
         now = time.time()
         session_id = str(uuid.uuid4())
         with self._db() as conn:
             conn.execute(
                 "INSERT INTO voice_sessions (id, tenant_id, call_sid, from_number, to_number, "
-                "script_id, script_version, definition, status, current_step, attempt, "
-                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, 1, ?, ?)",
+                "script_id, script_version, definition, status, current_step, attempt, language, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, 1, ?, ?, ?)",
                 (
                     session_id,
                     tenant_id,
@@ -217,6 +220,7 @@ class VoiceStore:
                     script_version,
                     json.dumps(script, ensure_ascii=False),
                     first_step,
+                    language,
                     now,
                     now,
                 ),
@@ -337,6 +341,13 @@ class VoiceStore:
             conn.executemany("DELETE FROM voice_replies WHERE call_sid = ?", [(s,) for s in sids])
             conn.executemany("DELETE FROM voice_sessions WHERE call_sid = ?", [(s,) for s in sids])
         return len(sids)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Columns added after the first deploy (CREATE TABLE IF NOT EXISTS skips them)."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(voice_sessions)")}
+    if "language" not in columns:
+        conn.execute("ALTER TABLE voice_sessions ADD COLUMN language TEXT")
 
 
 def _hash(token: str) -> str:

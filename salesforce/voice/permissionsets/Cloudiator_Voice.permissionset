@@ -4,8 +4,18 @@
     <description>Edit and publish voice scripts and run the commit action. External Credential principal access is granted separately (docs/salesforce.md step 5).</description>
     <classAccesses><apexClass>CloudiatorVoicePublish</apexClass><enabled>true</enabled></classAccesses>
     <classAccesses><apexClass>CloudiatorVoiceCommit</apexClass><enabled>true</enabled></classAccesses>
+    <classAccesses><apexClass>CloudiatorVoiceTemplates</apexClass><enabled>true</enabled></classAccesses>
     <objectPermissions>
         <object>Cloudiator_Voice_Script__c</object>
+        <allowCreate>true</allowCreate>
+        <allowRead>true</allowRead>
+        <allowEdit>true</allowEdit>
+        <allowDelete>true</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Cloudiator_Voice_Question__c</object>
         <allowCreate>true</allowCreate>
         <allowRead>true</allowRead>
         <allowEdit>true</allowEdit>
@@ -18,4 +28,20 @@
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Active__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Published_Version__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Last_Publish_Error__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Languages__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Greeting__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Greeting__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Closing__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Closing__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Voice__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Voice__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Transcript_Field__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Record_Links__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Fixed_Values__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Step_Key__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Arabic_Text__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.English_Text__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Target_Field__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Required__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Question__c.Max_Attempts__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
 </PermissionSet>
