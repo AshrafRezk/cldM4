@@ -1,20 +1,26 @@
-"""Number answers are read back ("قلت 0 1 0 1…، صح كده؟") and confirmed."""
+"""Number answers are read back as one grouped sentence and confirmed."""
 
 from __future__ import annotations
 
-import base64
 import dataclasses
-import os
-import subprocess
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app import main
 from app.voice import speech
 from app.voice.audio import VoiceAudio
-from app.voice.engine import ScriptInvalid, VoiceEngine, digits_in, validate_script, yes_no
+from app.voice.engine import (
+    ScriptInvalid,
+    VoiceEngine,
+    confirm_text,
+    digits_in,
+    group_digits,
+    validate_script,
+    yes_no,
+)
 from app.voice.store import VoiceStore
 
 
@@ -46,9 +52,11 @@ def begin(engine, language="ar-EG", **overrides):
     return call
 
 
-def say(engine, call, text):
+def say(engine, call, text, intent=None):
     s = engine.store.session_by_call(call)
-    return engine.on_gather(call_sid=call, step=s["current_step"], attempt=s["attempt"], speech=text, turn=s["turn"])
+    return engine.on_gather(
+        call_sid=call, step=s["current_step"], attempt=s["attempt"], speech=text, turn=s["turn"], intent=intent
+    )
 
 
 def gather_of(reply):
@@ -71,6 +79,20 @@ def test_digits_in_handles_arabic_indic():
     assert digits_in("رقمي ٠١٠ 123") == "010123"
 
 
+def test_group_digits_mobile_and_other_lengths():
+    assert group_digits("01012345678") == ["010", "1234", "5678"]
+    assert group_digits("123456") == ["123", "456"]
+    assert group_digits("12345") == ["123", "45"]
+    assert group_digits("12") == ["12"]
+
+
+def test_confirm_text_is_one_grouped_sentence():
+    ar = confirm_text("01012345678", "ar-EG")
+    assert ar == "قلت صفر واحد صفر، واحد اتنين تلاتة أربعة، خمسة ستة سبعة تمانية. صح كده؟"
+    en = confirm_text("01012345678", "en-US")
+    assert en == "You said zero one zero, one two three four, five six seven eight. Is that right?"
+
+
 def test_confirm_only_on_questions():
     with pytest.raises(ScriptInvalid):
         validate_script(intake(steps=[{"key": "x", "say": "hi", "confirm": True}]))
@@ -81,7 +103,7 @@ def test_yes_keeps_the_number(engine):
     reply = say(engine, call, "01012345678")
     g = gather_of(reply)
     assert g["confirm_digits"] == "01012345678"
-    assert g["prompt"] == "قلت 0 1 0 1 2 3 4 5 6 7 8، صح كده؟"
+    assert g["prompt"] == confirm_text("01012345678", "ar-EG")
     say(engine, call, "أيوه مظبوط")
     s = engine.store.session_by_call(call)
     assert s["status"] == "ready_to_commit"
@@ -127,44 +149,50 @@ def test_out_of_attempts_moves_on(engine):
     assert s["commit_doc"]["records"][0]["fields"]["MobilePhone"] == "", '"no" is never stored as the number'
 
 
-def test_readback_lines_are_rendered_per_voice():
+def test_a_question_mid_confirm_does_not_advance(engine):
+    call = begin(engine)
+    say(engine, call, "01012345678")
+    before = engine.store.session_by_call(call)
+    reply = say(engine, call, "هو الدوا غالي؟", {"kind": "off_script"})
+    assert reply["verbs"][0]["key"] == "__offscript__"
+    g = gather_of(reply)
+    assert g["step"] == "mobile" and g["confirm_digits"] == "01012345678"
+    after = engine.store.session_by_call(call)
+    assert after["confirming"] == "01012345678"
+    assert after["attempt"] == before["attempt"]
+
+
+def test_readback_again_line_is_rendered():
     lines = main.voice_audio.lines(validate_script(intake()))
     keys = [l["key"] for l in lines if l["language"] == "ar-EG"]
-    assert {"__said__", "__right__", "__again__"} <= set(keys)
-    assert [k for k in keys if k.startswith("__digit_")] == [f"__digit_{d}" for d in range(10)]
-    digits = {l["key"]: l["text"] for l in lines if l["language"] == "ar-EG"}
-    assert digits["__digit_2"] == "اتنين" and digits["__said__"] == "قلت"
+    assert "__again__" in keys
+    assert not any(k.startswith("__digit_") for k in keys)
+    assert "__said__" not in keys
 
 
-@pytest.mark.skipif(not Path(main.settings.ffmpeg_bin).exists(), reason="needs ffmpeg")
-async def test_the_readback_is_stitched_from_rendered_pieces(tmp_path):
-    (tmp_path / "python").write_text("")
-    audio = VoiceAudio(dataclasses.replace(main.settings, voice_tts_engine="voicetut",
-                                           voicetut_python=str(tmp_path / "python"),
-                                           voice_audio_dir=str(tmp_path / "audio")))
+async def test_confirm_clip_speaks_one_cached_sentence(tmp_path, monkeypatch):
+    audio = VoiceAudio(dataclasses.replace(
+        main.settings, voice_tts_engine="say", voice_audio_dir=str(tmp_path / "audio"),
+        voice_tts_cache=str(tmp_path / "tts"),
+    ))
     clean = validate_script(intake())
-    for line in audio.lines(clean):
-        if line["language"] == "ar-EG":
-            path = audio.rendered_path(line["speaker"], line["language"], line["spoken"])
-            path.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run([main.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-f", "lavfi",
-                            "-i", "sine=frequency=300:duration=0.3", "-c:a", "aac", str(path)], check=True)
-    data_url, source = await audio.confirm_clip(tenant_id="t1", script=clean, language="ar-EG",
-                                                persona=None, digits="0101")
-    assert source == "rendered" and data_url.startswith("data:audio/mp4;base64,")
-    stitched = tmp_path / "stitched.m4a"
-    stitched.write_bytes(base64.b64decode(data_url.split(",", 1)[1]))
-    probe = subprocess.run([main.settings.ffmpeg_bin, "-i", str(stitched)], capture_output=True, text=True).stderr
-    seconds = sum(60 ** i * float(x) for i, x in enumerate(reversed(probe.split("Duration: ")[1].split(",")[0].split(":"))))
-    assert 6 * 0.3 < seconds < 6 * 0.3 + 1.5, "said + 4 digits + right, with short gaps"
-    missing = await audio.confirm_clip(tenant_id="t1", script=clean, language="en-US", persona=None, digits="1")
-    assert missing == (None, "pending")
+    monkeypatch.setattr(speech, "synthesize", AsyncMock(return_value=b"m4a-bytes"))
+    data_url, source = await audio.confirm_clip(
+        tenant_id="t1", script=clean, language="ar-EG", persona=None, digits="0101"
+    )
+    assert source == "fallback" and data_url.startswith("data:audio/mp4;base64,")
+    speech.synthesize.assert_awaited_once()
+    spoken = speech.synthesize.await_args.args[0]
+    assert spoken == confirm_text("0101", "ar-EG")
+    # Second call is a cache hit — no new synthesize.
+    await audio.confirm_clip(tenant_id="t1", script=clean, language="ar-EG", persona=None, digits="0101")
+    assert speech.synthesize.await_count == 1
 
 
 async def test_browser_call_reads_the_number_back(make_client, install_key, monkeypatch):
     heard = iter(["01012345678", "أيوه"])
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         return next(heard)
 
     async def synthesize(text, **kwargs):
@@ -186,6 +214,6 @@ async def test_browser_call_reads_the_number_back(make_client, install_key, monk
             t = (await anon.post(f"{path}/turn", params={"call_id": t["call_id"], "step": l["step"],
                  "attempt": l["attempt"], "turn": l["turn"]}, content=b"RIFF")).json()
             if not t["done"]:
-                assert t["clips"][0]["text"] == "قلت 0 1 0 1 2 3 4 5 6 7 8، صح كده؟"
+                assert t["clips"][0]["text"] == confirm_text("01012345678", "ar-EG")
                 assert t["clips"][0]["audio"], "say engine: spoken whole, not silent"
         assert t["done"] is True

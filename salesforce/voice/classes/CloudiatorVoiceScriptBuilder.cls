@@ -105,6 +105,16 @@ public with sharing class CloudiatorVoiceScriptBuilder {
         if (String.isNotBlank(script.Arabic_Off_Script__c) || String.isNotBlank(script.English_Off_Script__c)) {
             def.put('off_script_say', localized(languages, script.Arabic_Off_Script__c, script.English_Off_Script__c, 'Off-script reply'));
         }
+        Map<String, Object> knowledge = new Map<String, Object>();
+        for (String lang : languages) {
+            String text = lang.startsWith('ar') ? script.Arabic_Knowledge__c : script.English_Knowledge__c;
+            if (String.isNotBlank(text)) {
+                knowledge.put(lang, text.trim());
+            }
+        }
+        if (!knowledge.isEmpty()) {
+            def.put('knowledge', knowledge);
+        }
         return def;
     }
 

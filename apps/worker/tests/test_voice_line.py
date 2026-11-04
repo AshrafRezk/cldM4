@@ -68,7 +68,7 @@ def test_idle_calls_and_abandoned_tickets_expire():
 
 @pytest.fixture()
 def fake_speech(monkeypatch):
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         return "Sara" if audio else ""
 
     async def synthesize(text, **kwargs):

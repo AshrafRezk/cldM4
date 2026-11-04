@@ -144,12 +144,15 @@ class EgyptianSTT:
         log.info("egyptian speech model loaded")
         return self.proc
 
-    async def transcribe(self, wav: Path) -> str:
+    async def transcribe(self, wav: Path, *, prompt: str | None = None) -> str:
         try:
             proc = await self._ensure()
             self._next += 1
             rid = self._next
-            proc.stdin.write((json.dumps({"id": rid, "wav": str(wav)}) + "\n").encode())  # type: ignore[union-attr]
+            request: dict = {"id": rid, "wav": str(wav)}
+            if prompt:
+                request["prompt"] = prompt
+            proc.stdin.write((json.dumps(request, ensure_ascii=False) + "\n").encode())  # type: ignore[union-attr]
             await proc.stdin.drain()  # type: ignore[union-attr]
             while True:
                 line = await asyncio.wait_for(proc.stdout.readline(), self.timeout)  # type: ignore[union-attr]
@@ -189,7 +192,17 @@ def egyptian_client(settings) -> EgyptianSTT:
     return _egyptian
 
 
-async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
+# Used only on a second decode of a number answer: never as the first prompt
+# (prompts leak into free-text names and questions).
+DIGIT_PROMPT = (
+    "صفر واحد اتنين تلاتة أربعة خمسة ستة سبعة تمانية تسعة "
+    "zero one two three four five six seven eight nine"
+)
+
+
+async def transcribe(
+    audio: bytes, *, language: str | None, settings, digits_hint: bool = False
+) -> str:
     if not audio:
         return ""
     engine = stt_engine(settings)
@@ -205,27 +218,58 @@ async def transcribe(audio: bytes, *, language: str | None, settings) -> str:
             wav = Path(tmp) / "in.wav"
             # Whatever the browser sent (WAV from the call page, webm/mp4 from
             # elsewhere) becomes 16 kHz mono 16-bit PCM, capped in length.
+            # 80 Hz high-pass matches the studio cleanup: cut mic rumble.
             await _run(
                 [settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-i", str(raw),
-                 "-t", str(MAX_UTTERANCE_SECONDS), "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
-                 "-f", "wav", str(wav)],
+                 "-t", str(MAX_UTTERANCE_SECONDS), "-ar", "16000", "-ac", "1",
+                 "-af", "highpass=f=80", "-c:a", "pcm_s16le", "-f", "wav", str(wav)],
                 20.0,
             )
             if speech_seconds(wav) < MIN_SPEECH_SECONDS:
                 # Both models invent fluent text from near-silence ("ماشي طيب",
                 # subtitle credits). No real speech, no transcript.
                 return ""
-            text = None
-            if engine == "egyptian":
-                try:
-                    text = await egyptian_client(settings).transcribe(wav)
-                except SpeechUnavailable as exc:
-                    if not whisper_ready:
-                        raise
-                    log.warning("egyptian speech model unavailable, using whisper.cpp: %s", exc)
-            if text is None:
-                text = await _whisper_cpp(wav, language, settings, binary, model, Path(tmp))
-    return clean_transcript(text)
+            text = await _decode_once(
+                wav, language, settings, engine, binary, model, Path(tmp), whisper_ready, prompt=None
+            )
+            cleaned = clean_transcript(text)
+            # Read-back questions only: if the first pass heard no digits, try
+            # once more with a digit-word prompt. Keep the first text if the
+            # second pass still has none (do not invent a phone number).
+            if digits_hint and not re.search(r"\d", cleaned):
+                retry = await _decode_once(
+                    wav, language, settings, engine, binary, model, Path(tmp), whisper_ready,
+                    prompt=DIGIT_PROMPT,
+                )
+                cleaned_retry = clean_transcript(retry)
+                if re.search(r"\d", cleaned_retry):
+                    return cleaned_retry
+            return cleaned
+
+
+async def _decode_once(
+    wav: Path,
+    language: str | None,
+    settings,
+    engine: str,
+    binary: str,
+    model: str,
+    tmp: Path,
+    whisper_ready: bool,
+    *,
+    prompt: str | None,
+) -> str:
+    text = None
+    if engine == "egyptian":
+        try:
+            text = await egyptian_client(settings).transcribe(wav, prompt=prompt)
+        except SpeechUnavailable as exc:
+            if not whisper_ready:
+                raise
+            log.warning("egyptian speech model unavailable, using whisper.cpp: %s", exc)
+    if text is None:
+        text = await _whisper_cpp(wav, language, settings, binary, model, tmp, prompt=prompt)
+    return text
 
 
 def clean_transcript(text: str) -> str:
@@ -265,18 +309,26 @@ def speech_seconds(wav: Path) -> float:
     return sum(1 for rms in frames if rms > threshold) * _FRAME / 16000
 
 
-async def _whisper_cpp(wav: Path, language: str | None, settings, binary: str, model: str, tmp: Path) -> str:
-    base = tmp / "out"
+async def _whisper_cpp(
+    wav: Path,
+    language: str | None,
+    settings,
+    binary: str,
+    model: str,
+    tmp: Path,
+    *,
+    prompt: str | None = None,
+) -> str:
+    base = tmp / ("out-digits" if prompt else "out")
     seconds = max(0, wav.stat().st_size - 44) / 32000  # 16 kHz, 16-bit mono
-    await _run(
-        [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
-         "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
-         # No initial prompt: tested on real Egyptian/English calls, it
-         # leaks its own words into transcripts ("مش عارف. مفهمتش.").
-         "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
-         "-otxt", "-of", str(base)],
-        STT_TIMEOUT,
-    )
+    args = [binary, "-m", model, "-f", str(wav), "-l", _lang(language),
+            "--no-gpu", "-t", str(settings.whisper_threads), "-bs", "5",
+            "-ac", str(audio_ctx(seconds)), "-mc", "0", "-nt", "-np",
+            "-otxt", "-of", str(base)]
+    # Default path stays prompt-free: prompts leak into names. Digit retry only.
+    if prompt:
+        args.extend(["-prompt", prompt])
+    await _run(args, STT_TIMEOUT)
     text_path = base.with_suffix(".txt")
     return text_path.read_text(encoding="utf-8", errors="replace") if text_path.exists() else ""
 

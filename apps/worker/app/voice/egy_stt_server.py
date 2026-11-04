@@ -49,17 +49,27 @@ def main() -> int:
             audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
             seconds = len(audio) / max(rate, 1)
             features = processor(audio, sampling_rate=16000, return_tensors="pt").input_features
+            generate_kwargs = {
+                "task": "transcribe",
+                "language": "ar",
+                "num_beams": 5,
+                # ~4 tokens a second of speech is generous; a silence loop
+                # cannot run past it.
+                "max_new_tokens": int(min(160, 12 + seconds * 8)),
+                "no_repeat_ngram_size": 3,
+            }
+            # Optional digit-word prompt on a second decode of a number answer.
+            # Never used on the first pass: prompts leak into free-text names.
+            prompt = request.get("prompt")
+            if isinstance(prompt, str) and prompt.strip():
+                try:
+                    generate_kwargs["prompt_ids"] = processor.get_prompt_ids(
+                        prompt.strip(), return_tensors="pt"
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
             with torch.no_grad():
-                ids = model.generate(
-                    features,
-                    task="transcribe",
-                    language="ar",
-                    num_beams=5,
-                    # ~4 tokens a second of speech is generous; a silence loop
-                    # cannot run past it.
-                    max_new_tokens=int(min(160, 12 + seconds * 8)),
-                    no_repeat_ngram_size=3,
-                )
+                ids = model.generate(features, **generate_kwargs)
             text = processor.batch_decode(ids, skip_special_tokens=True)[0].strip()
             print(json.dumps({"id": rid, "text": text}, ensure_ascii=False), flush=True)
         except Exception as exc:  # noqa: BLE001

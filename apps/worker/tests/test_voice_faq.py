@@ -12,7 +12,13 @@ import pytest
 from app import main
 from app.voice import speech
 from app.voice.assistant import VoiceAssistant
-from app.voice.engine import ScriptInvalid, VoiceEngine, looks_like_question, validate_script
+from app.voice.engine import (
+    ScriptInvalid,
+    VoiceEngine,
+    looks_like_concern,
+    looks_like_question,
+    validate_script,
+)
 from app.voice.store import VoiceStore
 
 
@@ -110,14 +116,19 @@ def test_an_unknown_question_is_noted_not_answered(engine):
 
 
 class FakeOllama:
-    def __init__(self, content=None, delay=0.0):
+    def __init__(self, content=None, delay=0.0, *, require_faq_only=True):
         self.content, self.delay, self.calls = content, delay, 0
+        self.require_faq_only = require_faq_only
+        self.messages = None
 
     async def chat(self, model, messages, *, options, response_format=None, tools=None, think=None):
         self.calls += 1
+        self.messages = messages
         assert think is False, "a JSON routing decision must not spend tokens thinking"
         await asyncio.sleep(self.delay)
-        assert response_format == "json_object" and "Never write an answer" in messages[0]["content"]
+        assert response_format == "json_object"
+        if self.require_faq_only:
+            assert "Never write an answer" in messages[0]["content"]
         return {"message": {"content": self.content}}
 
 
@@ -161,7 +172,7 @@ def test_faq_lines_are_rendered_like_any_other():
 async def test_browser_call_answers_a_question_then_re_asks(make_client, install_key, monkeypatch):
     heard = iter(["Can I take this with food?", "Sara Ahmed"])
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         return next(heard)
 
     async def synthesize(text, **kwargs):
@@ -184,3 +195,51 @@ async def test_browser_call_answers_a_question_then_re_asks(make_client, install
         q = {"call_id": t["call_id"], "step": "ask_name", "attempt": t["listen"]["attempt"], "turn": t["listen"]["turn"]}
         t = (await anon.post(f"{path}/turn", params=q, content=b"RIFF")).json()
         assert t["clips"][0]["text"] == "What is your mobile number?"
+
+
+def test_knowledge_validates_and_caps_length():
+    clean = validate_script(psp(knowledge={"en-US": "Nurses answer 9 to 5.", "ar-EG": "الممرضات من ٩ لـ ٥."}))
+    assert clean["knowledge"]["en-US"].startswith("Nurses")
+    with pytest.raises(ScriptInvalid):
+        validate_script(psp(knowledge={"en-US": "x" * 4001, "ar-EG": "y"}))
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("الدوا غالي أوي", True),
+    ("I'm worried about side effects", True),
+    ("أشرف رزق", False),
+    ("01012345678", False),
+    ("أيوه", False),
+])
+def test_concern_detection(text, expected):
+    assert looks_like_concern(text, "ar-EG" if any("\u0600" <= c <= "\u06ff" for c in text) else "en-US") is expected
+
+
+async def test_knowledge_answer_then_back_to_the_same_question(engine):
+    call = begin(engine, psp(knowledge={"en-US": "The programme is free for enrolled patients.", "ar-EG": "البرنامج مجاني."}))
+    reply = answer(
+        engine, call, "Is this programme expensive?",
+        {"kind": "knowledge", "answer": "The programme is free for enrolled patients."},
+    )
+    spoken = [v.get("say") or v["gather"]["prompt"] for v in reply["verbs"]]
+    assert spoken[0] == "The programme is free for enrolled patients."
+    assert spoken[1] == "Now, back to my question."
+    assert spoken[2] == "May I have your full name?"
+    assert reply["verbs"][0].get("live") is True and reply["verbs"][0].get("key") is None
+
+
+async def test_knowledge_null_falls_back_to_off_script():
+    clean = validate_script(psp(knowledge={"en-US": "Hours are nine to five.", "ar-EG": "من ٩ لـ ٥."}))
+    model = FakeOllama(json.dumps({"answer": None}), require_faq_only=False)
+    a = assistant(model, voice_llm_faq=True, voice_llm_timeout_seconds=2)
+    assert await a.intent(clean, clean["steps"][0], "I'm worried about the weather", "en-US") == {"kind": "off_script"}
+    assert "Knowledge:" in model.messages[0]["content"]
+    assert "Hours are nine to five." in model.messages[0]["content"]
+
+
+async def test_knowledge_grounded_reply_is_used():
+    clean = validate_script(psp(knowledge={"en-US": "Delivery takes two working days.", "ar-EG": "التوصيل يومين."}))
+    model = FakeOllama(json.dumps({"answer": "Delivery takes two working days."}), require_faq_only=False)
+    a = assistant(model, voice_llm_faq=True, voice_llm_timeout_seconds=2)
+    intent = await a.intent(clean, clean["steps"][0], "when will it arrive?", "en-US")
+    assert intent == {"kind": "knowledge", "answer": "Delivery takes two working days."}

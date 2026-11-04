@@ -82,7 +82,9 @@ Add **Cloudiator Voice FAQ** records under the Voice Script:
 | Arabic Answer / English Answer | the answer as spoken |
 | FAQ Key | optional short name |
 
-How a question is recognised: it starts like a question (هو/هي/هل/ليه/إمتى/إزاي/فين/كام…, what/how/when/can…) or is a sentence ending in "؟/?". Its keywords are matched first. If none match, the Mini's own language model (Gemma, already running locally) picks the FAQ that is *about* the same thing ("أنا جعان" → the food answer) or none. It only ever chooses one of your answers; it never writes one, so nothing improvised reaches a patient. If no FAQ fits, the agent says *"سؤال مهم، سجلته وحد من فريقنا هيرد عليك فيه. نرجع لسؤالنا."* (change it with **Arabic/English Off-Script Reply**) and asks again.
+How a question is recognised: it starts like a question (هو/هي/هل/ليه/إمتى/إزاي/فين/كام…, what/how/when/can…) or is a sentence ending in "؟/?". Concerns ("الدوا غالي", "I'm worried") count too. Its keywords are matched first. If none match, the Mini's own language model (Gemma, already running locally) picks the FAQ that is *about* the same thing ("أنا جعان" → the food answer) or none. FAQ answers are always the ones you wrote.
+
+If no FAQ fits, fill **Arabic Knowledge / English Knowledge** on the Voice Script with the facts the agent may say (up to 4000 characters). Gemma may paraphrase only that text into at most two short sentences, then goes back to the question. If knowledge is empty or does not cover the ask, the agent says *"سؤال مهم، سجلته وحد من فريقنا هيرد عليك فيه. نرجع لسؤالنا."* (change it with **Arabic/English Off-Script Reply**) and asks again.
 
 Every question a caller asked is kept: use `{{questions}}` in a Fixed Value, e.g. `Case.Description={{transcript}}` already contains them, or a dedicated field `Case.Comments__c={{questions}}`. Asking a question never counts as a failed answer. Answers that match a route (e.g. "is it new? yes, new") are still answers.
 

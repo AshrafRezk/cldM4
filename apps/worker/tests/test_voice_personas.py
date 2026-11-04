@@ -111,7 +111,7 @@ def fake_speech(monkeypatch):
     async def synthesize(text, **kwargs):
         return b"fallback-audio"
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         return "Sara" if audio else ""
 
     monkeypatch.setattr(speech, "synthesize", synthesize)
