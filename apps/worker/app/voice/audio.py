@@ -33,11 +33,9 @@ from . import speech
 from .pronounce import spoken
 from .engine import (
     CONFIRM_AGAIN,
-    CONFIRM_RIGHT,
-    CONFIRM_SAID,
-    DIGIT_WORDS,
     FAIL_MESSAGES,
     back_text,
+    confirm_text,
     find_persona,
     hold_text,
     languages_of,
@@ -95,12 +93,10 @@ def script_lines(script: Mapping[str, Any], speaker_for=None) -> list[dict[str, 
             for item in script.get("faq") or []:
                 lines.append({**base, "key": f"__faq_{item['key']}", "text": speak(item["say"], language, persona)})
             if any(step.get("confirm") for step in script["steps"]):
+                # Digits are spoken as one live sentence (confirm_clip); only the
+                # "say it again" line is fixed and pre-rendered.
                 lang = "ar" if _lang(language) == "ar" else "en"
-                lines.append({**base, "key": "__said__", "text": CONFIRM_SAID[lang]})
-                lines.append({**base, "key": "__right__", "text": CONFIRM_RIGHT[lang]})
                 lines.append({**base, "key": "__again__", "text": CONFIRM_AGAIN[lang]})
-                for digit, word in enumerate(DIGIT_WORDS[lang]):
-                    lines.append({**base, "key": f"__digit_{digit}", "text": word})
     for line in lines:
         line["spoken"] = spoken(line["text"], line["language"], script)
     return lines
@@ -205,40 +201,75 @@ class VoiceAudio:
     async def confirm_clip(
         self, *, tenant_id: str, script: Mapping[str, Any], language: str, persona: str | None, digits: str
     ) -> tuple[str | None, str]:
-        """"قلت 0 1 0 1… صح كده؟" in the persona's own voice, stitched from
-        pre-rendered pieces (a new sentence would take ~20 s to render)."""
-        lang = "ar" if _lang(language) == "ar" else "en"
-        pieces = [("__said__", CONFIRM_SAID[lang])]
-        pieces += [(f"__digit_{d}", DIGIT_WORDS[lang][int(d)]) for d in digits]
-        pieces.append(("__right__", CONFIRM_RIGHT[lang]))
+        """One grouped sentence in the persona's voice, cached by voice+digits."""
+        return await self.live_clip(
+            script=script, language=language, persona=persona, text=confirm_text(digits, language),
+            cache_key=f"confirm:{digits}",
+        )
+
+    async def live_clip(
+        self,
+        *,
+        script: Mapping[str, Any],
+        language: str,
+        persona: str | None,
+        text: str,
+        cache_key: str | None = None,
+    ) -> tuple[str | None, str]:
+        """Speak a dynamic line now (number read-back, knowledge answer).
+
+        Azure neural when configured; otherwise macOS `say`. VoiceTut is never
+        called on the live path (~20 s per line)."""
         chosen = find_persona(script, persona) if script.get("personas") else None
-        pid = chosen["id"] if chosen else None
-        paths = []
-        for key, text in pieces:
-            recording = self.recording_path(tenant_id, script["id"], key, language, pid)
-            rendered = (self.rendered_path(self.speaker_for(script, language, chosen), language,
-                                           spoken(text, language, script))
-                        if self.engine != "say" else None)
-            path = recording if recording.is_file() else rendered if rendered and rendered.is_file() else None
-            if path is None:
-                return None, "pending"
-            paths.append(path)
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "confirm.m4a"
-            inputs: list[str] = []
-            for path in paths:
-                inputs += ["-i", str(path)]
-            # A short pause after "قلت", a beat between digits, and a pause before "صح كده؟".
-            gaps = [0.25] + [0.12] * (len(paths) - 3) + [0.3, 0]
-            parts = "".join(f"[{i}:a]aresample=24000,aformat=channel_layouts=mono,apad=pad_dur={gap}[a{i}];"
-                            for i, gap in enumerate(gaps))
-            graph = parts + "".join(f"[a{i}]" for i in range(len(paths))) + f"concat=n={len(paths)}:v=0:a=1[out]"
-            await speech._run(
-                [self.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", *inputs,
-                 "-filter_complex", graph, "-map", "[out]", "-c:a", "aac", "-b:a", "64k", str(out)],
-                20.0,
+        speaker = self.speaker_for(script, language, chosen)
+        cache = self.root / "live"
+        cache.mkdir(parents=True, exist_ok=True)
+        key = cache_key or text
+        digest = hashlib.sha256(
+            f"{self.engine}\0{speaker}\0{_lang(language)}\0{key}\0{text}".encode()
+        ).hexdigest()[:40]
+        if self.engine == "azure":
+            path = cache / f"{digest}.mp3"
+            if path.is_file():
+                return _data_url(path.read_bytes(), ".mp3"), "rendered"
+            try:
+                audio = await azure_tts(spoken(text, language, script), speaker, self.settings)
+            except speech.SpeechUnavailable as exc:
+                log.warning("live azure tts unavailable: %s", exc)
+                return await self._live_say(text, language, chosen, speaker, cache, digest)
+            path.write_bytes(audio)
+            return _data_url(audio, ".mp3"), "rendered"
+        return await self._live_say(text, language, chosen, speaker, cache, digest)
+
+    async def _live_say(
+        self,
+        text: str,
+        language: str,
+        persona: Mapping[str, Any] | None,
+        speaker: str,
+        cache: Path,
+        digest: str,
+    ) -> tuple[str | None, str]:
+        path = cache / f"{digest}.m4a"
+        if path.is_file():
+            return _data_url(path.read_bytes()), "fallback"
+        picked = ((persona or {}).get("voices") or {}).get(language) or speaker
+        gender = "female" if picked in VOICETUT_FEMALE else "male" if picked in VOICETUT_MALE else None
+        if AZURE_VOICE.match(picked or ""):
+            gender = "female" if any(n in (picked or "") for n in ("Salma", "Sonia")) else \
+                "male" if any(n in (picked or "") for n in ("Shakir", "Ryan")) else gender
+        local_voice = FALLBACK_VOICES.get((_lang(language), gender)) if gender else None
+        if gender and local_voice is None:
+            local_voice = FALLBACK_VOICES.get((_lang(language), "male"))
+        try:
+            data = await speech.synthesize(
+                text, language=language, local_voice=local_voice, cache_dir=self.settings.voice_tts_cache
             )
-            return _data_url(out.read_bytes()), "rendered"
+        except speech.SpeechUnavailable as exc:
+            log.warning("live say unavailable: %s", exc)
+            return None, "none"
+        path.write_bytes(data)
+        return _data_url(data), "fallback"
 
     # Recordings --------------------------------------------------------------
 

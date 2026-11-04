@@ -1,7 +1,8 @@
 """The browser call page. One self-contained HTML document, no CDN.
 
-Turn-based on purpose, like the engine: play the prompt, listen until the
-caller stops talking, upload one 16 kHz mono WAV, play the next prompt.
+Play the prompt (caller may barge in), listen until they pause, upload one
+WAV, play the next prompt. Capture uses an AudioWorklet so buffers are not
+dropped; the mic is never routed to the speakers.
 """
 
 from __future__ import annotations
@@ -179,64 +180,125 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
     return data;
   }
 
-  async function play(dataUrl) {
+  // Mic capture via AudioWorklet (no ScriptProcessor drops). Connected through
+  // a gain of 0 so the caller's voice is never played back into the room.
+  const WORKLET_SRC = "class C extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c);return true}}registerProcessor('cld-cap',C);";
+  let workletReady = null, meterNode = null, muteGain = null;
+  async function ensureMeter() {
+    if (meterNode) return meterNode;
+    if (!workletReady) {
+      const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: "application/javascript" }));
+      workletReady = ctx.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url));
+    }
+    await workletReady;
+    meterNode = new AudioWorkletNode(ctx, "cld-cap");
+    muteGain = ctx.createGain(); muteGain.gain.value = 0;
+    source.connect(meterNode); meterNode.connect(muteGain); muteGain.connect(ctx.destination);
+    return meterNode;
+  }
+
+  function onMeter(handler) {
+    const node = meterNode;
+    const fn = (e) => handler(e.data);
+    node.port.onmessage = fn;
+    return () => { if (node.port.onmessage === fn) node.port.onmessage = null; };
+  }
+
+  function rmsOf(data) {
+    let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    return Math.sqrt(sum / data.length);
+  }
+
+  async function play(dataUrl, { barge = true } = {}) {
     const buf = await (await fetch(dataUrl)).arrayBuffer();
     const audio = await ctx.decodeAudioData(buf);
-    await new Promise((resolve) => {
+    await ensureMeter();
+    return new Promise((resolve) => {
       const node = ctx.createBufferSource();
-      node.buffer = audio; node.connect(ctx.destination); node.onended = resolve; node.start();
+      node.buffer = audio; node.connect(ctx.destination);
+      let done = false, noise = 0.004, voicedMs = 0, started = performance.now();
+      const stopMeter = barge ? onMeter((data) => {
+        if (done || !live) return;
+        const now = performance.now();
+        if (now - started < 400) { noise = noise * 0.9 + rmsOf(data) * 0.1; return; }
+        const rms = rmsOf(data);
+        // Higher threshold while the agent speaks (echo cancellation helps).
+        const threshold = Math.max(0.02, noise * 5);
+        if (rms > threshold) {
+          voicedMs += (data.length / ctx.sampleRate) * 1000;
+          if (voicedMs >= 300) { finish({ barged: true }); return; }
+        } else {
+          voicedMs = Math.max(0, voicedMs - 40);
+          noise = noise * 0.95 + rms * 0.05;
+        }
+      }) : () => {};
+      function finish(result) {
+        if (done) return; done = true;
+        stopMeter();
+        try { node.stop(); } catch (e) {}
+        try { node.disconnect(); } catch (e) {}
+        resolve(result);
+      }
+      node.onended = () => finish({ barged: false });
+      node.start();
     });
   }
 
   // Record one answer: wait up to `timeout` s for speech, stop after a pause.
   // Half a second before the detected start is kept, so the first syllable of
-  // a short answer (a name) is not cut off. The noise floor follows the room
-  // while nobody is talking instead of being guessed from the first frames.
-  function listen(spec) {
+  // a short answer (a name) is not cut off. After ~400 ms of speech, end the
+  // turn on 700 ms of silence (was a fixed 1300 ms).
+  async function listen(spec, seedChunks) {
+    await ensureMeter();
     return new Promise((resolve) => {
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const chunkSamples = 128; // AudioWorklet quantum; preroll counted in chunks
       const chunks = [], preroll = [], all = []; const started = performance.now();
-      const prerollChunks = Math.ceil((0.5 * ctx.sampleRate) / 4096);
-      const pauseMs = spec.speech_timeout === "auto" ? 1300 : Math.max(500, Number(spec.speech_timeout) * 1000 || 1300);
-      let noise = 0.004, speaking = false, lastVoice = 0, voiced = 0, peak = 0, firstVoice = null, why = "";
-      proc.onaudioprocess = (e) => {
+      const prerollChunks = Math.ceil((0.5 * ctx.sampleRate) / chunkSamples);
+      if (seedChunks && seedChunks.length) chunks.push(...seedChunks);
+      const pauseMs = spec.speech_timeout === "auto" ? 700
+        : Math.max(500, Number(spec.speech_timeout) * 1000 || 700);
+      const minSpeechMs = 400;
+      let noise = 0.004, speaking = !!chunks.length, lastVoice = speaking ? performance.now() : 0;
+      let voiced = chunks.length ? 2 : 0, peak = 0, firstVoice = speaking ? 0 : null, why = "", speechMs = speaking ? minSpeechMs : 0;
+      const stopMeter = onMeter((data) => {
         if (!live) { why = "hung_up"; finish(false); return; }
-        const data = new Float32Array(e.inputBuffer.getChannelData(0));
-        if (spec.debug && all.length * 4096 < ctx.sampleRate * 30) all.push(data);
-        let sum = 0; for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-        const rms = Math.sqrt(sum / data.length); const now = performance.now();
+        if (spec.debug && all.length * data.length < ctx.sampleRate * 30) all.push(new Float32Array(data));
+        const rms = rmsOf(data); const now = performance.now();
         peak = Math.max(peak, rms);
         const threshold = Math.max(0.005, noise * 3);
         if (!speaking) {
           if (rms > threshold) {
-            speaking = true; lastVoice = now; firstVoice = now - started; chunks.push(...preroll, data); voiced++;
+            speaking = true; lastVoice = now; firstVoice = now - started;
+            chunks.push(...preroll, new Float32Array(data)); voiced++; speechMs += (data.length / ctx.sampleRate) * 1000;
           } else {
             noise = noise * 0.9 + rms * 0.1;
-            preroll.push(data); if (preroll.length > prerollChunks) preroll.shift();
+            preroll.push(new Float32Array(data)); if (preroll.length > prerollChunks) preroll.shift();
             if (now - started > spec.timeout * 1000) { why = "no_speech_before_timeout"; finish(false); }
           }
           return;
         }
-        chunks.push(data);
-        if (rms > threshold) { lastVoice = now; voiced++; }
-        if (now - lastVoice > pauseMs) { why = voiced > 1 ? "pause" : "too_short"; finish(voiced > 1); }
+        chunks.push(new Float32Array(data));
+        if (rms > threshold) {
+          lastVoice = now; voiced++; speechMs += (data.length / ctx.sampleRate) * 1000;
+        }
+        const readyToEnd = speechMs >= minSpeechMs || voiced > 3;
+        if (readyToEnd && now - lastVoice > pauseMs) { why = voiced > 1 ? "pause" : "too_short"; finish(voiced > 1); }
         else if (now - started > 30000) { why = "max_length"; finish(true); }
-      };
+      });
       let done = false;
       function finish(heard) {
         if (done) return; done = true;
-        proc.disconnect(); source.disconnect(proc);
-        // What the speech detector saw, for tuning (sent only with debug on).
+        stopMeter();
         const diag = {
           sample_rate: ctx.sampleRate, ended: why, detected: heard,
           noise_floor: +noise.toFixed(5), threshold: +Math.max(0.005, noise * 3).toFixed(5),
-          peak: +peak.toFixed(5), voiced_chunks: voiced, first_voice_ms: firstVoice && Math.round(firstVoice),
+          peak: +peak.toFixed(5), voiced_chunks: voiced, first_voice_ms: firstVoice != null && Math.round(firstVoice),
           window_ms: Math.round(performance.now() - started),
         };
-        const blob = spec.debug ? wav(all, ctx.sampleRate) : heard ? wav(chunks, ctx.sampleRate) : new Blob([]);
-        resolve({ blob, heard, diag });
+        const blob = spec.debug ? wav(all.length ? all : chunks, ctx.sampleRate)
+          : heard ? wav(chunks, ctx.sampleRate) : new Blob([]);
+        resolve({ blob, heard, diag, barged: !!spec._barged });
       }
-      source.connect(proc); proc.connect(ctx.destination);
       status('<span class="dot"></span>' + t$.listening);
     });
   }
@@ -263,21 +325,33 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
 
   async function handle(t) {
     callId = t.call_id;
+    await ensureMeter();
     while (live) {
       if (t.heard) say("you", t.heard);
-      for (const clip of t.clips) {
+      let barged = false;
+      for (let i = 0; i < t.clips.length; i++) {
+        const clip = t.clips[i];
         say("agent", clip.text);
-        if (clip.audio && live) { status(t$.speaking); await play(clip.audio); }
+        if (clip.audio && live) {
+          status(t$.speaking);
+          const result = await play(clip.audio, { barge: !!t.listen });
+          if (result.barged) { barged = true; break; }
+        }
       }
       if (t.done || !t.listen || !live) break;
-      if (t.listen.beep !== false) await beep();
-      const answer = await listen(t.listen);
+      if (!barged && t.listen.beep !== false) await beep();
+      const answer = await listen({ ...t.listen, _barged: barged });
       if (!live) break;
       status(t$.thinking);
       const q = new URLSearchParams({ call_id: t.call_id, step: t.listen.step, attempt: t.listen.attempt, turn: t.listen.turn });
       document.querySelectorAll('input[name="persona"]').forEach((i) => { i.disabled = true; });
-      t = await post("/turn?" + q, answer.blob, t.listen.debug
-        ? { "X-Voice-Detected": answer.heard ? "1" : "0", "X-Voice-Diag": JSON.stringify(answer.diag) } : {});
+      const headers = {};
+      if (answer.barged) headers["X-Voice-Barge"] = "1";
+      if (t.listen.debug) {
+        headers["X-Voice-Detected"] = answer.heard ? "1" : "0";
+        headers["X-Voice-Diag"] = JSON.stringify(answer.diag);
+      }
+      t = await post("/turn?" + q, answer.blob, headers);
     }
     if (live) callId = null;  // the Mini already freed the line when the call finished
     end(live ? t$.ended : t$.hung);
@@ -286,7 +360,10 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
   function end(message) {
     release();
     live = false;
+    if (meterNode) { try { meterNode.disconnect(); } catch (e) {} meterNode = null; }
+    if (muteGain) { try { muteGain.disconnect(); } catch (e) {} muteGain = null; }
     if (stream) stream.getTracks().forEach((tr) => tr.stop());
+    source = null;
     callBtns.forEach((b) => { b.style.display = ""; b.disabled = false; }); hangBtn.style.display = "none";
     document.querySelectorAll('input[name="persona"]').forEach((i) => { i.disabled = false; });
     status(message);
@@ -301,6 +378,7 @@ button{font:inherit;border:0;border-radius:999px;padding:12px 22px;cursor:pointe
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       await ctx.resume();
+      meterNode = null; muteGain = null;
       source = ctx.createMediaStreamSource(stream);
       live = true; logEl.textContent = "";
       callBtns.forEach((b) => { b.style.display = "none"; }); hangBtn.style.display = "";

@@ -39,6 +39,16 @@ def test_engine_choice(tmp_path):
     assert speech.stt_engine(dataclasses.replace(s, voice_stt_engine="whisper_cpp")) == "whisper_cpp"
 
 
+PROMPT_HELPER = """
+import json, sys
+print(json.dumps({"ready": True}), flush=True)
+for raw in sys.stdin:
+    req = json.loads(raw)
+    text = "صفر واحد اتنين" if req.get("prompt") else "مش فاكر"
+    print(json.dumps({"id": req["id"], "text": text}, ensure_ascii=False), flush=True)
+"""
+
+
 async def test_the_helper_answers_and_restarts_after_a_crash(tmp_path):
     client = speech.EgyptianSTT(helper(tmp_path, FAKE_HELPER), load_timeout=10, timeout=10)
     wav = tmp_path / "a.wav"
@@ -47,6 +57,15 @@ async def test_the_helper_answers_and_restarts_after_a_crash(tmp_path):
     client.proc.kill()
     await client.proc.wait()
     assert await client.transcribe(wav) == "لأ لأ a new case", "a dead helper is started again"
+    await client.close()
+
+
+async def test_helper_accepts_an_optional_digit_prompt(tmp_path):
+    client = speech.EgyptianSTT(helper(tmp_path, PROMPT_HELPER), load_timeout=10, timeout=10)
+    wav = tmp_path / "a.wav"
+    wav.write_bytes(b"RIFF")
+    assert await client.transcribe(wav) == "مش فاكر"
+    assert await client.transcribe(wav, prompt=speech.DIGIT_PROMPT) == "صفر واحد اتنين"
     await client.close()
 
 
@@ -81,6 +100,27 @@ async def test_transcribe_falls_back_to_whisper_cpp(tmp_path, monkeypatch):
 
     monkeypatch.setattr(speech, "_egyptian", speech.EgyptianSTT(helper(tmp_path, FAKE_HELPER), load_timeout=5))
     assert await speech.transcribe(wav.read_bytes(), language="ar-EG", settings=s) == "لأ لأ a new case"
+    await speech._egyptian.close()
+
+
+@pytest.mark.skipif(not Path(main.settings.ffmpeg_bin).exists(), reason="needs ffmpeg")
+async def test_digits_hint_retries_when_first_pass_has_no_digits(tmp_path, monkeypatch):
+    import subprocess
+
+    wav = tmp_path / "in.wav"
+    subprocess.run([main.settings.ffmpeg_bin, "-nostdin", "-loglevel", "error", "-f", "lavfi",
+                    "-i", "sine=frequency=300:duration=1", str(wav)], check=True)
+    model = tmp_path / "model"
+    model.mkdir()
+    py = tmp_path / "python"
+    py.write_text("")
+    s = dataclasses.replace(main.settings, voice_stt_engine="egyptian", egyptian_stt_model=str(model),
+                            voicetut_python=str(py), whisper_cpp_bin="/missing", whisper_model=str(tmp_path / "m.bin"))
+    monkeypatch.setattr(speech, "_egyptian", speech.EgyptianSTT(helper(tmp_path, PROMPT_HELPER), load_timeout=5))
+    # Without the hint, the helper returns words with no digits.
+    assert await speech.transcribe(wav.read_bytes(), language="ar-EG", settings=s) == "مش فاكر"
+    # With the hint, the second decode (prompted) yields digits.
+    assert await speech.transcribe(wav.read_bytes(), language="ar-EG", settings=s, digits_hint=True) == "012"
     await speech._egyptian.close()
 
 

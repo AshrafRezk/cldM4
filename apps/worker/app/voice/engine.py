@@ -55,8 +55,8 @@ OFF_SCRIPT_MESSAGES = {
 }
 BACK_MESSAGES = {"ar": "نرجع لسؤالنا.", "en": "Now, back to my question."}
 
-# Read-back of number answers: "قلت 0 1 0 1…، صح كده؟". The digits and these
-# frames are pre-rendered per voice and stitched together during the call.
+# Read-back of number answers: one grouped sentence in the persona's voice
+# ("قلت صفر واحد صفر، واحد اتنين تلاتة أربعة، … صح كده؟"), rendered live and cached.
 CONFIRM_SAID = {"ar": "قلت", "en": "You said"}
 CONFIRM_RIGHT = {"ar": "صح كده؟", "en": "Is that right?"}
 CONFIRM_AGAIN = {"ar": "معلش، ممكن تقولها تاني؟", "en": "Sorry, could you say it again?"}
@@ -64,6 +64,7 @@ DIGIT_WORDS = {
     "ar": ["صفر", "واحد", "اتنين", "تلاتة", "أربعة", "خمسة", "ستة", "سبعة", "تمانية", "تسعة"],
     "en": ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"],
 }
+MAX_KNOWLEDGE_CHARS = 4000
 # Matched on word stems as speech recognition writes them: "أيوه صح" came back
 # as "ايو صحة" on a live call. "ايه" (what) must not count as yes.
 _YES_STEMS = ("ايو", "اه", "صح", "تمام", "مظبوط", "مضبوط", "بالظبط", "اكيد", "نعم", "ماشي", "طبعا")
@@ -87,10 +88,38 @@ def digits_in(text: str) -> str:
     return "".join(re.findall(r"\d", text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2))))
 
 
+def group_digits(digits: str) -> list[str]:
+    """An 11-digit mobile is 3-4-4; anything else is groups of three, last 2–4."""
+    digits = "".join(c for c in digits if c.isdigit())
+    if not digits:
+        return []
+    if len(digits) == 11:
+        sizes = [3, 4, 4]
+    else:
+        sizes = []
+        left = len(digits)
+        while left > 0:
+            if left <= 4:
+                sizes.append(left)
+                break
+            sizes.append(3)
+            left -= 3
+    groups, i = [], 0
+    for size in sizes:
+        groups.append(digits[i : i + size])
+        i += size
+    return groups
+
+
 def confirm_text(digits: str, language: str) -> str:
+    """One natural sentence: digit words grouped, not a slow digit-by-digit list."""
     lang = "ar" if language.lower().startswith("ar") else "en"
-    return f"{CONFIRM_SAID[lang]} {' '.join(digits)}، {CONFIRM_RIGHT[lang]}" if lang == "ar" else \
-        f"{CONFIRM_SAID[lang]} {' '.join(digits)}. {CONFIRM_RIGHT[lang]}"
+    words = DIGIT_WORDS[lang]
+    spoken = []
+    for group in group_digits(digits):
+        spoken.append(" ".join(words[int(d)] for d in group))
+    joined = ("، " if lang == "ar" else ", ").join(spoken)
+    return f"{CONFIRM_SAID[lang]} {joined}. {CONFIRM_RIGHT[lang]}"
 
 
 HOLD_MESSAGES = {
@@ -269,6 +298,8 @@ def validate_script(body: Mapping[str, Any]) -> dict[str, Any]:
             _fill(_localized(body["off_script_say"], languages, "off_script_say"), variables, "off_script_say", passthrough)
             if body.get("off_script_say") else None
         ),
+        # Plain text the agent may paraphrase when a caller asks something no FAQ covers.
+        "knowledge": _knowledge(body.get("knowledge"), languages),
         "fail_say": _fill(_localized(fail_say, languages, "fail_say"), variables, "fail_say", passthrough) if fail_say else None,
         "hold_say": (
             _fill(_localized(body["hold_say"], languages, "hold_say"), variables, "hold_say", passthrough)
@@ -292,6 +323,38 @@ def _localized(value: Any, languages: list[str], param: str) -> dict[str, str]:
             out[lang] = text.strip()
         return out
     raise ScriptInvalid(f"{param} must be text, or text per language.", param)
+
+
+def _knowledge(value: Any, languages: list[str]) -> dict[str, str] | None:
+    """Optional per-language knowledge payload. Empty / missing is fine."""
+    if value is None or value == "" or value == {}:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if len(text) > MAX_KNOWLEDGE_CHARS:
+            raise ScriptInvalid(
+                f"knowledge must be at most {MAX_KNOWLEDGE_CHARS} characters.", "knowledge"
+            )
+        return {lang: text for lang in languages}
+    if isinstance(value, Mapping):
+        out: dict[str, str] = {}
+        for lang in languages:
+            text = value.get(lang)
+            if text is None or text == "":
+                continue
+            if not isinstance(text, str):
+                raise ScriptInvalid(f"knowledge.{lang} must be text.", "knowledge")
+            text = text.strip()
+            if len(text) > MAX_KNOWLEDGE_CHARS:
+                raise ScriptInvalid(
+                    f"knowledge.{lang} must be at most {MAX_KNOWLEDGE_CHARS} characters.", "knowledge"
+                )
+            if text:
+                out[lang] = text
+        return out or None
+    raise ScriptInvalid("knowledge must be text, or text per language.", "knowledge")
 
 
 VARIABLE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
@@ -434,6 +497,12 @@ _QUESTION_WORDS = {
     "en": ["what", "why", "how", "when", "where", "who", "which", "can i", "can you", "could", "is it", "is there",
            "are there", "do i", "do you", "does", "should", "will", "i have a question", "question"],
 }
+_CONCERN_WORDS = {
+    "ar": ["خايف", "قلقان", "غالي", "مش عاجبني", "مش متاكد", "مقلق", "اعراض", "اعراض جانبيه",
+           "مش مرتاح", "وحشتني", "مش عايز", "بقلق"],
+    "en": ["worried", "worry", "concerned", "expensive", "afraid", "side effect", "side effects",
+           "anxious", "uncomfortable", "not sure", "concern"],
+}
 
 
 def looks_like_question(text: str, language: str) -> bool:
@@ -448,12 +517,30 @@ def looks_like_question(text: str, language: str) -> bool:
     return any(heard.startswith(" " + normalize_answer(w).strip() + " ") for w in words)
 
 
+def looks_like_concern(text: str, language: str) -> bool:
+    """A worry or complaint that is not a yes/no or a number answer."""
+    if yes_no(text) is not None:
+        return False
+    if len(digits_in(text)) >= 3:
+        return False
+    heard = normalize_answer(text)
+    words = _CONCERN_WORDS["ar"] + _CONCERN_WORDS["en"]
+    return any((" " + normalize_answer(w).strip() + " ") in heard for w in words)
+
+
 def match_faq(script: Mapping[str, Any], text: str, language: str) -> str | None:
     heard = normalize_answer(text)
     for item in script.get("faq") or []:
         if any(keyword in heard for keyword in _keywords(item["when"], language)):
             return item["key"]
     return None
+
+
+def knowledge_text(script: Mapping[str, Any], language: str) -> str:
+    knowledge = script.get("knowledge") or {}
+    if not isinstance(knowledge, Mapping):
+        return ""
+    return (knowledge.get(language) or next(iter(knowledge.values()), "") or "").strip()
 
 
 def off_script_text(script: Mapping[str, Any], language: str) -> str:
@@ -735,7 +822,7 @@ class VoiceEngine:
         if sum(1 for t in turns if t["role"] == "caller") >= MAX_CALLER_TURNS:
             # A route loop that never resolves must not keep a caller (and the line) forever.
             text, current = "", {**current, "max_attempts": attempt, "on_fail": "hangup"}
-        if text and intent and intent.get("kind") in ("faq", "off_script"):
+        if text and intent and intent.get("kind") in ("faq", "off_script", "knowledge"):
             language = session_language(session)
             persona = session_persona(session)
             turns.append({"role": "caller", "text": text})
@@ -747,15 +834,27 @@ class VoiceEngine:
                 answer = speak(faq["say"], language, persona)
                 bridge = speak(back_text(language), language, persona)
                 verbs += [{"say": answer, "key": f"__faq_{faq['key']}"}, {"say": bridge, "key": "__back__"}]
+            elif intent["kind"] == "knowledge" and (intent.get("answer") or "").strip():
+                # Live sentence from the knowledge payload; not a pre-rendered FAQ clip.
+                # Keep sentence punctuation for TTS (clean_answer is for CRM fields).
+                answer = " ".join(str(intent["answer"]).strip().split())
+                bridge = speak(back_text(language), language, persona)
+                verbs += [{"say": answer, "key": None, "live": True}, {"say": bridge, "key": "__back__"}]
             else:
                 answer = speak(off_script_text(script, language), language, persona)
                 verbs.append({"say": answer, "key": "__offscript__"})
             for verb in verbs:
                 turns.append({"role": "agent", "text": verb["say"]})
             next_turn = (session.get("turn") or 0) + 1
+            # A barge-in that was a question/concern must not clear a pending
+            # number confirmation: the same read-back is asked again.
             self.store.update_session(session["id"], turns=turns, answers=answers, turn=next_turn)
             # Same question, same attempt: asking something is not a failed answer.
-            verbs.append(self._gather_verb({**session, "turns": turns, "turn": next_turn}, current))
+            updated = {**session, "turns": turns, "turn": next_turn}
+            if session.get("confirming") is not None and current.get("confirm"):
+                verbs.append(self._confirm_verb(updated, current, session["confirming"]))
+            else:
+                verbs.append(self._gather_verb(updated, current))
             reply = _reply(script, verbs, language, persona)
         elif text and (session.get("confirming") is not None or current.get("confirm")):
             reply = self._confirm_flow(session, current, attempt, text, turns, answers)

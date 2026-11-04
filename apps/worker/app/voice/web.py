@@ -269,9 +269,18 @@ def register_web_routes(
         cached = store.reply_for(call_sid, f"{step}#{turn_no}" if turn_no is not None else step, attempt)
         if cached is not None:
             return JSONResponse(content=await _turn(audio, tenant_id, call_sid, cached, store, heard=None))
+        current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
+        # Digit-word second decode only for the first answer on a read-back
+        # question — never while confirming yes/no (would bias "أيوه").
+        digits_hint = bool(
+            current
+            and current.get("confirm")
+            and session.get("confirming") is None
+            and session["status"] == "in_progress"
+        )
         try:
             heard = await speech.transcribe(
-                answer, language=session_language(session), settings=settings
+                answer, language=session_language(session), settings=settings, digits_hint=digits_hint
             )
             if note is not None:
                 debug.record_heard(note, heard, transcribed=bool(answer))
@@ -282,8 +291,9 @@ def register_web_routes(
                 error_type="server_error",
             ) from exc
         intent = None
-        current = next((s for s in session["definition"]["steps"] if s["key"] == step), None)
-        if current is not None and session["status"] == "in_progress" and session.get("confirming") is None:
+        # FAQ / knowledge / off-script also apply during a pending number
+        # confirmation (and on barge-in): a question must not store a number.
+        if current is not None and session["status"] == "in_progress":
             intent = await assistant.intent(session["definition"], current, heard, session_language(session))
         if refiner is not None and intent is None and current is not None:
             # Kept until the call ends, then heard again by the accurate model (refine.py).
@@ -322,10 +332,15 @@ async def _turn(
                 )
             clips.append({"text": text, "audio": data_url, "source": source})
         elif text:
-            data_url, source = await audio.clip(
-                tenant_id=tenant_id, script=script, key=verb.get("key") or gather.get("step"),
-                language=language, text=text, persona=reply.get("persona"),
-            )
+            if verb.get("live"):
+                data_url, source = await audio.live_clip(
+                    script=script, language=language, persona=reply.get("persona"), text=text,
+                )
+            else:
+                data_url, source = await audio.clip(
+                    tenant_id=tenant_id, script=script, key=verb.get("key") or gather.get("step"),
+                    language=language, text=text, persona=reply.get("persona"),
+                )
             clips.append({"text": text, "audio": data_url, "source": source})
         if gather:
             listen = {

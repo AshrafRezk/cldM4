@@ -27,7 +27,7 @@ def debug_on():
 def fake_speech(monkeypatch):
     calls = []
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         calls.append(len(audio))
         return "Sara" if audio else ""
 

@@ -186,4 +186,20 @@
         <length>1000</length>
         <visibleLines>3</visibleLines>
     </fields>
+    <fields>
+        <fullName>Arabic_Knowledge__c</fullName>
+        <label>Arabic Knowledge</label>
+        <description>Optional. Facts the agent may paraphrase when a caller asks something no FAQ covers (Egyptian Arabic). Never invents beyond this text. Max ~4000 characters.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>6</visibleLines>
+    </fields>
+    <fields>
+        <fullName>English_Knowledge__c</fullName>
+        <label>English Knowledge</label>
+        <description>Optional. Facts the agent may paraphrase when a caller asks something no FAQ covers. Never invents beyond this text. Max ~4000 characters.</description>
+        <type>LongTextArea</type>
+        <length>4000</length>
+        <visibleLines>6</visibleLines>
+    </fields>
 </CustomObject>

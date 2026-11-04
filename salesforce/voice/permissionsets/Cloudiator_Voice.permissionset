@@ -68,5 +68,7 @@
     <fieldPermissions><field>Cloudiator_Voice_FAQ__c.English_Answer__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Off_Script__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Off_Script__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.Arabic_Knowledge__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
+    <fieldPermissions><field>Cloudiator_Voice_Script__c.English_Knowledge__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
     <fieldPermissions><field>Cloudiator_Voice_Question__c.Read_Back__c</field><editable>true</editable><readable>true</readable></fieldPermissions>
 </PermissionSet>

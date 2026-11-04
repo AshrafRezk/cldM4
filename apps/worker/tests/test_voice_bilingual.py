@@ -22,7 +22,7 @@ from tests.voice_fixture import bilingual, intake
 def fake_speech(monkeypatch):
     seen = {"languages": []}
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         seen["languages"].append(language)
         return "Sara Ahmed" if audio else ""
 

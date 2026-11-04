@@ -17,7 +17,7 @@ def fake_speech(monkeypatch):
     heard: list[str] = []
     calls = {"stt": 0}
 
-    async def transcribe(audio, *, language, settings):
+    async def transcribe(audio, *, language, settings, digits_hint=False):
         calls["stt"] += 1
         return heard.pop(0) if audio else ""
 
@@ -144,7 +144,7 @@ async def test_missing_stt_is_a_503_not_a_silent_skip(make_client, install_key, 
     async def synthesize(text, **kwargs):
         raise speech.SpeechUnavailable("no say here")
 
-    async def broken(audio, *, language, settings):
+    async def broken(audio, *, language, settings, digits_hint=False):
         raise speech.SpeechUnavailable("whisper model is missing")
 
     monkeypatch.setattr(speech, "synthesize", synthesize)
